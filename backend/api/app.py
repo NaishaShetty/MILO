@@ -204,9 +204,16 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # present, `VoiceAgent.is_available()` is simply `False` and
     # `routes/voice.py` reports a clean 503. Not simulator-gated: voice
     # is a pure network integration, same as the language agent.
-    app.state.voice_agent = VoiceAgent(
-        ElevenLabsClient.from_config(VoiceConfig.from_env())
-    )
+    # Also retained on its own so `routes/voice.py`'s `GET /voice`
+    # status endpoint can report `voice_id`/`enabled` even when the
+    # agent itself is unavailable (`ElevenLabsClient.from_config()`
+    # discards its config entirely when `enabled=False` -- see that
+    # method's docstring) -- Settings' "Speech & Voice" section needs
+    # to show the real configured voice ID regardless of whether
+    # voice is currently on.
+    voice_config = VoiceConfig.from_env()
+    app.state.voice_config = voice_config
+    app.state.voice_agent = VoiceAgent(ElevenLabsClient.from_config(voice_config))
 
     # See this module's docstring ("Why the VisionSystem construction
     # can fail without crashing the app") -- a missing AI2-THOR/Unity

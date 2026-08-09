@@ -45,6 +45,32 @@ class _FakeClient:
         return self._audio
 
 
+def test_voice_status_reports_honest_disabled_state_never_503(monkeypatch) -> None:
+    monkeypatch.delenv("VOICE_ENABLE_ELEVENLABS", raising=False)
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/voice")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {
+        "enabled": False,
+        "available": False,
+        "provider": "elevenlabs",
+        "voice_id": "ISnQja0Ank6t1FE2Wj07",
+    }
+
+
+def test_voice_status_never_exposes_an_api_key(monkeypatch) -> None:
+    monkeypatch.setenv("VOICE_ENABLE_ELEVENLABS", "true")
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "sk-should-never-appear")
+
+    with TestClient(app) as client:
+        response = client.get("/api/v1/voice")
+
+    assert "sk-should-never-appear" not in response.text
+
+
 def test_transcribe_reports_503_when_voice_disabled(monkeypatch) -> None:
     monkeypatch.delenv("VOICE_ENABLE_ELEVENLABS", raising=False)
 

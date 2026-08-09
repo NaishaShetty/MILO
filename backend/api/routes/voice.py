@@ -53,6 +53,39 @@ _STATUS_FOR_CODE = {
 }
 
 
+class VoiceStatusResponse(BaseModel):
+    """Response body for `GET /voice` -- real, current configuration.
+    Never includes the API key (see `voice/config.py`'s security note:
+    the key is never stored on `VoiceConfig` in the first place)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+    available: bool
+    provider: str = "elevenlabs"
+    voice_id: str
+
+
+@router.get(
+    "",
+    summary="Real ElevenLabs voice configuration status",
+    description=(
+        "Never 503s -- reports the real configured state (enabled/"
+        "available/voice_id) so a caller (e.g. Settings' Speech & "
+        "Voice section) can show an honest disabled state rather than "
+        "treating 'not configured' as an error."
+    ),
+)
+def get_voice_status(request: Request) -> VoiceStatusResponse:
+    config = request.app.state.voice_config
+    voice_agent: VoiceAgent = request.app.state.voice_agent
+    return VoiceStatusResponse(
+        enabled=config.enabled,
+        available=voice_agent.is_available(),
+        voice_id=config.voice_id,
+    )
+
+
 def get_voice_agent(request: Request) -> VoiceAgent:
     """FastAPI dependency returning the `VoiceAgent` constructed at
     application startup. Raises 503 if unavailable -- same pattern as
