@@ -22,10 +22,32 @@ Current contents
   3.9, `backend/requirements.txt`, and the system libraries
   `opencv-python` needs at runtime. Build from the repository root
   (see the root `README.md`'s "Engineering Infrastructure" section for
-  the exact commands). It packages the backend as it exists today
-  (Phases 1-3.5, including the Language Parsing Runtime and its output
-  validation/error recovery layer) and deliberately runs nothing by
-  default -- there is still no FastAPI service (Phase 3.7+).
+  the exact commands):
+
+  ```
+  docker build -f docker/Dockerfile -t vision-language-robotics-backend .
+  docker run --rm -p 8000:8000 vision-language-robotics-backend
+  ```
+
+  `COPY backend/ ./` packages the entire `backend/` tree as it exists
+  today -- not a fixed phase snapshot -- so later backend-only
+  additions (e.g. Phase 6 Memory, Phase 7 Agents/Orchestration) are
+  included automatically and have never required a Dockerfile change,
+  since none of them added a new system/Python dependency beyond what
+  `backend/requirements.txt` already declared.
+
+  By default the container runs the FastAPI service (`uvicorn
+  api.app:app --host 0.0.0.0 --port 8000`, published on `EXPOSE 8000`)
+  -- `GET /health` answers immediately with no configuration; routes
+  that need an LLM provider key (e.g. `POST /api/v1/language/parse`)
+  return a safe `503 configuration_error` until `OPENAI_API_KEY` /
+  `GEMINI_API_KEY` is passed via `docker run -e` (never baked into the
+  image). The same image doubles as a test/shell environment by
+  overriding `CMD`, e.g. `docker run --rm
+  vision-language-robotics-backend python -m pytest tests/`. Runs as a
+  non-root `appuser`. The frontend (`frontend/`) is a separate
+  Vite/Node project **not** built by this image -- see
+  `frontend/README.md`.
 
 Phase 5 (Execution)
 --------------------

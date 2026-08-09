@@ -8,12 +8,33 @@ __pycache__/
 .ruff_cache/
 
 # ----------------------------
-# Generated perception outputs
+# Locally downloaded wheels (e.g. backend/scripts/download_torch.py's
+# output) -- large binaries, reproducible via that script, never
+# committed.
 # ----------------------------
-outputs/*.png
-outputs/*.jpg
-outputs/*.jpeg
-!outputs/.gitkeep
+*.whl
+
+# ----------------------------
+# Generated perception outputs
+#
+# NOTE: these are rooted at backend/outputs/, not a top-level
+# outputs/ -- patterns must say so explicitly. A bare "outputs/*.png"
+# only matches a top-level outputs/ dir per gitignore's anchoring
+# rules (any pattern containing a non-trailing slash is rooted at the
+# .gitignore's own directory), so it silently never matched anything
+# here. Fixed as part of the Phase 8.1 audit.
+# ----------------------------
+backend/outputs/*.png
+backend/outputs/*.jpg
+backend/outputs/*.jpeg
+!backend/outputs/.gitkeep
+
+# ----------------------------
+# Generated runtime databases (memory store + vector store --
+# regenerate on first use from MEMORY_DATABASE_PATH /
+# MEMORY_VECTOR_STORE_PATH, see backend/.env.example)
+# ----------------------------
+backend/outputs/**/*.db
 
 # ----------------------------
 # Editor / OS
@@ -39,6 +60,16 @@ models/*
 results/*
 !results/.gitkeep
 !results/README.md
+
+# experiments/results/ holds raw benchmark run output (timestamped
+# json/csv), same nature as results/ above -- ignored by default so
+# future runs don't accumulate as tracked files. The
+# benchmark_20260809T120511Z run is a deliberate exception: it's the
+# cited reproducibility source for experiments/reports/phase6_4_report.md
+# (see that report's opening section) and stays tracked.
+experiments/results/*
+!experiments/results/benchmark_20260809T120511Z.json
+!experiments/results/benchmark_20260809T120511Z_episodes.csv
 
 # ----------------------------
 # Frontend (Phase 3.7 -- frontend/, Vite + React + TypeScript)
