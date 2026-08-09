@@ -284,6 +284,31 @@ class MemoryAgent:
             task_id=context.task_id,
         )
 
+    # -- listing --------------------------------------------------------
+
+    def list_memories(
+        self,
+        *,
+        memory_type: Optional[MemoryType] = None,
+        limit: Optional[int] = None,
+    ) -> List[Memory]:
+        """
+        Thin passthrough to `MemoryManager.list()` (`manager.py`),
+        newest first -- the read-only counterpart to `retrieve_relevant_
+        memories()` for callers that want an unranked listing/browse
+        view (e.g. the Phase 8.2 Memory API) rather than a query-scored
+        retrieval. Never raises: an unavailable memory subsystem or a
+        store error both degrade to an empty list, matching every other
+        method on this class.
+        """
+        if self._engine is None:
+            return []
+        try:
+            return self._engine.manager.list(memory_type=memory_type, limit=limit)
+        except Exception:
+            logger.warning("memory_agent.list_failed", exc_info=True)
+            return []
+
     # -- writes: episodic / failure / observation --------------------
 
     def remember_episode(

@@ -83,6 +83,15 @@ python-dotenv>=1.0
 openai-whisper>=20231117
 
 # ----------------------------
+# Voice (ElevenLabs, Phase 8.2)
+# ----------------------------
+# No new dependency needed: backend/voice/elevenlabs_client.py speaks
+# ElevenLabs' plain REST API via `requests` (already declared above),
+# the same "no provider SDK" choice language/llm_client.py documents
+# for Gemini. Opt-in via VOICE_ENABLE_ELEVENLABS=false (default) --
+# see voice/config.py.
+
+# ----------------------------
 # Dev / Static Analysis / Testing
 # ----------------------------
 mypy>=1.10

@@ -125,15 +125,19 @@ from fastapi.responses import JSONResponse
 from agents.memory_agent import MemoryAgentWrapper
 from agents.speech_agent import SpeechAgent
 from agents.vision_agent import VisionAgentWrapper
+from agents.voice_agent import VoiceAgent
 from api.routes.agents import router as agents_router
 from api.routes.execution import router as execution_router
 from api.routes.health import router as health_router
+from api.routes.lab import router as lab_router
 from api.routes.language import router as language_router
+from api.routes.memory import router as memory_router
 from api.routes.planner import router as planner_router
 from api.routes.speech import router as speech_router
 from api.routes.tasks import build_orchestrator
 from api.routes.tasks import router as tasks_router
 from api.routes.vision import router as vision_router
+from api.routes.voice import router as voice_router
 from language.agent import LanguageAgent
 from memory.agent import MemoryAgent
 from memory.config import MemoryConfig
@@ -141,6 +145,8 @@ from simulator.simulator import Simulator
 from speech.config import SpeechConfig
 from speech.whisper_client import WhisperTranscriber
 from vision.factory import DEPTH_SOURCE_GROUND_TRUTH, build_vision_system
+from voice.config import VoiceConfig
+from voice.elevenlabs_client import ElevenLabsClient
 
 # Loaded from an explicit path (backend/.env), not a bare
 # `load_dotenv()`, so it is found regardless of the working directory
@@ -190,6 +196,16 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # is simply `False` and `routes/speech.py` reports a clean 503.
     app.state.speech_agent = SpeechAgent(
         WhisperTranscriber.from_config(SpeechConfig.from_env())
+    )
+
+    # Built unconditionally, same rationale as `speech_agent` above:
+    # `ElevenLabsClient.from_config()` never raises -- when
+    # `VOICE_ENABLE_ELEVENLABS` is unset (default) or no API key is
+    # present, `VoiceAgent.is_available()` is simply `False` and
+    # `routes/voice.py` reports a clean 503. Not simulator-gated: voice
+    # is a pure network integration, same as the language agent.
+    app.state.voice_agent = VoiceAgent(
+        ElevenLabsClient.from_config(VoiceConfig.from_env())
     )
 
     # See this module's docstring ("Why the VisionSystem construction
@@ -331,12 +347,15 @@ app.add_middleware(
 )
 
 app.include_router(health_router)
+app.include_router(lab_router, prefix="/api/v1/lab", tags=["lab"])
 app.include_router(language_router, prefix="/api/v1/language", tags=["language"])
+app.include_router(memory_router, prefix="/api/v1/memory", tags=["memory"])
 app.include_router(planner_router, prefix="/api/v1/planner", tags=["planner"])
 app.include_router(vision_router, prefix="/api/v1/vision", tags=["vision"])
 app.include_router(execution_router, prefix="/api/v1/execution", tags=["execution"])
 app.include_router(tasks_router, prefix="/api/v1/tasks", tags=["tasks"])
 app.include_router(speech_router, prefix="/api/v1/speech", tags=["speech"])
+app.include_router(voice_router, prefix="/api/v1/voice", tags=["voice"])
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["agents"])
 
 
