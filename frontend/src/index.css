@@ -1527,14 +1527,14 @@ body {
   align-items: center;
   gap: 0.4rem;
   padding: 0.5rem 0.8rem;
-  border-radius: 8px;
-  background: #14161c;
-  border: 1px solid #1e2129;
+  border-radius: var(--milo-radius-sm);
+  background: var(--milo-surface-hover);
+  border: 1px solid var(--milo-border);
 }
 
 .memory-page__category-count {
   font-weight: 700;
-  color: #4f7cff;
+  color: var(--milo-accent-text);
 }
 
 .memory-page__search-row {
@@ -1545,47 +1545,70 @@ body {
 .memory-page__search-row input {
   flex: 1;
   padding: 0.5rem 0.7rem;
-  border-radius: 6px;
-  border: 1px solid #2a2e38;
-  background: #0f1115;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-border);
+  background: var(--milo-bg-elevated);
   color: inherit;
 }
 
 .memory-page__search-row button {
   padding: 0.5rem 1rem;
-  border-radius: 6px;
-  border: 1px solid #4f7cff;
-  background: #4f7cff;
-  color: #0f1115;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-accent);
+  background: var(--milo-accent);
+  color: #0a0a10;
   cursor: pointer;
 }
 
 .memory-page__search-label {
   display: block;
   font-size: 0.8rem;
-  color: #9aa0a6;
+  color: var(--milo-text-muted);
   margin-bottom: 0.3rem;
 }
 
+.memory-page__search-result ul {
+  list-style: none;
+  margin: var(--milo-space-sm) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.memory-page__search-result li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--milo-space-sm);
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--milo-radius-sm);
+  background: var(--milo-surface);
+}
+
+.memory-page__search-score {
+  flex-shrink: 0;
+}
+
 .memory-page__error {
-  color: #ff5252;
+  color: var(--milo-danger);
 }
 
 .memory-page__recent-item {
   display: flex;
   gap: 0.5rem;
   padding: 0.35rem 0;
-  border-bottom: 1px solid #1e2129;
+  border-bottom: 1px solid var(--milo-border);
   font-size: 0.85rem;
 }
 
 .memory-page__recent-type {
-  color: #4f7cff;
+  color: var(--milo-accent-text);
   white-space: nowrap;
 }
 
 .memory-page__recent-source {
-  color: #9aa0a6;
+  color: var(--milo-text-faint);
   white-space: nowrap;
 }
 
