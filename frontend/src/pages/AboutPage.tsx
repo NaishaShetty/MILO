@@ -8,7 +8,16 @@
 // No backend integration needed (spec: "This page does not require
 // complex backend integration") -- just static content plus links to
 // Home/Mission Control/MILO Lab.
+//
+// Phase 8.2 visual pass: hero with MiloCharacter + dialogue bubble,
+// "How MILO Works" as a card grid instead of a plain list -- every
+// stage name/description and every link/href is unchanged from the
+// original static content, only the surrounding markup/CSS changed.
 import { Link } from "react-router-dom";
+
+import { GlassCard } from "../components/GlassCard";
+import { MiloCharacter } from "../components/MiloCharacter";
+import { MiloDialogue } from "../components/MiloDialogue";
 
 const PIPELINE_STAGES: Array<{ stage: string; description: string }> = [
   {
@@ -59,8 +68,20 @@ export function AboutPage() {
   return (
     <main aria-label="About MILO" className="about-page">
       <h1>About MILO</h1>
-      <p className="about-page__greeting">Hi, I'm MILO.</p>
-      <p className="about-page__fullname">Memory Integrated Language Oriented Robot</p>
+
+      <section className="about-page__hero">
+        <div className="about-page__character">
+          <MiloCharacter state="idle" size="lg" />
+          <MiloDialogue text="Hey! I'm MILO 👋" />
+        </div>
+        <div className="about-page__intro">
+          <p className="about-page__greeting">Hi, I'm MILO.</p>
+          <p className="about-page__fullname">Memory Integrated Language Oriented Robot</p>
+          <Link to="/mission-control" className="about-page__talk-link">
+            Talk to MILO
+          </Link>
+        </div>
+      </section>
 
       <section aria-label="What is MILO" className="about-page__section">
         <h2>What is MILO?</h2>
@@ -79,13 +100,15 @@ export function AboutPage() {
 
       <section aria-label="How MILO Works" className="about-page__section">
         <h2>How MILO Works</h2>
-        <ol className="about-page__pipeline">
-          {PIPELINE_STAGES.map(({ stage, description }) => (
-            <li key={stage}>
-              <strong>{stage}</strong> — {description}
-            </li>
+        <div className="about-page__pipeline">
+          {PIPELINE_STAGES.map(({ stage, description }, index) => (
+            <GlassCard key={stage} className="about-page__pipeline-card">
+              <span className="about-page__pipeline-index">{index + 1}</span>
+              <strong className="about-page__pipeline-stage">{stage}</strong>
+              <p className="about-page__pipeline-description">{description}</p>
+            </GlassCard>
           ))}
-        </ol>
+        </div>
       </section>
 
       <section aria-label="Explore MILO" className="about-page__section">

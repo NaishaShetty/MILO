@@ -1809,15 +1809,53 @@ body {
 }
 
 /* About page */
+.about-page__hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: var(--milo-space-xl);
+  margin: var(--milo-space-lg) 0 var(--milo-space-xl);
+}
+
+@media (max-width: 900px) {
+  .about-page__hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+.about-page__character {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.about-page__character .milo-dialogue {
+  position: absolute;
+  top: 0;
+  right: -1rem;
+}
+
 .about-page__greeting {
-  font-size: 1.4rem;
+  font-size: 2.5rem;
   font-weight: 700;
   margin: 0.5rem 0 0;
+  color: var(--milo-text);
 }
 
 .about-page__fullname {
-  color: #9aa0a6;
+  color: var(--milo-text-muted);
   margin: 0.1rem 0 1rem;
+}
+
+.about-page__talk-link {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--milo-radius-sm);
+  background: var(--milo-accent);
+  color: #0a0a10;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .about-page__section {
@@ -1825,10 +1863,37 @@ body {
 }
 
 .about-page__pipeline {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--milo-space-md);
+}
+
+@media (max-width: 900px) {
+  .about-page__pipeline {
+    grid-template-columns: 1fr;
+  }
+}
+
+.about-page__pipeline-card {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding-left: 1.2rem;
+  gap: 0.35rem;
+}
+
+.about-page__pipeline-index {
+  color: var(--milo-accent-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.about-page__pipeline-stage {
+  color: var(--milo-text);
+}
+
+.about-page__pipeline-description {
+  margin: 0;
+  color: var(--milo-text-muted);
+  font-size: 0.88rem;
 }
 
 .about-page__links {
@@ -1839,9 +1904,9 @@ body {
 
 .about-page__links a {
   padding: 0.5rem 1rem;
-  border-radius: 6px;
-  border: 1px solid #4f7cff;
-  color: #4f7cff;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-accent);
+  color: var(--milo-accent-text);
   text-decoration: none;
 }
 
