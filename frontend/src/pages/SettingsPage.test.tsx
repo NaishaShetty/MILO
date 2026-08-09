@@ -8,10 +8,16 @@ import { SettingsPage } from "./SettingsPage";
 import { SettingsProvider } from "../state/SettingsContext";
 import { TaskProvider } from "../state/TaskContext";
 import * as tasksApi from "../api/tasks";
+import * as voiceApi from "../api/voice";
 
 vi.mock("../api/tasks", async () => {
   const actual = await vi.importActual<typeof import("../api/tasks")>("../api/tasks");
   return { ...actual, listTasks: vi.fn(), getTask: vi.fn(), getTaskEvents: vi.fn() };
+});
+
+vi.mock("../api/voice", async () => {
+  const actual = await vi.importActual<typeof import("../api/voice")>("../api/voice");
+  return { ...actual, getVoiceStatus: vi.fn() };
 });
 
 function renderPage() {
@@ -30,6 +36,9 @@ beforeEach(() => {
   window.localStorage.clear();
   vi.mocked(tasksApi.listTasks).mockReset().mockResolvedValue([]);
   vi.mocked(tasksApi.getTaskEvents).mockReset().mockResolvedValue([]);
+  vi.mocked(voiceApi.getVoiceStatus)
+    .mockReset()
+    .mockResolvedValue({ enabled: false, available: false, provider: "elevenlabs", voice_id: "ISnQja0Ank6t1FE2Wj07" });
   document.documentElement.removeAttribute("data-theme");
 });
 
