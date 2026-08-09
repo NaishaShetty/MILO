@@ -2,151 +2,218 @@
 //
 // Purpose
 // -------
-// "How is the system working technically?" -- the research/debugging
-// dashboard. Every number here is computed from real data already in
-// `TaskContext` (`history`, `activeTask`) or `AgentsContext`; there is
-// no experiment-tracking system anywhere in this repo (Session 3
-// audit), so "Recent Experiments" says so plainly instead of
-// fabricating a history, and shows the real Lab Stats in its place, as
-// the plan calls for.
-import { useMemo } from "react";
+// "How is the system working technically?" -- the research/
+// experimentation dashboard. Phase 8.2 wires this to the real MILO Lab
+// API (`backend/api/routes/lab.py`): "Recent Experiments" lists real
+// persisted benchmark runs and can trigger a new one; "My Sandbox" is
+// a real parse+plan dry run (never touches the simulator); "Lab Stats"
+// comes from the backend's own aggregation. "Tune Parameters"/"Upload
+// Custom Data" are intentionally NOT built as full features here --
+// see `backend/api/routes/lab.py`'s module docstring for why (env-
+// derived config isn't live-mutable without a real architecture
+// change) -- "Tune Parameters" links to Settings' real read-only
+// config display instead of a fake toggle.
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import type { FormEvent } from "react";
 
 import { AgentStatusList } from "../components/AgentStatusList";
+import { GlassCard } from "../components/GlassCard";
+import { StatusPill } from "../components/StatusPill";
+import { getLabStats, listExperiments, runPerceptionExperiment, runSandbox } from "../api/lab";
+import type { ExperimentSummary, LabStatsResponse, SandboxResponse } from "../api/labTypes";
 import { useAgents } from "../state/AgentsContext";
 import { useTask } from "../state/TaskContext";
+import { usePolling } from "../hooks/usePolling";
 
 const ALL_AGENTS = ["vision", "memory", "planner", "navigation", "execution", "reflection", "speech"];
-
-function formatMs(ms: number | null): string {
-  if (ms == null) return "unavailable";
-  return ms < 1000 ? `${ms.toFixed(0)} ms` : `${(ms / 1000).toFixed(1)} s`;
-}
+const POLL_INTERVAL_MS = 10000;
 
 function formatPercent(fraction: number | null): string {
   if (fraction == null) return "unavailable";
   return `${(fraction * 100).toFixed(0)}%`;
 }
 
+function ExperimentRow({ experiment }: { experiment: ExperimentSummary }) {
+  return (
+    <li className="lab-page__experiment">
+      <span className="lab-page__experiment-id">{experiment.run_id}</span>
+      <StatusPill tone="info">{experiment.experiment_type}</StatusPill>
+      <span className="lab-page__experiment-time">
+        {new Date(experiment.timestamp).toLocaleString()}
+      </span>
+    </li>
+  );
+}
+
 export function LabPage() {
-  const { history, activeTask, activeTaskId, events } = useTask();
+  const { activeTaskId, events } = useTask();
   const { agents, status: agentsStatus } = useAgents();
 
-  const stats = useMemo(() => {
-    const tasksRun = history.length;
-    if (tasksRun === 0) {
-      return {
-        tasksRun: 0,
-        successRate: null as number | null,
-        totalActions: 0,
-        memoriesCreated: 0,
-        failures: 0,
-        replans: 0,
-        avgTaskMs: null as number | null,
-      };
+  const experimentsResult = usePolling(listExperiments, { intervalMs: POLL_INTERVAL_MS, enabled: true });
+  const statsResult = usePolling(getLabStats, { intervalMs: POLL_INTERVAL_MS, enabled: true });
+
+  const [runningPerception, setRunningPerception] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const [sandboxState, setSandboxState] = useState<
+    { status: "idle" } | { status: "loading" } | { status: "success"; data: SandboxResponse } | { status: "error"; message: string }
+  >({ status: "idle" });
+
+  const stats: LabStatsResponse = statsResult.data ?? {
+    experiments_run: 0,
+    task_success_rate: null,
+    total_actions: 0,
+    memories_created: 0,
+    tasks_run: 0,
+  };
+
+  async function handleRunPerception() {
+    setRunningPerception(true);
+    try {
+      await runPerceptionExperiment();
+      experimentsResult.refresh();
+      statsResult.refresh();
+    } finally {
+      setRunningPerception(false);
     }
-    const successCount = history.filter((task) => task.metrics.success).length;
-    const totalActions = history.reduce((sum, task) => sum + task.metrics.actions, 0);
-    const memoriesCreated = history.reduce((sum, task) => sum + task.created_memories.length, 0);
-    const failures = history.reduce((sum, task) => sum + task.metrics.failures, 0);
-    const replans = history.reduce((sum, task) => sum + task.metrics.replans, 0);
-    const durations = history
-      .map((task) => task.metrics.total_ms)
-      .filter((ms): ms is number => ms != null);
-    const avgTaskMs = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : null;
+  }
 
-    return {
-      tasksRun,
-      successRate: successCount / tasksRun,
-      totalActions,
-      memoriesCreated,
-      failures,
-      replans,
-      avgTaskMs,
-    };
-  }, [history]);
-
-  const latestPlannerType = history.find((task) => task.current_plan)?.current_plan?.planner_type ?? null;
+  async function handleSandboxSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = instruction.trim();
+    if (!trimmed || sandboxState.status === "loading") return;
+    setSandboxState({ status: "loading" });
+    try {
+      const data = await runSandbox(trimmed);
+      setSandboxState({ status: "success", data });
+    } catch (error) {
+      setSandboxState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Sandbox request failed.",
+      });
+    }
+  }
 
   return (
     <main aria-label="MILO Lab" className="lab-page">
       <h1>MILO Lab</h1>
 
-      <section aria-label="Quick Start" className="lab-page__section">
-        <h2>Quick Start</h2>
-        <div className="lab-page__quick-start">
-          <Link to="/" className="lab-page__action">
-            Try a New Instruction
-          </Link>
-          <Link to="/mission-control" className="lab-page__action">
-            Test a Scenario
-          </Link>
-          <Link to="/settings" className="lab-page__action">
-            Tune Parameters
-          </Link>
-        </div>
-      </section>
+      <GlassCard title="Quick Start" className="lab-page__section">
+        <section aria-label="Quick Start">
+          <div className="lab-page__quick-start">
+            <Link to="/" className="lab-page__action">
+              Try a New Instruction
+            </Link>
+            <Link to="/mission-control" className="lab-page__action">
+              Test a Scenario
+            </Link>
+            <Link to="/settings" className="lab-page__action">
+              Tune Parameters
+            </Link>
+          </div>
+        </section>
+      </GlassCard>
 
-      <section aria-label="Recent Experiments" className="lab-page__section">
-        <h2>Recent Experiments</h2>
-        <p>No experiment framework connected — showing live task metrics instead (Lab Stats below).</p>
-      </section>
+      <GlassCard title="Recent Experiments" className="lab-page__section">
+        <section aria-label="Recent Experiments">
+          <button
+            type="button"
+            className="lab-page__run-experiment"
+            onClick={() => void handleRunPerception()}
+            disabled={runningPerception}
+          >
+            {runningPerception ? "Running..." : "Run Perception Benchmark"}
+          </button>
+          {experimentsResult.status !== "loading" && experimentsResult.data?.experiments.length === 0 && (
+            <p>No experiments have been run yet.</p>
+          )}
+          {experimentsResult.data && experimentsResult.data.experiments.length > 0 && (
+            <ul className="lab-page__experiments">
+              {experimentsResult.data.experiments.map((experiment) => (
+                <ExperimentRow key={experiment.run_id} experiment={experiment} />
+              ))}
+            </ul>
+          )}
+        </section>
+      </GlassCard>
 
-      <section aria-label="My Sandbox" className="lab-page__section">
-        <h2>My Sandbox</h2>
-        {!activeTaskId && <p>No active task.</p>}
-        {activeTask && (
-          <dl className="lab-page__sandbox">
-            <dt>Current task</dt>
-            <dd>{activeTask.user_request}</dd>
-            <dt>Current plan</dt>
+      <GlassCard title="My Sandbox" className="lab-page__section">
+        <section aria-label="My Sandbox">
+          <p className="lab-page__readonly-note">
+            Dry run only -- parses and plans a real instruction without touching the simulator.
+          </p>
+          <form onSubmit={handleSandboxSubmit} className="lab-page__sandbox-form">
+            <label htmlFor="lab-sandbox-input">Try an instruction</label>
+            <div className="lab-page__sandbox-row">
+              <input
+                id="lab-sandbox-input"
+                type="text"
+                placeholder="Put the apple in the refrigerator"
+                value={instruction}
+                onChange={(event) => setInstruction(event.target.value)}
+                disabled={sandboxState.status === "loading"}
+              />
+              <button type="submit" disabled={sandboxState.status === "loading" || instruction.trim().length === 0}>
+                {sandboxState.status === "loading" ? "Running..." : "Run"}
+              </button>
+            </div>
+          </form>
+          {sandboxState.status === "error" && (
+            <p className="memory-page__error" role="alert">
+              {sandboxState.message}
+            </p>
+          )}
+          {sandboxState.status === "success" && (
+            <dl className="lab-page__sandbox">
+              <dt>Parsed task</dt>
+              <dd>
+                {sandboxState.data.parsed.task_type === "single"
+                  ? `${sandboxState.data.parsed.goal ?? "unknown goal"} ${sandboxState.data.parsed.object ?? ""}`.trim()
+                  : "Multi-step task (not supported in sandbox)"}
+              </dd>
+              <dt>Plan</dt>
+              <dd>
+                {sandboxState.data.unsupported_reason
+                  ? sandboxState.data.unsupported_reason
+                  : sandboxState.data.plan?.plan
+                    ? `${sandboxState.data.plan.plan.steps.length} step(s), ${sandboxState.data.plan.planner_type}`
+                    : "No plan produced."}
+              </dd>
+            </dl>
+          )}
+        </section>
+      </GlassCard>
+
+      <GlassCard title="Lab Stats" className="lab-page__section">
+        <section aria-label="Lab Stats">
+          <ul className="lab-page__stats">
+            <li>Experiments run: {stats.experiments_run}</li>
+            <li>Tasks run: {stats.tasks_run}</li>
+            <li>Success rate: {formatPercent(stats.task_success_rate)}</li>
+            <li>Total actions: {stats.total_actions}</li>
+            <li>Memories created: {stats.memories_created}</li>
+          </ul>
+        </section>
+      </GlassCard>
+
+      <GlassCard title="Technical System Information" className="lab-page__section">
+        <section aria-label="Technical System Information">
+          <p>Active agents:</p>
+          <AgentStatusList names={ALL_AGENTS} />
+          <dl className="lab-page__technical">
+            <dt>Simulator / environment</dt>
             <dd>
-              {activeTask.current_plan
-                ? `${activeTask.current_plan.steps.length} step(s), ${activeTask.current_plan.planner_type}`
-                : "No plan yet."}
+              {agentsStatus === "success" && agents.length > 0
+                ? "Orchestrator/simulator reachable (agents registered)"
+                : "Not reachable — no agents registered (simulator likely disabled)"}
             </dd>
-            <dt>Current observation</dt>
-            <dd>{activeTask.observations.length > 0 ? `${activeTask.observations.length} observation(s) recorded` : "None yet."}</dd>
-            <dt>Current action</dt>
-            <dd>{activeTask.current_step != null ? `Step ${activeTask.current_step}` : "None yet."}</dd>
-            <dt>Status</dt>
-            <dd>{activeTask.status}</dd>
+            <dt>Task state</dt>
+            <dd>{activeTaskId ? activeTaskId : "No active task"}</dd>
+            <dt>Event state</dt>
+            <dd>{events.length} event(s) recorded for the active task</dd>
           </dl>
-        )}
-      </section>
-
-      <section aria-label="Lab Stats" className="lab-page__section">
-        <h2>Lab Stats</h2>
-        <ul className="lab-page__stats">
-          <li>Tasks run: {stats.tasksRun}</li>
-          <li>Success rate: {formatPercent(stats.successRate)}</li>
-          <li>Total actions: {stats.totalActions}</li>
-          <li>Memories created: {stats.memoriesCreated}</li>
-          <li>Failures: {stats.failures}</li>
-          <li>Replans: {stats.replans}</li>
-          <li>Average task time: {formatMs(stats.avgTaskMs)}</li>
-        </ul>
-      </section>
-
-      <section aria-label="Technical System Information" className="lab-page__section">
-        <h2>Technical System Information</h2>
-        <p>Active agents:</p>
-        <AgentStatusList names={ALL_AGENTS} />
-        <dl className="lab-page__technical">
-          <dt>Planner</dt>
-          <dd>{latestPlannerType ?? "unknown (no task has run yet)"}</dd>
-          <dt>Simulator / environment</dt>
-          <dd>
-            {agentsStatus === "success" && agents.length > 0
-              ? "Orchestrator/simulator reachable (agents registered)"
-              : "Not reachable — no agents registered (simulator likely disabled)"}
-          </dd>
-          <dt>Task state</dt>
-          <dd>{activeTaskId ? `${activeTaskId} (${activeTask?.status ?? "unknown"})` : "No active task"}</dd>
-          <dt>Event state</dt>
-          <dd>{events.length} event(s) recorded for the active task</dd>
-        </dl>
-      </section>
+        </section>
+      </GlassCard>
     </main>
   );
 }

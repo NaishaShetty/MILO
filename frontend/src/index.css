@@ -1923,16 +1923,102 @@ body {
 
 .lab-page__action {
   padding: 0.5rem 1rem;
-  border-radius: 6px;
-  border: 1px solid #4f7cff;
-  color: #4f7cff;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-accent);
+  color: var(--milo-accent-text);
   text-decoration: none;
+}
+
+.lab-page__readonly-note {
+  font-size: 0.8rem;
+  color: var(--milo-text-faint);
+  font-style: italic;
+  margin-top: 0;
+}
+
+.lab-page__run-experiment {
+  padding: 0.5rem 1rem;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-accent);
+  background: var(--milo-accent);
+  color: #0a0a10;
+  cursor: pointer;
+  margin-bottom: var(--milo-space-md);
+}
+
+.lab-page__run-experiment:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lab-page__experiments {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.lab-page__experiment {
+  display: flex;
+  align-items: center;
+  gap: var(--milo-space-sm);
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--milo-radius-sm);
+  background: var(--milo-surface);
+  font-size: 0.85rem;
+}
+
+.lab-page__experiment-id {
+  font-family: monospace;
+  color: var(--milo-text);
+}
+
+.lab-page__experiment-time {
+  margin-left: auto;
+  color: var(--milo-text-faint);
+}
+
+.lab-page__sandbox-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: var(--milo-space-sm);
+}
+
+.lab-page__sandbox-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.lab-page__sandbox-row input {
+  flex: 1;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-border);
+  background: var(--milo-bg-elevated);
+  color: inherit;
+}
+
+.lab-page__sandbox-row button {
+  padding: 0.5rem 1rem;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-accent);
+  background: var(--milo-accent);
+  color: #0a0a10;
+  cursor: pointer;
+}
+
+.lab-page__sandbox-row button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .lab-page__sandbox dt,
 .lab-page__technical dt {
   font-size: 0.75rem;
-  color: #9aa0a6;
+  color: var(--milo-text-faint);
   margin-top: 0.6rem;
 }
 
@@ -1952,9 +2038,9 @@ body {
 
 .lab-page__stats li {
   padding: 0.5rem 0.8rem;
-  border-radius: 8px;
-  background: #14161c;
-  border: 1px solid #1e2129;
+  border-radius: var(--milo-radius-sm);
+  background: var(--milo-surface-hover);
+  border: 1px solid var(--milo-border);
   font-size: 0.85rem;
 }
 
