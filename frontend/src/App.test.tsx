@@ -40,7 +40,7 @@ vi.mock("./api/tasks", async () => {
 describe("App routing", () => {
   it("shows the MILO brand and renders Home at /", async () => {
     render(<App />);
-    expect(screen.getByText("MILO")).toBeInTheDocument();
+    expect(screen.getAllByText("MILO").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Memory Integrated Language Oriented Robot").length).toBeGreaterThan(0);
     expect(await screen.findByRole("heading", { name: "Home" })).toBeInTheDocument();
   });

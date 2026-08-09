@@ -78,7 +78,8 @@ beforeEach(() => {
 describe("HomePage", () => {
   it("greets the user as MILO and explains what it does", async () => {
     renderHome();
-    expect(screen.getByText("Hi, I'm MILO.")).toBeInTheDocument();
+    expect(screen.getByText("Hi, I'm")).toBeInTheDocument();
+    expect(screen.getByText("MILO")).toBeInTheDocument();
     expect(screen.getByText("Memory Integrated Language Oriented Robot")).toBeInTheDocument();
     await waitFor(() => expect(tasksApi.listTasks).toHaveBeenCalled());
   });

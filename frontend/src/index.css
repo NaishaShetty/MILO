@@ -1310,50 +1310,157 @@ body {
 }
 
 /* Home page */
+.home-page__hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--milo-space-xl);
+  margin: var(--milo-space-lg) 0 var(--milo-space-xl);
+}
+
+@media (max-width: 900px) {
+  .home-page__hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+.home-page__intro h1 {
+  /* The literal page title -- kept visually de-emphasized (small,
+   * muted) since the mockup's real hero heading is the "Hi, I'm
+   * MILO" treatment just below it; this h1 stays for the App-level
+   * routing test's "one h1 == the nav link label" convention. */
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--milo-text-faint);
+  font-weight: 500;
+  margin: 0 0 var(--milo-space-md);
+}
+
+.home-page__greeting-eyebrow {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--milo-text-muted);
+}
+
 .home-page__greeting {
-  font-size: 1.4rem;
+  font-size: 3.2rem;
   font-weight: 700;
-  margin: 0.5rem 0 0;
+  letter-spacing: 0.02em;
+  margin: 0.1rem 0 0;
+  background: linear-gradient(90deg, var(--milo-text), var(--milo-accent-text));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .home-page__fullname {
-  color: #9aa0a6;
+  color: var(--milo-text-muted);
   margin: 0.1rem 0 0.75rem;
 }
 
-.home-page__glance,
-.home-page__recent-mission,
-.home-page__latest-memory {
-  margin: 1.5rem 0;
+.home-page__description {
+  color: var(--milo-text-muted);
+  max-width: 52ch;
+}
+
+.home-page__character {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-page__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--milo-space-lg);
+  margin: var(--milo-space-xl) 0;
+}
+
+@media (max-width: 900px) {
+  .home-page__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.home-page__glance .status-pill {
+  margin-bottom: var(--milo-space-md);
 }
 
 .home-page__mission-card {
   padding: 0.75rem 1rem;
-  border-radius: 8px;
-  background: #14161c;
-  border: 1px solid #1e2129;
+  border-radius: var(--milo-radius-sm);
+  background: var(--milo-surface-hover);
+  border: 1px solid var(--milo-border);
+}
+
+.home-page__mission-request {
+  font-weight: 600;
+  margin: 0 0 0.25rem;
 }
 
 /* Mission Control */
+.mission-control > h1 {
+  margin-bottom: var(--milo-space-lg);
+}
+
+.mission-control__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--milo-space-lg);
+  align-items: start;
+}
+
+.mission-control__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--milo-space-lg);
+}
+
+.mission-control__eyes,
+.mission-control__talk,
+.mission-control__plan,
+.mission-control__location,
+.mission-control__activity {
+  grid-column: span 1;
+}
+
+@media (max-width: 1100px) {
+  .mission-control__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .mission-control__section {
   margin: 1.5rem 0;
 }
 
 .mission-control__mission-card {
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  background: #14161c;
-  border: 1px solid #1e2129;
+  display: flex;
+  flex-direction: column;
+  gap: var(--milo-space-sm);
+  align-items: flex-start;
+}
+
+.mission-control__mission-request {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0;
 }
 
 .mission-control__cancel {
   margin-top: 0.5rem;
   padding: 0.5rem 1rem;
-  border-radius: 6px;
-  border: 1px solid #ff5252;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-danger);
   background: transparent;
-  color: #ff5252;
+  color: var(--milo-danger);
   cursor: pointer;
+  transition: background var(--milo-transition-fast);
+}
+
+.mission-control__cancel:hover:not(:disabled) {
+  background: var(--milo-danger-soft);
 }
 
 .mission-control__cancel:disabled {
@@ -1362,8 +1469,14 @@ body {
 }
 
 .mission-control__cancelled {
-  color: #9aa0a6;
+  color: var(--milo-text-muted);
   margin-top: 0.5rem;
+}
+
+.mission-control__status-body {
+  display: flex;
+  align-items: center;
+  gap: var(--milo-space-md);
 }
 
 .mission-control__events {
@@ -1373,7 +1486,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  max-height: 260px;
+  max-height: 320px;
   overflow-y: auto;
 }
 
@@ -1381,17 +1494,18 @@ body {
   display: flex;
   gap: 0.6rem;
   font-size: 0.85rem;
-  padding: 0.25rem 0;
-  border-bottom: 1px solid #1e2129;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--milo-border);
+  animation: milo-dialogue-in var(--milo-transition-medium);
 }
 
 .mission-control__event-time {
-  color: #9aa0a6;
+  color: var(--milo-text-faint);
   font-variant-numeric: tabular-nums;
 }
 
 .mission-control__event-agent {
-  color: #4f7cff;
+  color: var(--milo-accent-text);
 }
 
 /* Memory page */

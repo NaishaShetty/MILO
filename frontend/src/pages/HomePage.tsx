@@ -9,8 +9,20 @@
 // /tasks`) directly for "Recent Mission"/"Latest Memory" -- both are
 // real data or an explicit empty state, never a fabricated number
 // (spec Part 12/13).
-import { TalkToMilo } from "../components/TalkToMilo";
+//
+// Phase 8.2 visual pass: hero (MiloCharacter + greeting) and a 3-card
+// glance/mission/memory row, matching the Home mockup's composition.
+// `AgentStatusList`'s per-agent rows already avoid fabricating
+// "Online" (see that component's docstring) -- this page does not add
+// a second, invented "All systems operational" claim on top of that;
+// the "systems" summary below is instead computed from the same real
+// per-agent states already rendered.
 import { AgentStatusList } from "../components/AgentStatusList";
+import { GlassCard } from "../components/GlassCard";
+import { MiloCharacter } from "../components/MiloCharacter";
+import { StatusPill } from "../components/StatusPill";
+import { TalkToMilo } from "../components/TalkToMilo";
+import { useAgents } from "../state/AgentsContext";
 import { useTask } from "../state/TaskContext";
 
 const QUICK_EXAMPLES = [
@@ -30,58 +42,86 @@ function formatElapsed(totalMs: number | null | undefined): string | null {
 
 export function HomePage() {
   const { history, historyStatus } = useTask();
+  const { agents, status: agentsStatus } = useAgents();
   const recentMission = history[0] ?? null;
   const latestMemory = recentMission
     ? (recentMission.created_memories[0] ?? recentMission.retrieved_memories[0] ?? null)
     : null;
 
+  // Real, not invented: "all operational" only when every agent this
+  // process has actually registered reports a non-error state -- an
+  // empty registry (no simulator yet) is reported honestly, never as
+  // "operational".
+  const hasErrorAgent = agents.some((agent) => agent.state === "error");
+  const systemsSummary =
+    agentsStatus === "error"
+      ? "Agent status unavailable"
+      : agents.length === 0
+        ? "No agents registered yet"
+        : hasErrorAgent
+          ? "Attention needed"
+          : "All systems operational";
+
   return (
     <main aria-label="Home" className="home-page">
-      <section className="home-page__intro">
-        <h1>Home</h1>
-        <p className="home-page__greeting">Hi, I'm MILO.</p>
-        <p className="home-page__fullname">Memory Integrated Language Oriented Robot</p>
-        <p className="home-page__description">
-          I perceive the scene in front of me, remember what I've learned, plan a sequence of
-          actions to reach a goal, navigate a simulated home, act on it, reflect on what happened,
-          replan when something goes wrong, and remember the outcome for next time.
-        </p>
+      <section className="home-page__hero">
+        <div className="home-page__intro">
+          <h1>Home</h1>
+          <p className="home-page__greeting-eyebrow">Hi, I'm</p>
+          <p className="home-page__greeting">MILO</p>
+          <p className="home-page__fullname">Memory Integrated Language Oriented Robot</p>
+          <p className="home-page__description">
+            I see the world, understand what you say, remember what I learn, and figure out the
+            best way to help.
+          </p>
+        </div>
+        <div className="home-page__character">
+          <MiloCharacter state="idle" size="lg" />
+        </div>
       </section>
 
       <TalkToMilo quickExamples={QUICK_EXAMPLES} />
 
-      <section aria-label="MILO At a Glance" className="home-page__glance">
-        <h2>MILO At a Glance</h2>
-        <AgentStatusList names={GLANCE_AGENTS} />
-      </section>
+      <div className="home-page__grid">
+        <GlassCard title="MILO At a Glance" className="home-page__glance">
+          <section aria-label="MILO At a Glance">
+            <StatusPill tone={hasErrorAgent ? "danger" : "success"} dot>
+              {systemsSummary}
+            </StatusPill>
+            <AgentStatusList names={GLANCE_AGENTS} />
+          </section>
+        </GlassCard>
 
-      <section aria-label="Recent Mission" className="home-page__recent-mission">
-        <h2>Recent Mission</h2>
-        {historyStatus === "loading" && !recentMission && <p>Loading...</p>}
-        {historyStatus !== "loading" && !recentMission && <p>No missions yet.</p>}
-        {recentMission && (
-          <div className="home-page__mission-card">
-            <p className="home-page__mission-request">{recentMission.user_request}</p>
-            <p className="home-page__mission-status">Status: {recentMission.status}</p>
-            {formatElapsed(recentMission.metrics.total_ms) && (
-              <p className="home-page__mission-elapsed">
-                Took {formatElapsed(recentMission.metrics.total_ms)}
+        <GlassCard title="Recent Mission" className="home-page__recent-mission">
+          <section aria-label="Recent Mission">
+            {historyStatus === "loading" && !recentMission && <p>Loading...</p>}
+            {historyStatus !== "loading" && !recentMission && <p>No missions yet.</p>}
+            {recentMission && (
+              <div className="home-page__mission-card">
+                <p className="home-page__mission-request">{recentMission.user_request}</p>
+                <p className="home-page__mission-status">Status: {recentMission.status}</p>
+                {formatElapsed(recentMission.metrics.total_ms) && (
+                  <p className="home-page__mission-elapsed">
+                    Took {formatElapsed(recentMission.metrics.total_ms)}
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+        </GlassCard>
+
+        <GlassCard title="Latest Memory" className="home-page__latest-memory">
+          <section aria-label="Latest Memory">
+            {!latestMemory && <p>No memories yet.</p>}
+            {latestMemory && (
+              <p className="home-page__memory-content">
+                {typeof latestMemory.content === "string" ? latestMemory.content : "One new memory."}
+                {latestMemory.memory_type ? ` (${latestMemory.memory_type})` : ""}
               </p>
             )}
-          </div>
-        )}
-      </section>
-
-      <section aria-label="Latest Memory" className="home-page__latest-memory">
-        <h2>Latest Memory</h2>
-        {!latestMemory && <p>No memories yet.</p>}
-        {latestMemory && (
-          <p className="home-page__memory-content">
-            {typeof latestMemory.content === "string" ? latestMemory.content : "One new memory."}
-            {latestMemory.memory_type ? ` (${latestMemory.memory_type})` : ""}
-          </p>
-        )}
-      </section>
+          </section>
+        </GlassCard>
+      </div>
     </main>
   );
 }
