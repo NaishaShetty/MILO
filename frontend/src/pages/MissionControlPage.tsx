@@ -52,7 +52,7 @@ export function MissionControlPage() {
 
   return (
     <main aria-label="Mission Control" className="mission-control">
-      <h1>🎮 Mission Control</h1>
+      <h1>Mission Control</h1>
 
       <section aria-label="MILO's Eyes" className="mission-control__section">
         <h2>MILO's Eyes</h2>

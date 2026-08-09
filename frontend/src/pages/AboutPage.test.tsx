@@ -39,11 +39,11 @@ describe("AboutPage", () => {
 
   it("links to Home, Mission Control, and MILO Lab", () => {
     renderPage();
-    expect(screen.getByRole("link", { name: "🏠 Home" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "🎮 Mission Control" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Mission Control" })).toHaveAttribute(
       "href",
       "/mission-control",
     );
-    expect(screen.getByRole("link", { name: "🔬 MILO Lab" })).toHaveAttribute("href", "/lab");
+    expect(screen.getByRole("link", { name: "MILO Lab" })).toHaveAttribute("href", "/lab");
   });
 });

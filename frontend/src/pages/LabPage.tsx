@@ -70,7 +70,7 @@ export function LabPage() {
 
   return (
     <main aria-label="MILO Lab" className="lab-page">
-      <h1>🔬 MILO Lab</h1>
+      <h1>MILO Lab</h1>
 
       <section aria-label="Quick Start" className="lab-page__section">
         <h2>Quick Start</h2>

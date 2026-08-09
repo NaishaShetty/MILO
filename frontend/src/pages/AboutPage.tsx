@@ -58,7 +58,7 @@ const PIPELINE_STAGES: Array<{ stage: string; description: string }> = [
 export function AboutPage() {
   return (
     <main aria-label="About MILO" className="about-page">
-      <h1>👋 About MILO</h1>
+      <h1>About MILO</h1>
       <p className="about-page__greeting">Hi, I'm MILO.</p>
       <p className="about-page__fullname">Memory Integrated Language Oriented Robot</p>
 
@@ -91,9 +91,9 @@ export function AboutPage() {
       <section aria-label="Explore MILO" className="about-page__section">
         <h2>Explore MILO</h2>
         <div className="about-page__links">
-          <Link to="/">🏠 Home</Link>
-          <Link to="/mission-control">🎮 Mission Control</Link>
-          <Link to="/lab">🔬 MILO Lab</Link>
+          <Link to="/">Home</Link>
+          <Link to="/mission-control">Mission Control</Link>
+          <Link to="/lab">MILO Lab</Link>
         </div>
       </section>
     </main>

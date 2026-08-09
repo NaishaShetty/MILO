@@ -33,7 +33,7 @@ export function ActivityPage() {
 
   return (
     <main aria-label="Activity" className="activity-page">
-      <h1>📜 Activity</h1>
+      <h1>Activity</h1>
 
       <div className="activity-page__toolbar">
         <label htmlFor="activity-search" className="activity-page__search-label">

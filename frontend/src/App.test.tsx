@@ -42,20 +42,20 @@ describe("App routing", () => {
     render(<App />);
     expect(screen.getByText("MILO")).toBeInTheDocument();
     expect(screen.getAllByText("Memory Integrated Language Oriented Robot").length).toBeGreaterThan(0);
-    expect(await screen.findByRole("heading", { name: /🏠 Home/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Home" })).toBeInTheDocument();
   });
 
   it.each([
-    ["🎮 Mission Control"],
-    ["🧠 Memory"],
-    ["📜 Activity"],
-    ["👋 About MILO"],
-    ["🔬 MILO Lab"],
-    ["⚙ Settings"],
+    ["Mission Control"],
+    ["Memory"],
+    ["Activity"],
+    ["About MILO"],
+    ["MILO Lab"],
+    ["Settings"],
   ])("navigates to %s via the nav link", async (linkLabel) => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole("heading", { name: /🏠 Home/ });
+    await screen.findByRole("heading", { name: "Home" });
 
     await user.click(screen.getByRole("link", { name: linkLabel }));
 
@@ -69,18 +69,18 @@ describe("App routing", () => {
   it("marks the active route's nav link", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole("heading", { name: /🏠 Home/ });
+    await screen.findByRole("heading", { name: "Home" });
 
-    const memoryLink = screen.getByRole("link", { name: "🧠 Memory" });
+    const memoryLink = screen.getByRole("link", { name: "Memory" });
     await user.click(memoryLink);
 
     expect(memoryLink.className).toContain("milo-navbar__link--active");
-    expect(screen.getByRole("link", { name: "🏠 Home" }).className).not.toContain("--active");
+    expect(screen.getByRole("link", { name: "Home" }).className).not.toContain("--active");
   });
 
   it("has exactly seven nav links (no Mission Detail page)", async () => {
     render(<App />);
-    await screen.findByRole("heading", { name: /🏠 Home/ });
+    await screen.findByRole("heading", { name: "Home" });
     const nav = screen.getByRole("navigation", { name: /main navigation/i });
     expect(within(nav).getAllByRole("link")).toHaveLength(7);
   });

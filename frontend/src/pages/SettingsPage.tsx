@@ -47,7 +47,7 @@ export function SettingsPage() {
 
   return (
     <main aria-label="Settings" className="settings-page">
-      <h1>⚙ Settings</h1>
+      <h1>Settings</h1>
 
       <section aria-label="General" className="settings-page__section">
         <h2>General</h2>

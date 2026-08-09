@@ -18,12 +18,97 @@
     -apple-system,
     "Segoe UI",
     sans-serif;
+
+  /* ------------------------------------------------------------
+   * Phase 8.2 design tokens
+   *
+   * Additive to the existing hand-rolled BEM stylesheet below (no
+   * CSS framework introduced -- see this file's original header
+   * comment). Every new Phase 8.2 component pulls colors/spacing/
+   * radius from these custom properties instead of a fresh
+   * hardcoded literal, so the MILO visual identity (dark, near-black
+   * background; purple/lavender primary accent; green/red/orange/
+   * cyan semantic colors) stays consistent across every page as
+   * Stage 3 rebuilds each one. Pre-existing selectors are untouched
+   * here -- they keep their own hardcoded colors until the page/
+   * component they belong to is itself rebuilt in Stage 3.
+   * ------------------------------------------------------------ */
+
+  /* Background: dark, near-black with a faint blue/purple undertone. */
+  --milo-bg: #0a0a10;
+  --milo-bg-elevated: #0e0e17;
+  --milo-bg-radial: radial-gradient(
+    ellipse 80% 60% at 50% -10%,
+    rgba(139, 92, 246, 0.12),
+    transparent 60%
+  );
+
+  /* Card/panel surface -- translucent, purple-tinted border. */
+  --milo-surface: rgba(255, 255, 255, 0.03);
+  --milo-surface-hover: rgba(255, 255, 255, 0.05);
+  --milo-border: rgba(139, 92, 246, 0.18);
+  --milo-border-strong: rgba(139, 92, 246, 0.4);
+
+  /* Primary accent: purple/lavender -- active nav, primary buttons,
+   * MILO branding, focus states (spec section 10). */
+  --milo-accent: #8b5cf6;
+  --milo-accent-soft: rgba(139, 92, 246, 0.16);
+  --milo-accent-glow: rgba(139, 92, 246, 0.45);
+  --milo-accent-text: #c4b5fd;
+
+  /* Secondary: blue/cyan -- vision, perception, informational states. */
+  --milo-info: #38bdf8;
+  --milo-info-soft: rgba(56, 189, 248, 0.14);
+
+  /* Semantic: online/ready/success. */
+  --milo-success: #4ade80;
+  --milo-success-soft: rgba(74, 222, 128, 0.14);
+
+  /* Semantic: errors/failures/destructive. */
+  --milo-danger: #f87171;
+  --milo-danger-soft: rgba(248, 113, 113, 0.14);
+
+  /* Semantic: warnings/important observations. */
+  --milo-warning: #fbbf24;
+  --milo-warning-soft: rgba(251, 191, 36, 0.14);
+
+  /* Text hierarchy. */
+  --milo-text: #f3f1f8;
+  --milo-text-muted: #9c98ab;
+  --milo-text-faint: #6b6779;
+
+  /* Spacing scale. */
+  --milo-space-xs: 0.25rem;
+  --milo-space-sm: 0.5rem;
+  --milo-space-md: 1rem;
+  --milo-space-lg: 1.5rem;
+  --milo-space-xl: 2rem;
+
+  /* Radius/shadow. */
+  --milo-radius-sm: 8px;
+  --milo-radius-md: 14px;
+  --milo-radius-lg: 20px;
+  --milo-shadow-glow: 0 0 32px var(--milo-accent-glow);
+  --milo-shadow-card: 0 8px 24px rgba(0, 0, 0, 0.35);
+
+  /* Motion -- see the prefers-reduced-motion override just below. */
+  --milo-transition-fast: 150ms ease;
+  --milo-transition-medium: 300ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 body {
   margin: 0;
-  background: #0f1115;
-  color: #e6e6e6;
+  background: var(--milo-bg);
+  color: var(--milo-text);
 }
 
 .app {
@@ -936,9 +1021,12 @@ body {
  * this file's existing dark palette.
  */
 .milo-app {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 0 1.25rem 4rem;
+  padding: 0 1.5rem 4rem;
+  min-height: 100vh;
+  background-image: var(--milo-bg-radial);
+  background-repeat: no-repeat;
 }
 
 .milo-navbar {
@@ -948,7 +1036,7 @@ body {
   justify-content: space-between;
   gap: 1rem;
   padding: 1.25rem 0;
-  border-bottom: 1px solid #1e2129;
+  border-bottom: 1px solid var(--milo-border);
   margin-bottom: 1.5rem;
 }
 
@@ -959,40 +1047,68 @@ body {
 }
 
 .milo-navbar__title {
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  color: #4f7cff;
+  letter-spacing: 0.14em;
+  color: var(--milo-text);
 }
 
 .milo-navbar__subtitle {
-  font-size: 0.75rem;
-  color: #9aa0a6;
+  font-size: 0.72rem;
+  color: var(--milo-text-faint);
 }
 
 .milo-navbar__links {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.25rem;
 }
 
 .milo-navbar__link {
-  padding: 0.4rem 0.7rem;
-  border-radius: 6px;
-  color: #e6e6e6;
+  position: relative;
+  padding: 0.5rem 0.8rem;
+  border-radius: var(--milo-radius-sm);
+  color: var(--milo-text-muted);
   text-decoration: none;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   white-space: nowrap;
+  transition:
+    color var(--milo-transition-fast),
+    background var(--milo-transition-fast);
 }
 
 .milo-navbar__link:hover {
-  background: #1e2129;
+  color: var(--milo-text);
+  background: var(--milo-surface-hover);
 }
 
 .milo-navbar__link--active {
-  background: #4f7cff;
-  color: #0f1115;
+  color: var(--milo-text);
   font-weight: 600;
+}
+
+.milo-navbar__link--active::after {
+  content: "";
+  position: absolute;
+  left: 0.8rem;
+  right: 0.8rem;
+  bottom: -3px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--milo-accent);
+  box-shadow: 0 0 8px var(--milo-accent-glow);
+}
+
+.milo-navbar__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.milo-navbar__avatar {
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--milo-border-strong);
 }
 
 .error-boundary {
@@ -1632,4 +1748,393 @@ body {
   background: transparent;
   color: #ff5252;
   cursor: pointer;
+}
+
+/* ==================================================================
+ * Phase 8.2 shared components
+ *
+ * Styles for the reusable components introduced in Stage 2
+ * (MiloCharacter, GlassCard, StatusPill, SectionHeader, MiloDialogue,
+ * VoiceButton) -- built from the --milo-* tokens defined at the top of
+ * this file. Page-specific layout for each rebuilt page lives in its
+ * own section further below, added as Stage 3 rebuilds each page.
+ * ================================================================== */
+
+/* -- MiloCharacter ------------------------------------------------- */
+
+.milo-character {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.milo-character--sm {
+  width: 40px;
+  height: 40px;
+}
+
+.milo-character--md {
+  width: 120px;
+  height: 140px;
+}
+
+.milo-character--lg {
+  width: 260px;
+  height: 300px;
+}
+
+.milo-character__svg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.milo-character__glow {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--milo-accent-glow), transparent 70%);
+  filter: blur(12px);
+  opacity: 0.6;
+  transition: opacity var(--milo-transition-medium);
+}
+
+.milo-character__shadow {
+  fill: rgba(0, 0, 0, 0.4);
+  filter: blur(4px);
+}
+
+.milo-character__hood,
+.milo-character__body {
+  fill: #16151d;
+  stroke: var(--milo-border-strong);
+  stroke-width: 1;
+}
+
+.milo-character__eye {
+  fill: var(--milo-accent-text);
+  filter: drop-shadow(0 0 6px var(--milo-accent-glow));
+  transition:
+    fill var(--milo-transition-fast),
+    height var(--milo-transition-fast);
+}
+
+.milo-character--offline .milo-character__glow {
+  opacity: 0;
+}
+.milo-character--offline .milo-character__eye {
+  fill: #3a3742;
+  filter: none;
+}
+
+.milo-character--idle .milo-character__glow {
+  animation: milo-pulse-soft 3.2s ease-in-out infinite;
+}
+
+.milo-character--initializing .milo-character__eye,
+.milo-character--thinking .milo-character__eye,
+.milo-character--understanding .milo-character__eye,
+.milo-character--planning .milo-character__eye,
+.milo-character--replanning .milo-character__eye,
+.milo-character--reflecting .milo-character__eye {
+  animation: milo-blink-think 1.1s ease-in-out infinite;
+}
+
+.milo-character--listening .milo-character__glow,
+.milo-character--speaking .milo-character__glow {
+  animation: milo-pulse-active 0.9s ease-in-out infinite;
+}
+.milo-character--listening .milo-character__eye,
+.milo-character--speaking .milo-character__eye {
+  fill: var(--milo-info);
+  filter: drop-shadow(0 0 8px var(--milo-info));
+}
+
+.milo-character--perceiving .milo-character__eye {
+  fill: var(--milo-info);
+  filter: drop-shadow(0 0 8px var(--milo-info));
+}
+
+.milo-character--navigating .milo-character__glow,
+.milo-character--executing .milo-character__glow {
+  animation: milo-pulse-active 1.6s ease-in-out infinite;
+}
+
+.milo-character--success .milo-character__eye {
+  fill: var(--milo-success);
+  filter: drop-shadow(0 0 8px var(--milo-success));
+}
+
+.milo-character--error .milo-character__eye {
+  fill: var(--milo-danger);
+  filter: drop-shadow(0 0 8px var(--milo-danger));
+}
+
+@keyframes milo-pulse-soft {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+@keyframes milo-pulse-active {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes milo-blink-think {
+  0%,
+  100% {
+    height: 18px;
+  }
+  50% {
+    height: 6px;
+  }
+}
+
+/* -- GlassCard ------------------------------------------------------- */
+
+.glass-card {
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+  border-radius: var(--milo-radius-md);
+  box-shadow: var(--milo-shadow-card);
+  padding: var(--milo-space-lg);
+  backdrop-filter: blur(12px);
+  transition:
+    background var(--milo-transition-fast),
+    border-color var(--milo-transition-fast),
+    transform var(--milo-transition-fast);
+}
+
+.glass-card:hover {
+  background: var(--milo-surface-hover);
+  border-color: var(--milo-border-strong);
+}
+
+.glass-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--milo-space-md);
+}
+
+.glass-card__title {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--milo-text-muted);
+}
+
+.glass-card__title-action {
+  font-size: 0.85rem;
+  color: var(--milo-accent-text);
+}
+
+.glass-card__body {
+  color: var(--milo-text);
+}
+
+/* -- StatusPill -------------------------------------------------------- */
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.75em;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.status-pill__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-pill--neutral {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--milo-text-muted);
+}
+
+.status-pill--accent {
+  background: var(--milo-accent-soft);
+  border-color: var(--milo-border-strong);
+  color: var(--milo-accent-text);
+}
+
+.status-pill--success {
+  background: var(--milo-success-soft);
+  border-color: rgba(74, 222, 128, 0.35);
+  color: var(--milo-success);
+}
+
+.status-pill--danger {
+  background: var(--milo-danger-soft);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: var(--milo-danger);
+}
+
+.status-pill--warning {
+  background: var(--milo-warning-soft);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: var(--milo-warning);
+}
+
+.status-pill--info {
+  background: var(--milo-info-soft);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: var(--milo-info);
+}
+
+/* -- SectionHeader ----------------------------------------------------- */
+
+.section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--milo-space-lg);
+  margin-bottom: var(--milo-space-xl);
+}
+
+.section-header__eyebrow {
+  margin: 0 0 var(--milo-space-xs);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--milo-accent-text);
+}
+
+.section-header__title {
+  margin: 0;
+  font-size: 2.25rem;
+  font-weight: 600;
+  color: var(--milo-text);
+  letter-spacing: -0.01em;
+}
+
+.section-header__description {
+  margin: var(--milo-space-sm) 0 0;
+  color: var(--milo-text-muted);
+  max-width: 60ch;
+}
+
+/* -- MiloDialogue -------------------------------------------------------- */
+
+.milo-dialogue {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--milo-space-xs);
+  max-width: 320px;
+}
+
+.milo-dialogue__caption {
+  font-size: 0.8rem;
+  color: var(--milo-accent-text);
+  font-style: italic;
+}
+
+.milo-dialogue__bubble {
+  background: var(--milo-surface-hover);
+  border: 1px solid var(--milo-border-strong);
+  border-radius: var(--milo-radius-md);
+  padding: var(--milo-space-md);
+  color: var(--milo-text);
+  box-shadow: var(--milo-shadow-glow);
+  animation: milo-dialogue-in var(--milo-transition-medium);
+}
+
+@keyframes milo-dialogue-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* -- VoiceButton --------------------------------------------------------- */
+
+.voice-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--milo-border-strong);
+  background: var(--milo-surface);
+  color: var(--milo-text);
+  cursor: pointer;
+  transition:
+    background var(--milo-transition-fast),
+    color var(--milo-transition-fast),
+    border-color var(--milo-transition-fast);
+}
+
+.voice-button:hover:not(:disabled) {
+  background: var(--milo-accent-soft);
+  border-color: var(--milo-accent);
+}
+
+.voice-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.voice-button--listening {
+  background: var(--milo-accent);
+  color: #0a0a10;
+  border-color: var(--milo-accent);
+}
+
+.voice-button--error {
+  border-color: var(--milo-danger);
+  color: var(--milo-danger);
+}
+
+.voice-button__icon {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+}
+
+.voice-button__ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--milo-accent);
+  animation: milo-voice-ring 1.2s ease-out infinite;
+}
+
+@keyframes milo-voice-ring {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
 }

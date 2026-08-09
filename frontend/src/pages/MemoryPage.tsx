@@ -50,7 +50,7 @@ export function MemoryPage() {
 
   return (
     <main aria-label="Memory" className="memory-page">
-      <h1>🧠 Memory</h1>
+      <h1>Memory</h1>
 
       <section aria-label="Memory Categories" className="memory-page__section">
         <h2>Memory Categories</h2>

@@ -38,7 +38,7 @@ export function HomePage() {
   return (
     <main aria-label="Home" className="home-page">
       <section className="home-page__intro">
-        <h1>🏠 Home</h1>
+        <h1>Home</h1>
         <p className="home-page__greeting">Hi, I'm MILO.</p>
         <p className="home-page__fullname">Memory Integrated Language Oriented Robot</p>
         <p className="home-page__description">
