@@ -1,0 +1,661 @@
+{
+  "$comment_purpose": "Few-shot example library for the Language Understanding parser (backend/prompts/parser_prompt.txt). Every entry pairs a realistic household-robot instruction with the exact JSON a correct parse of it should produce, matching schemas.task.SingleTask / MultiTask (backend/schemas/task.py) field-for-field. These examples are disjoint from the five worked examples embedded directly in parser_prompt.txt -- duplicating them here would test nothing a prompt review couldn't already see, and this file exists specifically to cover categories broader than what fits readably inline in the prompt itself.",
+  "$comment_responsibility": "Provide diverse, realistic, schema-valid VALID commands only. Anti-patterns (what the parser must never produce) live in negative_examples.json; ambiguous/unusual inputs live in edge_cases.json; this file is the 'normal operation, wide category coverage' set.",
+  "$comment_consumers": "A future Language Agent (Phase 3.4) may sample from this file for dynamic few-shot prompt construction. Phase 3.6 (Testing & Benchmarking) may use it as a smoke-test set distinct from the formal evaluation benchmarks in datasets/language/evaluation/. Prompt engineers reviewing a parser_prompt.txt change should re-check outputs against every category here before merging.",
+  "$schema_version": "1.0.0",
+  "$prompt_version": "1.1.0",
+  "examples": [
+    {
+      "id": "ex-nav-001",
+      "category": "navigation",
+      "input": "Go to the kitchen.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "navigate_to",
+        "object": null,
+        "target": null,
+        "source_location": null,
+        "target_location": "kitchen",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the robot is in the kitchen",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-nav-002",
+      "category": "navigation",
+      "input": "Head over to the living room and wait there.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "navigate_to",
+        "object": null,
+        "target": null,
+        "source_location": null,
+        "target_location": "living room",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": ["the robot remains in the living room until given a new instruction"],
+        "estimated_goal": "the robot is in the living room",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-pickup-001",
+      "category": "pickup",
+      "input": "Pick up the green bowl.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "pick_up",
+        "object": "green bowl",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": {
+          "color": "green",
+          "size": null,
+          "material": null,
+          "state": null,
+          "quantity": null,
+          "descriptors": null
+        },
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the green bowl is held by the robot",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-place-001",
+      "category": "place",
+      "input": "Set the book down on the bookshelf.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "place",
+        "object": "book",
+        "target": null,
+        "source_location": null,
+        "target_location": "bookshelf",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the book is on the bookshelf",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-place-002",
+      "category": "place",
+      "input": "Put the small wooden spoon next to the pot.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "place",
+        "object": "small wooden spoon",
+        "target": "pot",
+        "source_location": null,
+        "target_location": null,
+        "attributes": {
+          "color": null,
+          "size": "small",
+          "material": "wooden",
+          "state": null,
+          "quantity": null,
+          "descriptors": null
+        },
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the small wooden spoon is next to the pot",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-store-001",
+      "category": "store",
+      "input": "Put the cereal box away in the pantry.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "store",
+        "object": "cereal box",
+        "target": null,
+        "source_location": null,
+        "target_location": "pantry",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the cereal box is stored in the pantry",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-store-002",
+      "category": "store",
+      "input": "Store the three clean towels in the bathroom cabinet.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "store",
+        "object": "clean towels",
+        "target": null,
+        "source_location": null,
+        "target_location": "bathroom cabinet",
+        "attributes": {
+          "color": null,
+          "size": null,
+          "material": null,
+          "state": "clean",
+          "quantity": 3,
+          "descriptors": null
+        },
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the three clean towels are in the bathroom cabinet",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-find-001",
+      "category": "find",
+      "input": "Find my keys.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "find",
+        "object": "keys",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": {
+          "color": null,
+          "size": null,
+          "material": null,
+          "state": null,
+          "quantity": null,
+          "descriptors": ["my keys"]
+        },
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the location of the keys is known",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-find-002",
+      "category": "find",
+      "input": "See if there's a charger anywhere in the office.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "search_for",
+        "object": "charger",
+        "target": null,
+        "source_location": null,
+        "target_location": "office",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the presence or absence of a charger in the office is known",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-inspect-001",
+      "category": "inspect",
+      "input": "Check whether the back door is locked.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "inspect",
+        "object": "back door",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the lock state of the back door is known",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-inspect-002",
+      "category": "inspect",
+      "input": "Take a look at the plant on the windowsill and tell me if it needs water.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "inspect",
+        "object": "plant",
+        "target": null,
+        "source_location": "windowsill",
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the watering need of the plant on the windowsill is known",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-multi-001",
+      "category": "multi_step",
+      "input": "Grab the trash bag from the kitchen and take it out to the bin, then come back and wipe the counter.",
+      "expected_output": {
+        "task_type": "multi",
+        "task_id": null,
+        "goal": null,
+        "subtasks": [
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "pick_up",
+            "object": "trash bag",
+            "target": null,
+            "source_location": "kitchen",
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": null,
+            "postconditions": null,
+            "estimated_goal": "the trash bag is held by the robot",
+            "needs_clarification": false,
+            "clarification_reason": null
+          },
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "deliver",
+            "object": "trash bag",
+            "target": null,
+            "source_location": null,
+            "target_location": "bin",
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": ["the trash bag has been picked up from the kitchen"],
+            "postconditions": null,
+            "estimated_goal": "the trash bag is in the bin",
+            "needs_clarification": false,
+            "clarification_reason": null
+          },
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "clean",
+            "object": "counter",
+            "target": null,
+            "source_location": null,
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": ["the robot has returned from the bin"],
+            "postconditions": null,
+            "estimated_goal": "the counter is clean",
+            "needs_clarification": false,
+            "clarification_reason": null
+          }
+        ],
+        "priority": null,
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-multi-002",
+      "category": "multi_step",
+      "input": "Close the window and turn off the lamp before you leave the bedroom.",
+      "expected_output": {
+        "task_type": "multi",
+        "task_id": null,
+        "goal": null,
+        "subtasks": [
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "close",
+            "object": "window",
+            "target": null,
+            "source_location": null,
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": null,
+            "postconditions": null,
+            "estimated_goal": "the window is closed",
+            "needs_clarification": false,
+            "clarification_reason": null
+          },
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "turn_off",
+            "object": "lamp",
+            "target": null,
+            "source_location": null,
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": null,
+            "postconditions": null,
+            "estimated_goal": "the lamp is off",
+            "needs_clarification": false,
+            "clarification_reason": null
+          }
+        ],
+        "priority": null,
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-attr-001",
+      "category": "attribute_extraction",
+      "input": "Bring me the large blue ceramic mug, not the small one.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "fetch",
+        "object": "large blue ceramic mug",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": {
+          "color": "blue",
+          "size": "large",
+          "material": "ceramic",
+          "state": null,
+          "quantity": null,
+          "descriptors": ["not the small one"]
+        },
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the large blue ceramic mug is delivered to the user",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-attr-002",
+      "category": "attribute_extraction",
+      "input": "Collect the two empty water bottles from the desk.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "pick_up",
+        "object": "water bottles",
+        "target": null,
+        "source_location": "desk",
+        "target_location": null,
+        "attributes": {
+          "color": null,
+          "size": null,
+          "material": null,
+          "state": "empty",
+          "quantity": 2,
+          "descriptors": null
+        },
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the two empty water bottles are held by the robot",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-constraint-001",
+      "category": "constraint_extraction",
+      "input": "Move the vase to the shelf, but be extremely careful -- it's an antique.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "place",
+        "object": "vase",
+        "target": null,
+        "source_location": null,
+        "target_location": "shelf",
+        "attributes": {
+          "color": null,
+          "size": null,
+          "material": null,
+          "state": null,
+          "quantity": null,
+          "descriptors": ["antique"]
+        },
+        "constraints": [
+          {
+            "constraint_type": "safety",
+            "description": "handle with extreme care because the vase is an antique",
+            "value": null
+          }
+        ],
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the vase is on the shelf, undamaged",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-constraint-002",
+      "category": "constraint_extraction",
+      "input": "Water the plants, but only after 6pm when it's cooler.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "water_the_plant",
+        "object": "plants",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": [
+          {
+            "constraint_type": "temporal",
+            "description": "must not begin before 6pm",
+            "value": "18:00"
+          }
+        ],
+        "priority": null,
+        "preconditions": ["it is after 6pm"],
+        "postconditions": null,
+        "estimated_goal": "the plants have been watered",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-srctgt-001",
+      "category": "source_target_location",
+      "input": "Move the laundry basket from the bedroom to the laundry room.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "pick_and_place",
+        "object": "laundry basket",
+        "target": null,
+        "source_location": "bedroom",
+        "target_location": "laundry room",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the laundry basket is in the laundry room",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-srctgt-002",
+      "category": "source_target_location",
+      "input": "Take the toolbox out of the garage and bring it to the backyard.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "deliver",
+        "object": "toolbox",
+        "target": null,
+        "source_location": "garage",
+        "target_location": "backyard",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the toolbox is in the backyard",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-user-ref-001",
+      "category": "user_reference",
+      "input": "Bring my glasses to me in the study.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "deliver",
+        "object": "glasses",
+        "target": null,
+        "source_location": null,
+        "target_location": "study",
+        "attributes": {
+          "color": null,
+          "size": null,
+          "material": null,
+          "state": null,
+          "quantity": null,
+          "descriptors": ["my glasses"]
+        },
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the glasses are delivered to the user in the study",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "ex-sequential-001",
+      "category": "sequential",
+      "input": "First check if the oven is off, then lock the front door, and finally turn off all the lights.",
+      "expected_output": {
+        "task_type": "multi",
+        "task_id": null,
+        "goal": null,
+        "subtasks": [
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "inspect",
+            "object": "oven",
+            "target": null,
+            "source_location": null,
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": null,
+            "postconditions": null,
+            "estimated_goal": "the power state of the oven is known",
+            "needs_clarification": false,
+            "clarification_reason": null
+          },
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "lock",
+            "object": "front door",
+            "target": null,
+            "source_location": null,
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": null,
+            "postconditions": null,
+            "estimated_goal": "the front door is locked",
+            "needs_clarification": false,
+            "clarification_reason": null
+          },
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "turn_off",
+            "object": "lights",
+            "target": null,
+            "source_location": null,
+            "target_location": null,
+            "attributes": {
+              "color": null,
+              "size": null,
+              "material": null,
+              "state": null,
+              "quantity": null,
+              "descriptors": ["all"]
+            },
+            "constraints": null,
+            "priority": null,
+            "preconditions": null,
+            "postconditions": null,
+            "estimated_goal": "all lights in the house are off",
+            "needs_clarification": false,
+            "clarification_reason": null
+          }
+        ],
+        "priority": null,
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    }
+  ]
+}

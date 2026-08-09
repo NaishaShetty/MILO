@@ -1,0 +1,50 @@
+# ----------------------------
+# Python
+# ----------------------------
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ----------------------------
+# Generated perception outputs
+# ----------------------------
+outputs/*.png
+outputs/*.jpg
+outputs/*.jpeg
+!outputs/.gitkeep
+
+# ----------------------------
+# Editor / OS
+# ----------------------------
+.DS_Store
+.idea/
+.vscode/
+
+# ----------------------------
+# Secrets / environment
+# ----------------------------
+.env
+
+# ----------------------------
+# Model weights (large, reproducible via ModelManager)
+# ----------------------------
+models/*
+!models/.gitkeep
+
+# ----------------------------
+# Benchmark/experiment run outputs
+# ----------------------------
+results/*
+!results/.gitkeep
+!results/README.md
+
+# ----------------------------
+# Frontend (Phase 3.7 -- frontend/, Vite + React + TypeScript)
+# ----------------------------
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.env
+frontend/.env.local

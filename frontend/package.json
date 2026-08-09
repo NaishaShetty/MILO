@@ -1,0 +1,38 @@
+{
+  "name": "vision-language-robotics-frontend",
+  "private": true,
+  "version": "3.8.0",
+  "type": "module",
+  "description": "Vision-Language Robotics dashboard: perceives the simulator's current scene (detection, segmentation, depth, tracking) via the backend Vision API and submits natural language instructions via the backend Language API. Neither is combined with the other, and neither plans, executes, or talks to a model/simulator directly -- see src/api/vision.ts and src/api/language.ts.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.4"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.8",
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/node": "^20.19.43",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.16.1",
+    "@typescript-eslint/parser": "^7.16.1",
+    "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.7",
+    "jsdom": "^24.1.1",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4",
+    "vitest": "^2.0.5"
+  }
+}

@@ -1,0 +1,455 @@
+{
+  "$comment_purpose": "Correctness benchmark for the Language Understanding parser. Unlike datasets/language/prompts/examples.json (a few-shot/review library the prompt is designed and reviewed against), every input here is intentionally DISJOINT from every input in parser_prompt.txt, examples.json, negative_examples.json, and edge_cases.json -- an LLM scoring well here has not simply memorized an in-prompt example, it has generalized the parsing rules to unseen instructions.",
+  "$comment_responsibility": "Measure parser correctness: given an input, does a candidate model's output match expected_output field-for-field (exact match for closed-vocabulary fields like goal/priority/constraint_type, semantic-equivalence for free-text fields like estimated_goal -- see $comment_scoring below)? This file holds ONLY realistic, answerable, non-ambiguous commands -- robustness and ambiguity-detection are measured by the sibling files failure_cases.json and ambiguity_cases.json respectively, deliberately kept separate so a single aggregate score can't hide a model that is strong on one dimension and weak on another.",
+  "$comment_consumers": "Phase 3.6 (Testing & Benchmarking) is the primary consumer: it will run each 'input' through a candidate Language Agent + LLM pairing, validate the raw response against schemas.task.ParsedInstruction, and score it against 'expected_output'. Designed to be re-run unmodified against GPT, Qwen, Llama, Phi, or any future model -- nothing in this file's schema names a specific provider.",
+  "$comment_scoring": "Recommended scoring approach for Phase 3.6: (1) schema validity -- does the raw output parse as a ParsedInstruction at all (pass/fail); (2) structural field match -- exact equality on task_type, goal, object, target, source_location, target_location, attributes, constraints, priority, needs_clarification (each scored independently, since a model can get most fields right and one wrong); (3) free-text field similarity -- estimated_goal and clarification_reason compared by semantic similarity or human judgment, never exact string match, since correct paraphrases are expected to differ across models.",
+  "$schema_version": "1.0.0",
+  "$prompt_version": "1.1.0",
+  "success_cases": [
+    {
+      "id": "success-001",
+      "category": "simple",
+      "input": "Switch off the hallway light.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "turn_off",
+        "object": "hallway light",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the hallway light is off",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-002",
+      "category": "simple",
+      "input": "Open the pantry door.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "open",
+        "object": "pantry door",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the pantry door is open",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-003",
+      "category": "navigation",
+      "input": "Head to the garage and stay put.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "navigate_to",
+        "object": null,
+        "target": null,
+        "source_location": null,
+        "target_location": "garage",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": ["the robot remains in the garage"],
+        "estimated_goal": "the robot is in the garage",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-004",
+      "category": "navigation",
+      "input": "Follow me into the kitchen.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "follow",
+        "object": null,
+        "target": null,
+        "source_location": null,
+        "target_location": "kitchen",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the robot has followed the user into the kitchen",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-005",
+      "category": "attributes",
+      "input": "Hand me the small round metal tin on the top shelf.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "fetch",
+        "object": "small round metal tin",
+        "target": null,
+        "source_location": "top shelf",
+        "target_location": null,
+        "attributes": {
+          "color": null,
+          "size": "small",
+          "material": "metal",
+          "state": null,
+          "quantity": null,
+          "descriptors": ["round"]
+        },
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the small round metal tin is delivered to the user",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-006",
+      "category": "attributes",
+      "input": "Grab all four dirty plates from the dining table.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "pick_up",
+        "object": "dirty plates",
+        "target": null,
+        "source_location": "dining table",
+        "target_location": null,
+        "attributes": {
+          "color": null,
+          "size": null,
+          "material": null,
+          "state": "dirty",
+          "quantity": 4,
+          "descriptors": null
+        },
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the four dirty plates are held by the robot",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-007",
+      "category": "constraints",
+      "input": "Carry the soup bowl to the table slowly so it doesn't spill.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "deliver",
+        "object": "soup bowl",
+        "target": null,
+        "source_location": null,
+        "target_location": "table",
+        "attributes": null,
+        "constraints": [
+          {
+            "constraint_type": "safety",
+            "description": "must move slowly to avoid spilling the soup",
+            "value": null
+          }
+        ],
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the soup bowl is on the table, unspilled",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-008",
+      "category": "constraints",
+      "input": "Vacuum the living room, but finish within the next twenty minutes.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "clean",
+        "object": "living room",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": [
+          {
+            "constraint_type": "temporal",
+            "description": "must be completed within twenty minutes",
+            "value": "20 minutes"
+          }
+        ],
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the living room is vacuumed",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-009",
+      "category": "multi_step",
+      "input": "Open the curtains, then water the fern by the window.",
+      "expected_output": {
+        "task_type": "multi",
+        "task_id": null,
+        "goal": null,
+        "subtasks": [
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "open",
+            "object": "curtains",
+            "target": null,
+            "source_location": null,
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": null,
+            "postconditions": null,
+            "estimated_goal": "the curtains are open",
+            "needs_clarification": false,
+            "clarification_reason": null
+          },
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "water_the_plant",
+            "object": "fern",
+            "target": null,
+            "source_location": "window",
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": null,
+            "postconditions": null,
+            "estimated_goal": "the fern has been watered",
+            "needs_clarification": false,
+            "clarification_reason": null
+          }
+        ],
+        "priority": null,
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-010",
+      "category": "multi_step",
+      "input": "Pick up the mail from the entryway, sort it on the desk, and recycle the junk mail.",
+      "expected_output": {
+        "task_type": "multi",
+        "task_id": null,
+        "goal": null,
+        "subtasks": [
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "pick_up",
+            "object": "mail",
+            "target": null,
+            "source_location": "entryway",
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": null,
+            "postconditions": null,
+            "estimated_goal": "the mail is held by the robot",
+            "needs_clarification": false,
+            "clarification_reason": null
+          },
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "place",
+            "object": "mail",
+            "target": null,
+            "source_location": null,
+            "target_location": "desk",
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": ["the mail has been picked up from the entryway"],
+            "postconditions": ["the mail is sorted"],
+            "estimated_goal": "the mail is sorted on the desk",
+            "needs_clarification": false,
+            "clarification_reason": null
+          },
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "store",
+            "object": "junk mail",
+            "target": null,
+            "source_location": "desk",
+            "target_location": "recycling",
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": ["the mail has been sorted"],
+            "postconditions": null,
+            "estimated_goal": "the junk mail is in the recycling",
+            "needs_clarification": false,
+            "clarification_reason": null
+          }
+        ],
+        "priority": null,
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-011",
+      "category": "spatial",
+      "input": "Slide the ottoman under the coffee table.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "place",
+        "object": "ottoman",
+        "target": "coffee table",
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": [
+          {
+            "constraint_type": "spatial",
+            "description": "must end up underneath the coffee table",
+            "value": "under"
+          }
+        ],
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the ottoman is under the coffee table",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-012",
+      "category": "spatial",
+      "input": "Set the fruit bowl in the middle of the kitchen island.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "place",
+        "object": "fruit bowl",
+        "target": null,
+        "source_location": null,
+        "target_location": "kitchen island",
+        "attributes": null,
+        "constraints": [
+          {
+            "constraint_type": "spatial",
+            "description": "must be positioned in the middle of the kitchen island",
+            "value": "center"
+          }
+        ],
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the fruit bowl is in the middle of the kitchen island",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-013",
+      "category": "navigation",
+      "input": "Patrol the hallway every so often while I'm out.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "patrol",
+        "object": null,
+        "target": null,
+        "source_location": null,
+        "target_location": "hallway",
+        "attributes": null,
+        "constraints": [
+          {
+            "constraint_type": "temporal",
+            "description": "must continue periodically while the user is away",
+            "value": null
+          }
+        ],
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the hallway has been periodically patrolled",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-014",
+      "category": "simple",
+      "input": "Count how many chairs are in the dining room.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "count",
+        "object": "chairs",
+        "target": null,
+        "source_location": null,
+        "target_location": "dining room",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the number of chairs in the dining room is known",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    },
+    {
+      "id": "success-015",
+      "category": "constraints",
+      "input": "This is urgent -- shut off the stove right now.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "turn_off",
+        "object": "stove",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": "critical",
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the stove is off",
+        "needs_clarification": false,
+        "clarification_reason": null
+      }
+    }
+  ]
+}

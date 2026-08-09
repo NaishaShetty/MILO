@@ -1,0 +1,220 @@
+{
+  "$comment_purpose": "Robustness benchmark for the Language Understanding parser and its future validation pipeline (Phase 3.5, Output Validation & Error Recovery). Every entry pairs a realistic instruction with a CANDIDATE model output that fails in some way, along with the expected validation verdict -- this measures whether the system built around the parser correctly detects and rejects bad output, not whether a model produces good output (that is success_cases.json's job).",
+  "$comment_responsibility": "Hold candidate (input, candidate_output) pairs representing failure modes an LLM might actually produce in practice, distinct in wording and structure from datasets/language/prompts/negative_examples.json -- that file is a human-facing anti-pattern catalog for prompt review; this file is a machine-scoreable benchmark for a validation pipeline. A case here is 'passed' by the system under test when its verdict on candidate_output matches expected_validation_result, not when candidate_output itself looks good.",
+  "$comment_consumers": "Phase 3.5 (Output Validation & Error Recovery), which will run each candidate_output through pydantic.TypeAdapter(ParsedInstruction).validate_python/json(...) and, for the semantic categories, whatever consistency check it designs, then compare the verdict against expected_validation_result. Phase 3.6 (Testing & Benchmarking) uses the aggregate pass rate as a robustness score, comparable across GPT/Qwen/Llama/Phi the same way success_cases.json's correctness score is.",
+  "$comment_verdict_semantics": "expected_validation_result is one of: 'reject_syntactic' (fails schema validation outright -- verifiable by direct pydantic validation, included in $comment_pydantic_verified below), 'reject_semantic' (schema-valid but violates a rule validation alone cannot check, e.g. hallucinated content -- requires a semantic check Phase 3.5 has not been designed yet, so these are unverified placeholders for that future pipeline), or 'accept' (a stylistically unusual but ultimately valid output that a validation pipeline should NOT reject -- included so a validator's robustness benchmark also penalizes false positives, not only missed detections).",
+  "$schema_version": "1.0.0",
+  "$prompt_version": "1.1.0",
+  "failure_cases": [
+    {
+      "id": "failure-001",
+      "category": "invalid_json_syntax",
+      "input": "Turn on the porch light.",
+      "candidate_output": "{\"task_type\": \"single\", \"goal\": \"turn_on\" \"object\": \"porch light\"}",
+      "expected_validation_result": "reject_syntactic",
+      "notes": "Missing comma between 'goal' and 'object' key-value pairs -- fails at the JSON tokenizer level, before any schema validation is even reachable."
+    },
+    {
+      "id": "failure-002",
+      "category": "invalid_json_syntax",
+      "input": "Close the garage door.",
+      "candidate_output": "{'task_type': 'single', 'goal': 'close', 'object': 'garage door'}",
+      "expected_validation_result": "reject_syntactic",
+      "notes": "Single-quoted keys/strings are Python-dict-literal syntax, not JSON -- a standard JSON parser rejects this."
+    },
+    {
+      "id": "failure-003",
+      "category": "schema_violation_missing_field",
+      "input": "Bring the umbrella from the closet.",
+      "candidate_output": {
+        "goal": "fetch",
+        "object": "umbrella",
+        "source_location": "closet"
+      },
+      "expected_validation_result": "reject_syntactic",
+      "notes": "Valid JSON, but missing the required 'task_type' discriminator -- schemas.task.ParsedInstruction cannot determine which concrete model to validate against, so this fails at the union-discrimination step."
+    },
+    {
+      "id": "failure-004",
+      "category": "schema_violation_bad_enum",
+      "input": "This is extremely urgent, get the fire extinguisher now.",
+      "candidate_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "fetch",
+        "object": "fire extinguisher",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": "urgent",
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the fire extinguisher is delivered to the user",
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "expected_validation_result": "reject_syntactic",
+      "notes": "'urgent' is not a member of TaskPriority (low/medium/high/critical) -- schemas/enums.py's enum validation rejects it outright. The correct value for this instruction's urgency would be 'critical'."
+    },
+    {
+      "id": "failure-005",
+      "category": "schema_violation_malformed_goal",
+      "input": "Please tidy the guest room.",
+      "candidate_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "Tidy Up",
+        "object": "guest room",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the guest room is tidy",
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "expected_validation_result": "reject_syntactic",
+      "notes": "'Tidy Up' fails schemas.validators.validate_snake_case_goal (capitalized, contains a space) -- Task.goal's field validator rejects it. The correct value would be 'tidy_up' or 'clean'."
+    },
+    {
+      "id": "failure-006",
+      "category": "schema_violation_inconsistent_clarification",
+      "input": "Deal with the thing on the porch.",
+      "candidate_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": null,
+        "object": "thing",
+        "target": null,
+        "source_location": null,
+        "target_location": "porch",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": null,
+        "needs_clarification": true,
+        "clarification_reason": null
+      },
+      "expected_validation_result": "reject_syntactic",
+      "notes": "needs_clarification=true with clarification_reason left null violates the cross-field invariant schemas.task.Task enforces (validate_clarification_consistency) -- the model correctly detected ambiguity but failed to explain it, which the schema treats as invalid rather than silently accepting a reason-less clarification flag."
+    },
+    {
+      "id": "failure-007",
+      "category": "schema_violation_degenerate_multitask",
+      "input": "Water the plants.",
+      "candidate_output": {
+        "task_type": "multi",
+        "task_id": null,
+        "goal": null,
+        "subtasks": [
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "water_the_plant",
+            "object": "plants",
+            "target": null,
+            "source_location": null,
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": null,
+            "postconditions": null,
+            "estimated_goal": "the plants have been watered",
+            "needs_clarification": false,
+            "clarification_reason": null
+          }
+        ],
+        "priority": null,
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "expected_validation_result": "reject_syntactic",
+      "notes": "A single-goal instruction wrapped in a MultiTask with only one subtask -- schemas.validators.validate_subtask_count rejects any MultiTask with fewer than 2 subtasks. The correct output is a SingleTask (task_type: 'single') directly."
+    },
+    {
+      "id": "failure-008",
+      "category": "hallucinated_object",
+      "input": "Bring me a snack.",
+      "candidate_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "fetch",
+        "object": "bag of pretzels",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "a bag of pretzels is delivered to the user",
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "expected_validation_result": "reject_semantic",
+      "notes": "Schema-valid JSON, but 'bag of pretzels' is a fabricated specific item never mentioned in an instruction that only said 'a snack'. No pydantic validator can catch this -- it requires a semantic check comparing 'object' against terms actually present in 'input', which is Phase 3.5 design scope, not yet implemented. Included here as a target case for that future check."
+    },
+    {
+      "id": "failure-009",
+      "category": "hallucinated_location",
+      "input": "Take the shoes to their spot.",
+      "candidate_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "store",
+        "object": "shoes",
+        "target": null,
+        "source_location": null,
+        "target_location": "shoe rack by the front door",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the shoes are on the shoe rack by the front door",
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "expected_validation_result": "reject_semantic",
+      "notes": "'their spot' is exactly the kind of underspecified reference parser_prompt.txt's ambiguity-handling rules require flagging -- the candidate instead fabricated a specific, plausible-sounding location. Schema-valid, semantically wrong; same future-check category as failure-008."
+    },
+    {
+      "id": "failure-010",
+      "category": "planner_shaped_output",
+      "input": "Get the mop and clean up the spill in the kitchen.",
+      "candidate_output": {
+        "task_type": "single",
+        "task_id": null,
+        "action_sequence": ["navigate_to_utility_closet", "grasp_mop", "navigate_to_kitchen", "mop_floor"]
+      },
+      "expected_validation_result": "reject_syntactic",
+      "notes": "Missing every required Task field and introduces an 'action_sequence' key that has no place in the schema at all -- extra='forbid' combined with missing required fields makes this fail immediately, independent of the semantic problem that this is Planner-shaped output, not parser output."
+    },
+    {
+      "id": "failure-011",
+      "category": "unstructured_text",
+      "input": "Dim the bedroom lights a little.",
+      "candidate_output": "I'll dim the bedroom lights for you now.",
+      "expected_validation_result": "reject_syntactic",
+      "notes": "Not JSON at all -- fails at the parsing step before schema validation is reachable."
+    },
+    {
+      "id": "failure-012",
+      "category": "valid_but_unusual_formatting",
+      "input": "Fetch my headphones from the desk.",
+      "candidate_output": "{\n  \"task_type\":   \"single\",\n  \"task_id\": null,\n  \"goal\": \"fetch\",\n  \"object\": \"headphones\",\n  \"target\": null,\n  \"source_location\": \"desk\",\n  \"target_location\": null,\n  \"attributes\": null,\n  \"constraints\": null,\n  \"priority\": null,\n  \"preconditions\": null,\n  \"postconditions\": null,\n  \"estimated_goal\": \"the headphones are delivered to the user\",\n  \"needs_clarification\": false,\n  \"clarification_reason\": null\n}\n",
+      "expected_validation_result": "accept",
+      "notes": "True-negative control case: irregular whitespace/indentation and a trailing newline are cosmetically unusual but perfectly valid JSON with every field correct. A validation pipeline that rejects this because it 'looks different' from a canonical single-line response would be over-strict -- this case exists specifically to catch that false-positive failure mode during Phase 3.5 design."
+    }
+  ]
+}

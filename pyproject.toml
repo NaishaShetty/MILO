@@ -1,0 +1,83 @@
+# ----------------------------------------------------------------------------
+# Repository-wide tooling configuration.
+#
+# This file intentionally contains no build-system/package metadata --
+# the project is not packaged/published yet. It exists solely to give
+# black, ruff, and mypy a single, version-controlled source of truth so
+# local runs and CI (.github/workflows/ci.yml) always agree.
+# ----------------------------------------------------------------------------
+
+[tool.black]
+line-length = 88
+target-version = ["py39"]
+
+[tool.ruff]
+line-length = 88
+# Matches the interpreter this project targets (see backend/scripts/
+# download_torch.py's cp39 wheel and README's setup instructions) --
+# keeps ruff from suggesting syntax (e.g. `X | None`) that predates it.
+target-version = "py39"
+# backend/ is the import root (every module is run as `cd backend &&
+# python -m ...`) -- without this, ruff's import sorter guesses
+# first-party vs. third-party differently depending on the invoking
+# working directory, producing different "fixes" from the repo root
+# vs. from backend/.
+src = ["backend"]
+
+[tool.ruff.lint]
+# Deliberately small and boring for a research codebase: pyflakes (F),
+# pycodestyle errors/warnings (E/W), and import sorting (I). No
+# opinionated/pyupgrade rule families -- those churn code without
+# improving correctness and are out of scope for this task.
+select = ["E", "F", "I", "W"]
+ignore = [
+    # black owns line length for code; E501 would otherwise flag long
+    # comments/docstrings that black deliberately does not wrap.
+    "E501",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Pre-existing Phase 1 design: `simulator/actions.py` defines the
+# AI2-THOR action-name constants and is star-imported so call sites
+# read as plain action names (e.g. `MOVE_AHEAD`). Refactoring that is
+# out of scope for this change, so the resulting "may be undefined"
+# warnings are silenced only for this file.
+"backend/simulator/ai2thor_env.py" = ["F403", "F405"]
+
+[tool.mypy]
+# Namespace packages (most backend/ subpackages, e.g. schemas/, tests/,
+# have no __init__.py) mapped onto backend/ as the package root -- mirrors
+# how the project is actually run (`cd backend && python -m pytest ...`).
+mypy_path = "backend"
+explicit_package_bases = true
+# No explicit python_version pin: mypy checks against the semantics of
+# the interpreter that runs it, and CI (.github/workflows/ci.yml) always
+# invokes it with the project's supported Python (see README). Pinning
+# a specific version here has previously broken when a newer mypy
+# release dropped support for checking against an old target.
+# Third-party packages here (ai2thor, cv2, transformers, torch, ...) ship
+# without type stubs; failing CI on missing stubs would block on
+# upstream, not on this project's code.
+ignore_missing_imports = true
+exclude = ["backend/.mypy_cache", "backend/.pytest_cache"]
+
+# `yaml` (PyYAML) and `requests` are known to typeshed as packages with
+# a separate stub distribution (types-PyYAML, types-requests). For
+# packages in that registry, mypy raises the more specific
+# "import-untyped" error instead of the generic "import-not-found" one
+# ignore_missing_imports normally silences, and that specific error code
+# is not reliably suppressed by ignore_missing_imports alone across mypy
+# versions (confirmed: silent on mypy 2.3.0, raised on mypy 1.19.1 --
+# the version `mypy>=1.10` in requirements.txt currently resolves to).
+# Installing the real stub packages was tried first and reverted: it
+# introduced a severe pip dependency-resolution backtrack (through 100+
+# historical `botocore` versions, pulled in transitively via ai2thor's
+# `aws-requests-auth`) that made `pip install -r requirements.txt` hang
+# for 15+ minutes before timing out. Disabling this one error code for
+# these two specific modules is the lower-risk fix -- everything else
+# about these imports (attribute access, call signatures) is still
+# checked via mypy's best-effort inference, just without the stub
+# package's precision.
+[[tool.mypy.overrides]]
+module = ["yaml", "requests", "requests.*"]
+ignore_missing_imports = true

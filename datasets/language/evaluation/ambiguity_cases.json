@@ -1,0 +1,90 @@
+{
+  "$comment_purpose": "Clarification-detection benchmark for the Language Understanding parser. Measures whether a candidate model correctly sets needs_clarification, in BOTH directions: true positives (genuinely ambiguous instructions that must be flagged) and true negatives (instructions that sound underspecified at a glance but are actually resolvable, which must NOT be over-flagged). A parser that flags everything as ambiguous would score perfectly on a true-positive-only benchmark while being useless -- this file's negative cases exist specifically to catch that failure mode.",
+  "$comment_responsibility": "Hold (input, expected_needs_clarification, ambiguity_type) triples distinct in wording from datasets/language/prompts/edge_cases.json (which documents WHY particular patterns are tricky, for prompt review) -- this file is a disjoint, scoreable benchmark set for Phase 3.6.",
+  "$comment_consumers": "Phase 3.6 (Testing & Benchmarking): run each 'input' through a candidate Language Agent + LLM pairing and compare the resulting needs_clarification boolean against expected_needs_clarification. For true-positive cases, reason_keywords gives a lightweight way to sanity-check that clarification_reason actually names the right ambiguity (contains at least one keyword) without requiring exact-string matching, since correct phrasings vary across models.",
+  "$comment_scoring": "Recommended aggregate metrics for Phase 3.6: precision and recall on needs_clarification against this set's expected_needs_clarification labels, reported separately from success_cases.json's correctness score and failure_cases.json's robustness score -- a model can be excellent at structural parsing while being poorly calibrated on when to ask for help, and this benchmark exists to make that visible rather than averaged away.",
+  "$schema_version": "1.0.0",
+  "$prompt_version": "1.1.0",
+  "ambiguity_cases": [
+    {
+      "id": "ambig-001",
+      "input": "Hand me that.",
+      "expected_needs_clarification": true,
+      "ambiguity_type": "unresolved_pronoun_no_referent",
+      "reason_keywords": ["that", "referent", "unclear", "unspecified", "which"],
+      "notes": "'That' has no antecedent anywhere in the instruction -- true positive."
+    },
+    {
+      "id": "ambig-002",
+      "input": "Put the plate back where you found it.",
+      "expected_needs_clarification": false,
+      "ambiguity_type": "none_self_referential_instruction_is_complete",
+      "reason_keywords": [],
+      "notes": "True negative: 'where you found it' is a complete, executable instruction (return to source location) even though no location is named explicitly -- it is a well-defined relative reference (source_location = wherever the plate was picked up from), not an unresolved one. A parser that flags this as needing clarification is over-triggering."
+    },
+    {
+      "id": "ambig-003",
+      "input": "Charge yourself when you're low.",
+      "expected_needs_clarification": false,
+      "ambiguity_type": "none_conditional_but_well_defined",
+      "reason_keywords": [],
+      "notes": "True negative: this is a conditional standing instruction, not an ambiguous one -- 'when you're low' is a clear, checkable precondition (low battery), representable directly in 'preconditions', with goal='charge' and object=null (the robot acts on itself)."
+    },
+    {
+      "id": "ambig-004",
+      "input": "Get one of the mugs from the cabinet.",
+      "expected_needs_clarification": true,
+      "ambiguity_type": "underspecified_selection_among_multiple_candidates",
+      "reason_keywords": ["which", "mug", "multiple", "unspecified", "any"],
+      "notes": "True positive: 'one of the mugs' explicitly signals multiple candidate objects exist and does not indicate the choice is unconstrained ('any mug will do') or specify a selection criterion -- genuinely underspecified which one is wanted."
+    },
+    {
+      "id": "ambig-005",
+      "input": "Grab any mug, doesn't matter which one.",
+      "expected_needs_clarification": false,
+      "ambiguity_type": "none_explicit_indifference_stated",
+      "reason_keywords": [],
+      "notes": "True negative, contrasted directly with ambig-004: the user explicitly states indifference ('doesn't matter which one'), which resolves the selection question within the instruction itself rather than leaving it open."
+    },
+    {
+      "id": "ambig-006",
+      "input": "Take these to the car.",
+      "expected_needs_clarification": true,
+      "ambiguity_type": "unresolved_pronoun_no_referent",
+      "reason_keywords": ["these", "referent", "unclear", "unspecified", "what"],
+      "notes": "True positive: 'these' has no antecedent -- same category as ambig-001 but with a plural demonstrative instead of a singular one."
+    },
+    {
+      "id": "ambig-007",
+      "input": "Refill the dog's water bowl.",
+      "expected_needs_clarification": false,
+      "ambiguity_type": "none_uniquely_identifying_description",
+      "reason_keywords": [],
+      "notes": "True negative: 'the dog's water bowl' is a specific, uniquely-identifying description even though the parser cannot verify how many bowls exist -- whether it actually resolves to one physical object is a Scene-grounding question for the Planner (Phase 4), not a linguistic ambiguity this module should flag. Contrast with ambig-004, where the instruction itself named multiple candidates."
+    },
+    {
+      "id": "ambig-008",
+      "input": "Move that thing over there.",
+      "expected_needs_clarification": true,
+      "ambiguity_type": "compound_unresolved_object_and_location",
+      "reason_keywords": ["that", "there", "unclear", "unspecified", "referent"],
+      "notes": "True positive: both the object ('that thing') and the destination ('over there') are unresolved demonstratives with no antecedent -- a compound ambiguity, similar in structure to edge_cases.json's edge-clarify-001 but with different wording and touching both object and location instead of object and recipient."
+    },
+    {
+      "id": "ambig-009",
+      "input": "Wipe down the counter after I finish cooking.",
+      "expected_needs_clarification": false,
+      "ambiguity_type": "none_well_defined_precondition",
+      "reason_keywords": [],
+      "notes": "True negative: 'after I finish cooking' is a clear, checkable precondition, not an ambiguous reference -- representable directly in 'preconditions' without any guessing."
+    },
+    {
+      "id": "ambig-010",
+      "input": "Put it back.",
+      "expected_needs_clarification": true,
+      "ambiguity_type": "unresolved_pronoun_no_referent",
+      "reason_keywords": ["it", "referent", "unclear", "unspecified"],
+      "notes": "True positive: unlike ambig-002 ('put the plate back where you found it', where the OBJECT is named and only the location is inferred from context), here the object itself ('it') is never named at all -- there is nothing to resolve 'back' relative to."
+    }
+  ]
+}

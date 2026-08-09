@@ -1,0 +1,145 @@
+# prompt_config.yaml
+#
+# Why this file exists
+# ---------------------
+# Every parameter an LLM call needs beyond the prompt text itself
+# (which prompt version, which schema version it targets, decoding
+# parameters, strictness mode) used to have nowhere to live except
+# hardcoded inside whatever Python eventually calls the LLM. That
+# couples "how do we call the model" to "what code implements the
+# call" -- changing temperature or trying a stricter JSON mode would
+# require a code change and a redeploy. This file is configuration,
+# not code: the future Language Agent (Phase 3.4) reads it at startup
+# instead of embedding these values inline, so tuning the parser's
+# behavior is a config edit and a version bump, never a code change.
+#
+# Responsibility
+# ---------------
+# Own every parameter that describes HOW to call an LLM with
+# parser_prompt.txt -- decoding parameters, strictness mode, retry
+# policy, model compatibility. Owns NOTHING about WHAT the LLM should
+# do (that is parser_prompt.txt's job) or WHAT the output should look
+# like (that is backend/schemas/task.py's job). Keeping those three
+# concerns in three separate files is what lets each evolve on its own
+# schedule -- see backend/prompts/README.md for the full map.
+#
+# Downstream consumers
+# ----------------------
+# The Language Agent (Phase 3.4) is the only intended reader of this
+# file at runtime -- it will load parser_prompt.txt as the system
+# prompt and use every parameter below as the corresponding LLM API
+# call argument. Phase 3.6 (Testing & Benchmarking) also reads
+# `prompt_version` and `schema_version` from this file to tag benchmark
+# runs against the exact asset versions being evaluated, so results
+# stay attributable after either version changes.
+
+# ----------------------------------------------------------------------
+# Versioning
+# ----------------------------------------------------------------------
+# `prompt_version` tracks parser_prompt.txt's own revision history (see
+# prompt_version.md for the full changelog) and is intentionally a
+# separate counter from `schema_version` -- a wording clarification to
+# the prompt does not require a schema change, and a new optional
+# schema field does not require a prompt change until the prompt is
+# updated to actually ask for it. `schema_version` must match
+# `schemas.metadata.SCHEMA_VERSION` (backend/schemas/metadata.py) at
+# the time this prompt version was authored -- if a future schema bump
+# lands without a matching prompt_config.yaml update, that is the
+# signal this file has gone stale and needs review.
+prompt_version: "1.1.0"
+schema_version: "1.0.0"
+
+# ----------------------------------------------------------------------
+# Decoding parameters
+# ----------------------------------------------------------------------
+# Low temperature and top_p are chosen deliberately: this prompt asks
+# for one deterministic, schema-conformant JSON object, not creative
+# or varied text. High-temperature sampling increases the chance of a
+# field being phrased inconsistently across repeated calls with the
+# same instruction, which directly hurts the reproducibility this
+# project's evaluation datasets (datasets/language/evaluation/) depend
+# on to compare model outputs meaningfully across runs.
+decoding:
+  temperature: 0.1
+  top_p: 0.9
+  # A hard ceiling on output length. Sized generously above the
+  # largest worked example in parser_prompt.txt (the multi-task
+  # example) so a legitimate multi-subtask response is never
+  # truncated mid-JSON, while still catching a runaway/looping
+  # generation early rather than paying for or waiting on it.
+  max_tokens: 1024
+  # Discourages the model from repeating boilerplate field scaffolding
+  # verbatim across a long multi-subtask response, without being high
+  # enough to push it toward inventing field names or values it
+  # wouldn't otherwise choose.
+  frequency_penalty: 0.0
+  presence_penalty: 0.0
+
+# ----------------------------------------------------------------------
+# Output strictness
+# ----------------------------------------------------------------------
+# `strict_json_mode: true` signals that the Language Agent (Phase 3.4)
+# should prefer a provider's native structured-output / JSON-mode
+# feature when one is available (e.g. an OpenAI-style
+# `response_format={"type": "json_object"}`, or a grammar-constrained
+# decoding mode), rather than relying solely on prompt instructions to
+# produce valid JSON. This is a preference, not a guarantee -- not
+# every model/provider combination supports it, which is exactly why
+# parser_prompt.txt's own JSON-only instructions must still hold on
+# their own for providers where this flag cannot be honored.
+output:
+  strict_json_mode: true
+  # The Language Agent (Phase 3.5, Output Validation & Error Recovery)
+  # is expected to reject and optionally retry any response that fails
+  # `pydantic.TypeAdapter(ParsedInstruction).validate_json(...)`,
+  # rather than attempting to silently coerce a malformed response into
+  # something schema-shaped.
+  validation_strategy: "strict_schema_validation"
+  # How many additional attempts the Language Agent (Phase 3.5) should
+  # make if a response fails schema validation, before surfacing a
+  # hard failure to its caller. A single retry catches the common
+  # transient case (an isolated formatting slip); repeated failures
+  # past that point indicate a prompt/model mismatch worth surfacing,
+  # not silently masking with more retries.
+  max_retries: 1
+
+# ----------------------------------------------------------------------
+# Model compatibility
+# ----------------------------------------------------------------------
+# Prompt version 1.1.0 has been designed and reviewed (see
+# prompt_version.md) against instruction-following chat models capable
+# of reliable structured JSON output. This list is a starting
+# compatibility statement, not a runtime allowlist enforced by any
+# code in this phase -- Phase 3.6 (Testing & Benchmarking) is where
+# each entry gets an actual benchmark score against
+# datasets/language/evaluation/, and this list should be updated with
+# that evidence as it becomes available rather than left as an
+# unverified claim.
+model_compatibility:
+  - provider: "openai"
+    models: ["gpt-4o", "gpt-4.1", "gpt-4o-mini"]
+    notes: "Supports native strict JSON mode; recommended default for strict_json_mode: true."
+  - provider: "anthropic"
+    models: ["claude-sonnet-5", "claude-opus-5"]
+    notes: "No dedicated JSON mode; relies on parser_prompt.txt's own JSON-only instructions, which have been written to hold without one."
+  - provider: "qwen"
+    models: ["qwen2.5-72b-instruct"]
+    notes: "Strong instruction following in early manual review; not yet benchmarked against datasets/language/evaluation/ (Phase 3.6)."
+  - provider: "meta"
+    models: ["llama-3.1-70b-instruct", "llama-3.1-8b-instruct"]
+    notes: "Smaller variants may need a lower max_tokens ceiling and closer monitoring of multi-task output completeness; not yet benchmarked."
+  - provider: "microsoft"
+    models: ["phi-4"]
+    notes: "Candidate for a low-resource/edge deployment profile; not yet benchmarked."
+
+# ----------------------------------------------------------------------
+# Configuration notes
+# ----------------------------------------------------------------------
+# Free-form notes for whoever next edits this file. Kept as actual
+# structured entries (not a prose paragraph) so a future automated
+# config-linting step (should one be added) can enumerate them without
+# parsing natural language.
+notes:
+  - "This file is read-only configuration data. No code in this repository parses it yet -- the Language Agent (Phase 3.4) is the first intended reader."
+  - "prompt_version and schema_version here are a point-in-time snapshot; prompt_version.md is the authoritative changelog if the two ever appear to disagree."
+  - "model_compatibility entries marked 'not yet benchmarked' should be updated with real evaluation scores once Phase 3.6 exists -- do not treat them as validated performance claims until then."

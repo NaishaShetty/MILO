@@ -1,0 +1,92 @@
+# Continuous Integration
+#
+# Runs on every push and pull request. Keeps the backend's static
+# quality gates (formatting, linting, typing), its unit test suite
+# (including the Phase 3.7 API tests, `backend/tests/test_api_*.py`),
+# and the Phase 3.7 frontend's type-check/test suite green without
+# requiring a human to run them locally first. Neither job makes a
+# real LLM API call -- the backend's `LanguageAgent` is always mocked
+# (see `backend/tests/test_api_language.py`'s docstring) and the
+# frontend's API client is always mocked (see
+# `frontend/src/App.test.tsx`'s docstring).
+#
+# Scope note: this project's `test_*.py` files split into two kinds --
+# genuine unit tests (backend/tests/) and hands-on integration scripts
+# that launch AI2-THOR/Unity or load multi-GB vision model weights
+# (backend/**/test_*.py elsewhere, e.g. scene/test_scene.py,
+# vision/segmenters/test_sam2.py). Only the former can run on a
+# standard GitHub-hosted runner; the latter are outside CI's scope
+# until a GPU/simulator-capable runner exists (see .github/README.md).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend -- format, lint, type-check, test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Supported interpreter for this project -- matches the cp39
+      # PyTorch wheel used in backend/scripts/download_torch.py and the
+      # version documented in the README's setup instructions.
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Check formatting (black)
+        run: black --check backend
+
+      - name: Lint (ruff)
+        run: ruff check backend
+
+      - name: Type-check (mypy)
+        run: mypy backend
+
+      # Run from backend/ so imports resolve the same way they do for a
+      # local developer (see backend/tests/test_task.py's docstring).
+      # Scoped to tests/ -- see the module-level comment above. Already
+      # includes the Phase 3.7 API tests (test_api_language.py,
+      # test_api_health.py), no separate step needed.
+      - name: Run test suite (pytest)
+        working-directory: backend
+        run: python -m pytest tests/ -v
+
+  frontend:
+    name: Frontend -- type-check, test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      # Vitest + Testing Library against a fully mocked API client
+      # (src/App.test.tsx, src/api/language.test.ts) -- no real backend
+      # or network access involved.
+      - name: Run test suite (vitest)
+        run: npm test

@@ -1,0 +1,1155 @@
+{
+  "reproducibility": {
+    "timestamp_utc": "2026-08-09T12:05:11.374719+00:00",
+    "git_commit": null,
+    "python_version": "3.14.6",
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+    "planner": "RuleBasedPlanner",
+    "simulator": "FakeSimulator (deterministic in-memory fake; not real AI2-THOR)",
+    "embedding_model": "HashingEmbedder (deterministic, offline, lexical)",
+    "vector_store": "SQLiteVectorStore",
+    "memory_store": "SQLiteMemoryStore",
+    "task_set": [
+      "A_object_recall_mug",
+      "B_episodic_experience_mug",
+      "C_failure_recovery_fridge",
+      "D_stale_memory_mug",
+      "E_conflicting_memory_mug"
+    ],
+    "seeds": {
+      "A_object_recall_mug": 1001,
+      "B_episodic_experience_mug": 1002,
+      "C_failure_recovery_fridge": 1003,
+      "D_stale_memory_mug": 1004,
+      "E_conflicting_memory_mug": 1005
+    },
+    "hardware": "CI/dev machine CPU (no GPU used by this benchmark)",
+    "determinism": "Fully deterministic (RuleBasedPlanner + FakeSimulator, no LLM, no randomness). Repeated runs are byte-identical, not independent trials -- see this module's docstring."
+  },
+  "episodes": [
+    {
+      "scenario_id": "A_object_recall_mug",
+      "category": "A_object_location_recall",
+      "seed": 1001,
+      "condition": "memory_off",
+      "episode_label": "episode_1_first_visit",
+      "task_id": "A-mug-ep1",
+      "goal": "find",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "planning_ms": 0.13598500027001137,
+        "execution_ms": 0.14214900011211284
+      },
+      "total_latency_ms": 0.2781340003821242
+    },
+    {
+      "scenario_id": "A_object_recall_mug",
+      "category": "A_object_location_recall",
+      "seed": 1001,
+      "condition": "memory_off",
+      "episode_label": "episode_2_recall",
+      "task_id": "A-mug-ep2",
+      "goal": "find",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "planning_ms": 0.05414099996414734,
+        "execution_ms": 0.071254999966186
+      },
+      "total_latency_ms": 0.12539599993033335
+    },
+    {
+      "scenario_id": "A_object_recall_mug",
+      "category": "A_object_location_recall",
+      "seed": 1001,
+      "condition": "memory_on",
+      "episode_label": "episode_1_first_visit",
+      "task_id": "A-mug-ep1",
+      "goal": "find",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "memory_retrieval_ms": 0.21076999973956845,
+        "planning_ms": 0.07487700031560962,
+        "execution_ms": 0.09620499986340292,
+        "memory_write_ms": 1.485789000071236
+      },
+      "total_latency_ms": 1.867640999989817
+    },
+    {
+      "scenario_id": "A_object_recall_mug",
+      "category": "A_object_location_recall",
+      "seed": 1001,
+      "condition": "memory_on",
+      "episode_label": "episode_2_recall",
+      "task_id": "A-mug-ep2",
+      "goal": "find",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 4,
+      "plan_step_count": 4,
+      "plan_targets": [
+        "table",
+        "table",
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 2,
+      "memory_used_in_plan": true,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "memory_retrieval_ms": 0.7098040000528272,
+        "planning_ms": 0.19445499992798432,
+        "execution_ms": 0.1932559998749639,
+        "memory_write_ms": 1.3950000002296292
+      },
+      "total_latency_ms": 2.4925150000854046
+    },
+    {
+      "scenario_id": "B_episodic_experience_mug",
+      "category": "B_episodic_experience",
+      "seed": 1002,
+      "condition": "memory_off",
+      "episode_label": "episode_1_find",
+      "task_id": "B-mug-ep1",
+      "goal": "find",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "planning_ms": 0.06798100002924912,
+        "execution_ms": 0.08423300005233614
+      },
+      "total_latency_ms": 0.15221400008158525
+    },
+    {
+      "scenario_id": "B_episodic_experience_mug",
+      "category": "B_episodic_experience",
+      "seed": 1002,
+      "condition": "memory_off",
+      "episode_label": "episode_2_related_task",
+      "task_id": "B-mug-ep2",
+      "goal": "bring",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 3,
+      "plan_step_count": 3,
+      "plan_targets": [
+        "mug",
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "planning_ms": 0.04905100013274932,
+        "execution_ms": 0.08148500000970671
+      },
+      "total_latency_ms": 0.13053600014245603
+    },
+    {
+      "scenario_id": "B_episodic_experience_mug",
+      "category": "B_episodic_experience",
+      "seed": 1002,
+      "condition": "memory_on",
+      "episode_label": "episode_1_find",
+      "task_id": "B-mug-ep1",
+      "goal": "find",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "memory_retrieval_ms": 0.1291700000365381,
+        "planning_ms": 0.0678519995744864,
+        "execution_ms": 0.07890999995652237,
+        "memory_write_ms": 0.9334639998996863
+      },
+      "total_latency_ms": 1.2093959994672332
+    },
+    {
+      "scenario_id": "B_episodic_experience_mug",
+      "category": "B_episodic_experience",
+      "seed": 1002,
+      "condition": "memory_on",
+      "episode_label": "episode_2_related_task",
+      "task_id": "B-mug-ep2",
+      "goal": "bring",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 5,
+      "plan_step_count": 5,
+      "plan_targets": [
+        "table",
+        "table",
+        "mug",
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 2,
+      "memory_used_in_plan": true,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "memory_retrieval_ms": 0.3610429998843756,
+        "planning_ms": 0.08406999995713704,
+        "execution_ms": 0.1394359996993444,
+        "memory_write_ms": 1.1558350001905637
+      },
+      "total_latency_ms": 1.7403839997314208
+    },
+    {
+      "scenario_id": "C_failure_recovery_fridge",
+      "category": "C_failure_recovery",
+      "seed": 1003,
+      "condition": "memory_off",
+      "episode_label": "episode_1_blocked",
+      "task_id": "C-fridge-task",
+      "goal": "find",
+      "object": "fridge",
+      "success": false,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "fridge",
+        "fridge"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "planning_ms": 0.0794800002950069,
+        "execution_ms": 0.2003650001825008
+      },
+      "total_latency_ms": 0.2798450004775077
+    },
+    {
+      "scenario_id": "C_failure_recovery_fridge",
+      "category": "C_failure_recovery",
+      "seed": 1003,
+      "condition": "memory_off",
+      "episode_label": "episode_2_retry_cleared",
+      "task_id": "C-fridge-task",
+      "goal": "find",
+      "object": "fridge",
+      "success": true,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "fridge",
+        "fridge"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "planning_ms": 0.05326300015440211,
+        "execution_ms": 0.07045800020932802
+      },
+      "total_latency_ms": 0.12372100036373013
+    },
+    {
+      "scenario_id": "C_failure_recovery_fridge",
+      "category": "C_failure_recovery",
+      "seed": 1003,
+      "condition": "memory_on",
+      "episode_label": "episode_1_blocked",
+      "task_id": "C-fridge-task",
+      "goal": "find",
+      "object": "fridge",
+      "success": false,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "fridge",
+        "fridge"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": "object not reachable",
+      "recovered_from": null,
+      "latencies_ms": {
+        "memory_retrieval_ms": 0.18515200008550892,
+        "planning_ms": 0.06607000022995635,
+        "execution_ms": 0.14971299970056862,
+        "memory_write_ms": 0.3808639999078878
+      },
+      "total_latency_ms": 0.7817989999239217
+    },
+    {
+      "scenario_id": "C_failure_recovery_fridge",
+      "category": "C_failure_recovery",
+      "seed": 1003,
+      "condition": "memory_on",
+      "episode_label": "episode_2_retry_cleared",
+      "task_id": "C-fridge-task",
+      "goal": "find",
+      "object": "fridge",
+      "success": true,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "fridge",
+        "fridge"
+      ],
+      "memory_context_count": 1,
+      "memory_used_in_plan": true,
+      "failure_cause": null,
+      "recovered_from": [
+        "a867a794-d074-4e9f-a122-1488509bc7ef"
+      ],
+      "latencies_ms": {
+        "memory_retrieval_ms": 0.3171749999637541,
+        "planning_ms": 0.06343699988065055,
+        "execution_ms": 0.07760299968140316,
+        "memory_write_ms": 1.0710760002439201
+      },
+      "total_latency_ms": 1.529290999769728
+    },
+    {
+      "scenario_id": "D_stale_memory_mug",
+      "category": "D_stale_memory",
+      "seed": 1004,
+      "condition": "memory_off",
+      "episode_label": "episode_1_learn_location",
+      "task_id": "D-mug-ep1",
+      "goal": "find",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "planning_ms": 0.059235999742668355,
+        "execution_ms": 0.07469999991371878
+      },
+      "total_latency_ms": 0.13393599965638714
+    },
+    {
+      "scenario_id": "D_stale_memory_mug",
+      "category": "D_stale_memory",
+      "seed": 1004,
+      "condition": "memory_off",
+      "episode_label": "episode_2_soft_stale",
+      "task_id": "D-mug-ep2",
+      "goal": "find",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "planning_ms": 0.041475999751128256,
+        "execution_ms": 0.07130700032575987
+      },
+      "total_latency_ms": 0.11278300007688813
+    },
+    {
+      "scenario_id": "D_stale_memory_mug",
+      "category": "D_stale_memory",
+      "seed": 1004,
+      "condition": "memory_off",
+      "episode_label": "episode_3_hard_stale",
+      "task_id": "D-mug-ep3",
+      "goal": "find",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "planning_ms": 0.04216800016365596,
+        "execution_ms": 0.06258899975364329
+      },
+      "total_latency_ms": 0.10475699991729925
+    },
+    {
+      "scenario_id": "D_stale_memory_mug",
+      "category": "D_stale_memory",
+      "seed": 1004,
+      "condition": "memory_on",
+      "episode_label": "episode_1_learn_location",
+      "task_id": "D-mug-ep1",
+      "goal": "find",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "memory_retrieval_ms": 0.14618400018662214,
+        "planning_ms": 0.06440800007112557,
+        "execution_ms": 0.07301799996639602,
+        "memory_write_ms": 0.8441840000159573
+      },
+      "total_latency_ms": 1.127794000240101
+    },
+    {
+      "scenario_id": "D_stale_memory_mug",
+      "category": "D_stale_memory",
+      "seed": 1004,
+      "condition": "memory_on",
+      "episode_label": "episode_2_soft_stale",
+      "task_id": "D-mug-ep2",
+      "goal": "find",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 4,
+      "plan_step_count": 4,
+      "plan_targets": [
+        "table",
+        "table",
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 2,
+      "memory_used_in_plan": true,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "memory_retrieval_ms": 0.36711199982164544,
+        "planning_ms": 0.078237999787234,
+        "execution_ms": 0.12210800014145207,
+        "memory_write_ms": 1.1337040000398702
+      },
+      "total_latency_ms": 1.7011619997902017
+    },
+    {
+      "scenario_id": "D_stale_memory_mug",
+      "category": "D_stale_memory",
+      "seed": 1004,
+      "condition": "memory_on",
+      "episode_label": "episode_3_hard_stale",
+      "task_id": "D-mug-ep3",
+      "goal": "find",
+      "object": "mug",
+      "success": false,
+      "plan_success": true,
+      "action_count": 4,
+      "plan_step_count": 4,
+      "plan_targets": [
+        "table",
+        "table",
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 4,
+      "memory_used_in_plan": true,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "memory_retrieval_ms": 0.5244730000413256,
+        "planning_ms": 0.07574799974463531,
+        "execution_ms": 0.14350399987961282,
+        "memory_write_ms": 0.41496199992252514
+      },
+      "total_latency_ms": 1.1586869995880988
+    },
+    {
+      "scenario_id": "E_conflicting_memory_mug",
+      "category": "E_conflicting_memory",
+      "seed": 1005,
+      "condition": "memory_off",
+      "episode_label": "episode_1_conflicting_evidence",
+      "task_id": "E-mug-ep1",
+      "goal": "find",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 2,
+      "plan_step_count": 2,
+      "plan_targets": [
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 0,
+      "memory_used_in_plan": false,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "planning_ms": 0.05978799981676275,
+        "execution_ms": 0.07308300018848968
+      },
+      "total_latency_ms": 0.13287100000525243
+    },
+    {
+      "scenario_id": "E_conflicting_memory_mug",
+      "category": "E_conflicting_memory",
+      "seed": 1005,
+      "condition": "memory_on",
+      "episode_label": "episode_1_conflicting_evidence",
+      "task_id": "E-mug-ep1",
+      "goal": "find",
+      "object": "mug",
+      "success": true,
+      "plan_success": true,
+      "action_count": 4,
+      "plan_step_count": 4,
+      "plan_targets": [
+        "cabinet",
+        "cabinet",
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 2,
+      "memory_used_in_plan": true,
+      "failure_cause": null,
+      "recovered_from": null,
+      "latencies_ms": {
+        "memory_retrieval_ms": 0.5507729997589195,
+        "planning_ms": 0.1235390000147163,
+        "execution_ms": 0.1358540002911468,
+        "memory_write_ms": 1.2096529999325867
+      },
+      "total_latency_ms": 2.0198189999973692
+    }
+  ],
+  "comparison": {
+    "pairs": [
+      {
+        "scenario_id": "A_object_recall_mug",
+        "episode_label": "episode_1_first_visit",
+        "success_off": true,
+        "success_on": true,
+        "success_changed": false,
+        "delta_actions": 0,
+        "delta_total_latency_ms": 1.5895069996076927,
+        "memory_used_in_plan_on": false
+      },
+      {
+        "scenario_id": "A_object_recall_mug",
+        "episode_label": "episode_2_recall",
+        "success_off": true,
+        "success_on": true,
+        "success_changed": false,
+        "delta_actions": 2,
+        "delta_total_latency_ms": 2.3671190001550713,
+        "memory_used_in_plan_on": true
+      },
+      {
+        "scenario_id": "B_episodic_experience_mug",
+        "episode_label": "episode_1_find",
+        "success_off": true,
+        "success_on": true,
+        "success_changed": false,
+        "delta_actions": 0,
+        "delta_total_latency_ms": 1.057181999385648,
+        "memory_used_in_plan_on": false
+      },
+      {
+        "scenario_id": "B_episodic_experience_mug",
+        "episode_label": "episode_2_related_task",
+        "success_off": true,
+        "success_on": true,
+        "success_changed": false,
+        "delta_actions": 2,
+        "delta_total_latency_ms": 1.6098479995889647,
+        "memory_used_in_plan_on": true
+      },
+      {
+        "scenario_id": "C_failure_recovery_fridge",
+        "episode_label": "episode_1_blocked",
+        "success_off": false,
+        "success_on": false,
+        "success_changed": false,
+        "delta_actions": 0,
+        "delta_total_latency_ms": 0.501953999446414,
+        "memory_used_in_plan_on": false
+      },
+      {
+        "scenario_id": "C_failure_recovery_fridge",
+        "episode_label": "episode_2_retry_cleared",
+        "success_off": true,
+        "success_on": true,
+        "success_changed": false,
+        "delta_actions": 0,
+        "delta_total_latency_ms": 1.4055699994059978,
+        "memory_used_in_plan_on": true
+      },
+      {
+        "scenario_id": "D_stale_memory_mug",
+        "episode_label": "episode_1_learn_location",
+        "success_off": true,
+        "success_on": true,
+        "success_changed": false,
+        "delta_actions": 0,
+        "delta_total_latency_ms": 0.9938580005837139,
+        "memory_used_in_plan_on": false
+      },
+      {
+        "scenario_id": "D_stale_memory_mug",
+        "episode_label": "episode_2_soft_stale",
+        "success_off": true,
+        "success_on": true,
+        "success_changed": false,
+        "delta_actions": 2,
+        "delta_total_latency_ms": 1.5883789997133135,
+        "memory_used_in_plan_on": true
+      },
+      {
+        "scenario_id": "D_stale_memory_mug",
+        "episode_label": "episode_3_hard_stale",
+        "success_off": true,
+        "success_on": false,
+        "success_changed": true,
+        "delta_actions": 2,
+        "delta_total_latency_ms": 1.0539299996707996,
+        "memory_used_in_plan_on": true
+      },
+      {
+        "scenario_id": "E_conflicting_memory_mug",
+        "episode_label": "episode_1_conflicting_evidence",
+        "success_off": true,
+        "success_on": true,
+        "success_changed": false,
+        "delta_actions": 2,
+        "delta_total_latency_ms": 1.8869479999921168,
+        "memory_used_in_plan_on": true
+      }
+    ],
+    "summary": {
+      "n_episode_pairs": 10,
+      "success_rate_memory_off": 0.9,
+      "success_rate_memory_on": 0.8,
+      "success_rate_delta_pp": -9.999999999999998,
+      "mean_actions_memory_off": 2.1,
+      "mean_actions_memory_on": 3.1,
+      "episodes_where_success_changed": 1,
+      "episodes_where_memory_influenced_plan": 6
+    }
+  },
+  "memory_size_experiment": [
+    {
+      "memory_count": 11,
+      "retrieval_latency_ms": 0.8453479999843694,
+      "task_success": true,
+      "plan_targets": [
+        "table",
+        "table",
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 5,
+      "real_memory_retrieved": true
+    },
+    {
+      "memory_count": 101,
+      "retrieval_latency_ms": 2.540999999837368,
+      "task_success": true,
+      "plan_targets": [
+        "table",
+        "table",
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 5,
+      "real_memory_retrieved": true
+    },
+    {
+      "memory_count": 1001,
+      "retrieval_latency_ms": 25.29321899964998,
+      "task_success": true,
+      "plan_targets": [
+        "table",
+        "table",
+        "mug",
+        "mug"
+      ],
+      "memory_context_count": 5,
+      "real_memory_retrieved": true
+    }
+  ],
+  "task_level_ablation": {
+    "A_object_recall": {
+      "A_vector_only": [
+        {
+          "scenario_id": "A_object_recall_mug",
+          "category": "A_object_location_recall",
+          "seed": 1001,
+          "condition": "memory_on",
+          "episode_label": "episode_1_first_visit",
+          "task_id": "A-mug-ep1",
+          "goal": "find",
+          "object": "mug",
+          "success": true,
+          "plan_success": true,
+          "action_count": 2,
+          "plan_step_count": 2,
+          "plan_targets": [
+            "mug",
+            "mug"
+          ],
+          "memory_context_count": 0,
+          "memory_used_in_plan": false,
+          "failure_cause": null,
+          "recovered_from": null,
+          "latencies_ms": {
+            "memory_retrieval_ms": 0.25107000010393676,
+            "planning_ms": 0.1498060000812984,
+            "execution_ms": 0.17368899989378406,
+            "memory_write_ms": 1.322358999914286
+          },
+          "total_latency_ms": 1.8969239999933052
+        },
+        {
+          "scenario_id": "A_object_recall_mug",
+          "category": "A_object_location_recall",
+          "seed": 1001,
+          "condition": "memory_on",
+          "episode_label": "episode_2_recall",
+          "task_id": "A-mug-ep2",
+          "goal": "find",
+          "object": "mug",
+          "success": true,
+          "plan_success": true,
+          "action_count": 4,
+          "plan_step_count": 4,
+          "plan_targets": [
+            "table",
+            "table",
+            "mug",
+            "mug"
+          ],
+          "memory_context_count": 2,
+          "memory_used_in_plan": true,
+          "failure_cause": null,
+          "recovered_from": null,
+          "latencies_ms": {
+            "memory_retrieval_ms": 0.5369489999793586,
+            "planning_ms": 0.1405100001647952,
+            "execution_ms": 0.17139999999926658,
+            "memory_write_ms": 1.5549720001217793
+          },
+          "total_latency_ms": 2.4038310002651997
+        }
+      ],
+      "B_similarity_confidence": [
+        {
+          "scenario_id": "A_object_recall_mug",
+          "category": "A_object_location_recall",
+          "seed": 1001,
+          "condition": "memory_on",
+          "episode_label": "episode_1_first_visit",
+          "task_id": "A-mug-ep1",
+          "goal": "find",
+          "object": "mug",
+          "success": true,
+          "plan_success": true,
+          "action_count": 2,
+          "plan_step_count": 2,
+          "plan_targets": [
+            "mug",
+            "mug"
+          ],
+          "memory_context_count": 0,
+          "memory_used_in_plan": false,
+          "failure_cause": null,
+          "recovered_from": null,
+          "latencies_ms": {
+            "memory_retrieval_ms": 0.17175399989355356,
+            "planning_ms": 0.08954099985203356,
+            "execution_ms": 0.10659700001269812,
+            "memory_write_ms": 1.1932239999623562
+          },
+          "total_latency_ms": 1.5611159997206414
+        },
+        {
+          "scenario_id": "A_object_recall_mug",
+          "category": "A_object_location_recall",
+          "seed": 1001,
+          "condition": "memory_on",
+          "episode_label": "episode_2_recall",
+          "task_id": "A-mug-ep2",
+          "goal": "find",
+          "object": "mug",
+          "success": true,
+          "plan_success": true,
+          "action_count": 4,
+          "plan_step_count": 4,
+          "plan_targets": [
+            "table",
+            "table",
+            "mug",
+            "mug"
+          ],
+          "memory_context_count": 2,
+          "memory_used_in_plan": true,
+          "failure_cause": null,
+          "recovered_from": null,
+          "latencies_ms": {
+            "memory_retrieval_ms": 0.46745000008741044,
+            "planning_ms": 0.10181500010730815,
+            "execution_ms": 0.1624680003260437,
+            "memory_write_ms": 1.5838710000934952
+          },
+          "total_latency_ms": 2.3156040006142575
+        }
+      ],
+      "C_similarity_confidence_recency": [
+        {
+          "scenario_id": "A_object_recall_mug",
+          "category": "A_object_location_recall",
+          "seed": 1001,
+          "condition": "memory_on",
+          "episode_label": "episode_1_first_visit",
+          "task_id": "A-mug-ep1",
+          "goal": "find",
+          "object": "mug",
+          "success": true,
+          "plan_success": true,
+          "action_count": 2,
+          "plan_step_count": 2,
+          "plan_targets": [
+            "mug",
+            "mug"
+          ],
+          "memory_context_count": 0,
+          "memory_used_in_plan": false,
+          "failure_cause": null,
+          "recovered_from": null,
+          "latencies_ms": {
+            "memory_retrieval_ms": 0.16937600003075204,
+            "planning_ms": 0.0827480002953962,
+            "execution_ms": 0.10027599955719779,
+            "memory_write_ms": 1.1681080000016664
+          },
+          "total_latency_ms": 1.5205079998850124
+        },
+        {
+          "scenario_id": "A_object_recall_mug",
+          "category": "A_object_location_recall",
+          "seed": 1001,
+          "condition": "memory_on",
+          "episode_label": "episode_2_recall",
+          "task_id": "A-mug-ep2",
+          "goal": "find",
+          "object": "mug",
+          "success": true,
+          "plan_success": true,
+          "action_count": 4,
+          "plan_step_count": 4,
+          "plan_targets": [
+            "table",
+            "table",
+            "mug",
+            "mug"
+          ],
+          "memory_context_count": 2,
+          "memory_used_in_plan": true,
+          "failure_cause": null,
+          "recovered_from": null,
+          "latencies_ms": {
+            "memory_retrieval_ms": 0.4632179998225183,
+            "planning_ms": 0.19210099981137319,
+            "execution_ms": 0.1611960001355328,
+            "memory_write_ms": 1.5480059996662021
+          },
+          "total_latency_ms": 2.3645209994356264
+        }
+      ],
+      "D_full_hybrid": [
+        {
+          "scenario_id": "A_object_recall_mug",
+          "category": "A_object_location_recall",
+          "seed": 1001,
+          "condition": "memory_on",
+          "episode_label": "episode_1_first_visit",
+          "task_id": "A-mug-ep1",
+          "goal": "find",
+          "object": "mug",
+          "success": true,
+          "plan_success": true,
+          "action_count": 2,
+          "plan_step_count": 2,
+          "plan_targets": [
+            "mug",
+            "mug"
+          ],
+          "memory_context_count": 0,
+          "memory_used_in_plan": false,
+          "failure_cause": null,
+          "recovered_from": null,
+          "latencies_ms": {
+            "memory_retrieval_ms": 0.16886599996723817,
+            "planning_ms": 0.08257599984062836,
+            "execution_ms": 0.12970800025868812,
+            "memory_write_ms": 1.3608740000563557
+          },
+          "total_latency_ms": 1.7420240001229104
+        },
+        {
+          "scenario_id": "A_object_recall_mug",
+          "category": "A_object_location_recall",
+          "seed": 1001,
+          "condition": "memory_on",
+          "episode_label": "episode_2_recall",
+          "task_id": "A-mug-ep2",
+          "goal": "find",
+          "object": "mug",
+          "success": true,
+          "plan_success": true,
+          "action_count": 4,
+          "plan_step_count": 4,
+          "plan_targets": [
+            "table",
+            "table",
+            "mug",
+            "mug"
+          ],
+          "memory_context_count": 2,
+          "memory_used_in_plan": true,
+          "failure_cause": null,
+          "recovered_from": null,
+          "latencies_ms": {
+            "memory_retrieval_ms": 0.6499850001091545,
+            "planning_ms": 0.1289490000999649,
+            "execution_ms": 0.20775100028913585,
+            "memory_write_ms": 1.5735060001134116
+          },
+          "total_latency_ms": 2.560191000611667
+        }
+      ]
+    },
+    "E_conflicting_memory": {
+      "A_vector_only": [
+        {
+          "scenario_id": "E_conflicting_memory_mug",
+          "category": "E_conflicting_memory",
+          "seed": 1005,
+          "condition": "memory_on",
+          "episode_label": "episode_1_conflicting_evidence",
+          "task_id": "E-mug-ep1",
+          "goal": "find",
+          "object": "mug",
+          "success": true,
+          "plan_success": true,
+          "action_count": 4,
+          "plan_step_count": 4,
+          "plan_targets": [
+            "table",
+            "table",
+            "mug",
+            "mug"
+          ],
+          "memory_context_count": 2,
+          "memory_used_in_plan": true,
+          "failure_cause": null,
+          "recovered_from": null,
+          "latencies_ms": {
+            "memory_retrieval_ms": 0.5209470000409056,
+            "planning_ms": 0.09905200022330973,
+            "execution_ms": 0.15956800007188576,
+            "memory_write_ms": 1.5312539999285946
+          },
+          "total_latency_ms": 2.3108210002646956
+        }
+      ],
+      "B_similarity_confidence": [
+        {
+          "scenario_id": "E_conflicting_memory_mug",
+          "category": "E_conflicting_memory",
+          "seed": 1005,
+          "condition": "memory_on",
+          "episode_label": "episode_1_conflicting_evidence",
+          "task_id": "E-mug-ep1",
+          "goal": "find",
+          "object": "mug",
+          "success": true,
+          "plan_success": true,
+          "action_count": 4,
+          "plan_step_count": 4,
+          "plan_targets": [
+            "cabinet",
+            "cabinet",
+            "mug",
+            "mug"
+          ],
+          "memory_context_count": 2,
+          "memory_used_in_plan": true,
+          "failure_cause": null,
+          "recovered_from": null,
+          "latencies_ms": {
+            "memory_retrieval_ms": 0.561937000384205,
+            "planning_ms": 0.10077499973704107,
+            "execution_ms": 0.16026000002966612,
+            "memory_write_ms": 1.5385919996333541
+          },
+          "total_latency_ms": 2.3615639997842663
+        }
+      ],
+      "C_similarity_confidence_recency": [
+        {
+          "scenario_id": "E_conflicting_memory_mug",
+          "category": "E_conflicting_memory",
+          "seed": 1005,
+          "condition": "memory_on",
+          "episode_label": "episode_1_conflicting_evidence",
+          "task_id": "E-mug-ep1",
+          "goal": "find",
+          "object": "mug",
+          "success": true,
+          "plan_success": true,
+          "action_count": 4,
+          "plan_step_count": 4,
+          "plan_targets": [
+            "cabinet",
+            "cabinet",
+            "mug",
+            "mug"
+          ],
+          "memory_context_count": 2,
+          "memory_used_in_plan": true,
+          "failure_cause": null,
+          "recovered_from": null,
+          "latencies_ms": {
+            "memory_retrieval_ms": 0.5621559998871817,
+            "planning_ms": 0.0980150002760638,
+            "execution_ms": 0.17477900019002846,
+            "memory_write_ms": 1.505766000263975
+          },
+          "total_latency_ms": 2.340716000617249
+        }
+      ],
+      "D_full_hybrid": [
+        {
+          "scenario_id": "E_conflicting_memory_mug",
+          "category": "E_conflicting_memory",
+          "seed": 1005,
+          "condition": "memory_on",
+          "episode_label": "episode_1_conflicting_evidence",
+          "task_id": "E-mug-ep1",
+          "goal": "find",
+          "object": "mug",
+          "success": true,
+          "plan_success": true,
+          "action_count": 4,
+          "plan_step_count": 4,
+          "plan_targets": [
+            "cabinet",
+            "cabinet",
+            "mug",
+            "mug"
+          ],
+          "memory_context_count": 2,
+          "memory_used_in_plan": true,
+          "failure_cause": null,
+          "recovered_from": null,
+          "latencies_ms": {
+            "memory_retrieval_ms": 0.5680389999724866,
+            "planning_ms": 0.1374779999423481,
+            "execution_ms": 0.2056439998341375,
+            "memory_write_ms": 1.6963419998319296
+          },
+          "total_latency_ms": 2.607502999580902
+        }
+      ]
+    }
+  },
+  "memory_pollution": {
+    "total_episodes": 10,
+    "successful_episodes_naming_an_object": 8,
+    "semantic_memories_created": 9,
+    "episodic_memories_created": 8,
+    "failure_memories_created": 2,
+    "total_memories_created": 19,
+    "semantic_memories_per_successful_object_episode": 1.125
+  }
+}

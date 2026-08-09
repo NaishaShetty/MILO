@@ -1,0 +1,46 @@
+# ----------------------------------------------------------------------------
+# Keeps the Docker build context (repo root -- see docker/Dockerfile) to
+# just what the backend image needs: backend/requirements.txt and
+# backend/ source. Everything else here is either irrelevant to the
+# backend image, reproducible without being copied in, or simply large.
+# ----------------------------------------------------------------------------
+
+# Version control / CI / editor
+.git/
+.github/
+.claude/
+.vscode/
+.idea/
+
+# Python caches and test/type-check artifacts
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+
+# Model weights -- large, reproducible via ModelManager
+# (backend/config/model_manager.py), never baked into the image.
+models/*
+!models/.gitkeep
+
+# Large binary checked into scripts/ for local dev only (see
+# backend/scripts/download_torch.py) -- never needed inside the image
+# since requirements.txt installs torch from PyPI directly.
+backend/scripts/*.whl
+
+# Perception run outputs
+backend/outputs/*
+!backend/outputs/.gitkeep
+
+# Directories unrelated to the backend image
+datasets/
+docs/
+frontend/
+benchmarks/
+experiments/
+results/
+deployment/
+docker/
+
+# Env / secrets
+.env

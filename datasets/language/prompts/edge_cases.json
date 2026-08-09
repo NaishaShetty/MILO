@@ -1,0 +1,428 @@
+{
+  "$comment_purpose": "Edge-case library for the Language Understanding parser (backend/prompts/parser_prompt.txt). Unlike examples.json (unambiguous, straightforward commands) and negative_examples.json (what a bad output looks like), this file covers inputs that are individually tricky to parse correctly -- ambiguous referents, unknown objects/locations, pronouns, multiple candidate objects, missing targets, spatial relations, sequential phrasing, impossible requests, and clarification-required commands -- each paired with the CORRECT parse a well-behaved parser should produce for it.",
+  "$comment_responsibility": "Every entry here is a VALID input (something a real user might plausibly say) whose correct output is non-obvious, not a malformed example. This distinguishes it from negative_examples.json, whose bad_output fields are intentionally wrong.",
+  "$comment_consumers": "Prompt engineers stress-testing a parser_prompt.txt revision against exactly the inputs most likely to expose a regression; Phase 3.6 benchmarking, as a harder-than-average subset distinct from the main evaluation benchmark (datasets/language/evaluation/); Phase 3.5 (Output Validation & Error Recovery) design, particularly for the clarification-required and impossible-command categories.",
+  "$schema_version": "1.0.0",
+  "$prompt_version": "1.1.0",
+  "edge_cases": [
+    {
+      "id": "edge-ambig-001",
+      "category": "ambiguous_command",
+      "input": "Clean it up.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "clean",
+        "object": null,
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": null,
+        "needs_clarification": true,
+        "clarification_reason": "The pronoun 'it' has no antecedent in this instruction -- what needs cleaning is unknown."
+      },
+      "notes": "No prior conversational turn is available to this module (see language_interface_spec.md section 20, Assumptions -- one instruction per call). A bare pronoun with no referent must be flagged, not guessed."
+    },
+    {
+      "id": "edge-unknown-obj-001",
+      "category": "unknown_object",
+      "input": "Grab the frobnicator from the workshop.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "pick_up",
+        "object": "frobnicator",
+        "target": null,
+        "source_location": "workshop",
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the frobnicator is held by the robot",
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "notes": "The parser has no world model or vocabulary of known objects -- whether 'frobnicator' is a real, findable object in this household is a Planner/Scene-grounding question (Phase 4), never this module's. The instruction itself is not ambiguous in structure -- goal, object, and source location are all clearly stated -- so it must be represented faithfully, not flagged, even though the object name is unfamiliar."
+    },
+    {
+      "id": "edge-unknown-loc-001",
+      "category": "unknown_location",
+      "input": "Take the folder to the observatory.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "deliver",
+        "object": "folder",
+        "target": null,
+        "source_location": null,
+        "target_location": "observatory",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the folder is in the observatory",
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "notes": "Same principle as edge-unknown-obj-001, applied to a location instead of an object: 'observatory' being an implausible room for a typical household is a Planner/Scene-grounding concern, not a parsing ambiguity. The instruction is structurally unambiguous."
+    },
+    {
+      "id": "edge-pronoun-001",
+      "category": "pronoun_reference",
+      "input": "Pick up the red mug and put it on the shelf.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "pick_and_place",
+        "object": "red mug",
+        "target": null,
+        "source_location": null,
+        "target_location": "shelf",
+        "attributes": {
+          "color": "red",
+          "size": null,
+          "material": null,
+          "state": null,
+          "quantity": null,
+          "descriptors": null
+        },
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the red mug is on the shelf",
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "notes": "Unlike edge-ambig-001, 'it' here has an unambiguous antecedent WITHIN the same instruction ('the red mug', stated two clauses earlier). This is not ambiguity -- resolving an in-instruction pronoun reference is exactly what the parser must do to preserve intent, distinct from a pronoun with no referent at all."
+    },
+    {
+      "id": "edge-multi-obj-001",
+      "category": "multiple_objects",
+      "input": "Pick up the apple and the orange from the counter.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "pick_up",
+        "object": "apple and orange",
+        "target": null,
+        "source_location": "counter",
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the apple and orange are held by the robot",
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "notes": "Two named objects sharing one action and one source location are represented as a single task with a compound 'object' string (preserving the user's own wording), not split into two subtasks -- splitting into a MultiTask would misrepresent this as two SEQUENTIAL goals when the instruction implies one joint pickup action."
+    },
+    {
+      "id": "edge-multi-obj-002",
+      "category": "multiple_objects",
+      "input": "Pick up the apple, then pick up the orange, and put both on the table.",
+      "expected_output": {
+        "task_type": "multi",
+        "task_id": null,
+        "goal": null,
+        "subtasks": [
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "pick_up",
+            "object": "apple",
+            "target": null,
+            "source_location": null,
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": null,
+            "postconditions": null,
+            "estimated_goal": "the apple is held by the robot",
+            "needs_clarification": false,
+            "clarification_reason": null
+          },
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "pick_up",
+            "object": "orange",
+            "target": null,
+            "source_location": null,
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": null,
+            "postconditions": null,
+            "estimated_goal": "the orange is held by the robot",
+            "needs_clarification": false,
+            "clarification_reason": null
+          },
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "place",
+            "object": "apple and orange",
+            "target": null,
+            "source_location": null,
+            "target_location": "table",
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": ["both the apple and the orange have been picked up"],
+            "postconditions": null,
+            "estimated_goal": "the apple and orange are on the table",
+            "needs_clarification": false,
+            "clarification_reason": null
+          }
+        ],
+        "priority": null,
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "notes": "Contrast with edge-multi-obj-001: here the user's own wording ('then', explicit separate pickups) signals sequenced sub-goals, so this decomposes into a MultiTask -- the deciding factor is the user's phrasing, not the number of objects involved."
+    },
+    {
+      "id": "edge-missing-target-001",
+      "category": "missing_target",
+      "input": "Move the recycling bin.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "place",
+        "object": "recycling bin",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": null,
+        "needs_clarification": true,
+        "clarification_reason": "No destination was given for moving the recycling bin -- where it should end up is unknown."
+      },
+      "notes": "Unlike a simple missing-information case (null is sufficient), a 'move' action with genuinely no destination anywhere in the instruction cannot be executed meaningfully without one -- this is flagged as needing clarification rather than left as a silently under-specified task, since proceeding without a destination risks the wrong (or no) action."
+    },
+    {
+      "id": "edge-spatial-001",
+      "category": "spatial_relation",
+      "input": "Put the remote between the two couch cushions.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "place",
+        "object": "remote",
+        "target": "couch cushions",
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": [
+          {
+            "constraint_type": "spatial",
+            "description": "must be positioned between the two couch cushions",
+            "value": null
+          }
+        ],
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the remote is between the two couch cushions",
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "notes": "A spatial relation more specific than a plain target_location ('between', not 'on'/'in') is captured as a SPATIAL constraint alongside 'target' naming the reference object(s), since target_location's semantics (a location, not a relation to another object) don't fit 'between two things' precisely."
+    },
+    {
+      "id": "edge-spatial-002",
+      "category": "spatial_relation",
+      "input": "Place the lamp to the left of the bookshelf.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "place",
+        "object": "lamp",
+        "target": "bookshelf",
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": [
+          {
+            "constraint_type": "spatial",
+            "description": "must be positioned to the left of the bookshelf",
+            "value": "left"
+          }
+        ],
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the lamp is to the left of the bookshelf",
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "notes": "A directional relation ('left of') is extractable as a structured 'value' on the constraint, distinct from edge-spatial-001 where 'between' has no single-word structured value."
+    },
+    {
+      "id": "edge-sequential-001",
+      "category": "sequential_command",
+      "input": "Before you water the plants, close the blinds.",
+      "expected_output": {
+        "task_type": "multi",
+        "task_id": null,
+        "goal": null,
+        "subtasks": [
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "close",
+            "object": "blinds",
+            "target": null,
+            "source_location": null,
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": null,
+            "postconditions": null,
+            "estimated_goal": "the blinds are closed",
+            "needs_clarification": false,
+            "clarification_reason": null
+          },
+          {
+            "task_type": "single",
+            "task_id": null,
+            "goal": "water_the_plant",
+            "object": "plants",
+            "target": null,
+            "source_location": null,
+            "target_location": null,
+            "attributes": null,
+            "constraints": null,
+            "priority": null,
+            "preconditions": ["the blinds have been closed"],
+            "postconditions": null,
+            "estimated_goal": "the plants have been watered",
+            "needs_clarification": false,
+            "clarification_reason": null
+          }
+        ],
+        "priority": null,
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "notes": "The clause order in the sentence ('before you water the plants, close the blinds') is the REVERSE of execution order. 'subtasks' must preserve INTENDED execution order (blinds first), not sentence order -- this is the key trap 'before'-structured instructions set for a naive parser that just walks the sentence left to right."
+    },
+    {
+      "id": "edge-impossible-001",
+      "category": "impossible_command",
+      "input": "Fly to the ceiling and dust the light fixture.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "clean",
+        "object": "light fixture",
+        "target": null,
+        "source_location": null,
+        "target_location": "ceiling",
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "the light fixture is dusted",
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "notes": "Whether this ground robot can physically reach the ceiling is a Planner/Execution feasibility question (Phase 4+), not something this module determines -- it has no embodiment model or physical capability awareness. The instruction's INTENT is structurally clear (clean the light fixture, located at the ceiling), so it is parsed faithfully; infeasibility is surfaced later, by the module that actually knows the robot's physical limits."
+    },
+    {
+      "id": "edge-impossible-002",
+      "category": "impossible_command",
+      "input": "Cook me a five-course dinner.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "cook",
+        "object": "five-course dinner",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": {
+          "color": null,
+          "size": null,
+          "material": null,
+          "state": null,
+          "quantity": 5,
+          "descriptors": ["course dinner"]
+        },
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": "a five-course dinner has been cooked",
+        "needs_clarification": false,
+        "clarification_reason": null
+      },
+      "notes": "Contrast with negative_examples.json's neg-unsupported-action-001: THAT example asks for diagnostic reasoning and autonomous purchasing (outside any plausible household-robot action space, and outside any goal category this project's action space anticipates). THIS example -- cooking -- is a normal household task the robot may simply lack the manipulation capability for today. The parser represents user intent, not the robot's current capability envelope; whether 'cook' is actually executable is a Planner/Execution-time determination, not a parsing-time one. The line drawn here: reject/flag only when the request cannot even be MEANINGFULLY represented as a goal (asks for judgment, external-world side effects, or open-ended reasoning this schema has no field for), not merely when it might be physically hard."
+    },
+    {
+      "id": "edge-clarify-001",
+      "category": "clarification_required",
+      "input": "Give it to her.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": "deliver",
+        "object": null,
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": null,
+        "needs_clarification": true,
+        "clarification_reason": "Neither 'it' (the object to deliver) nor 'her' (the recipient) has a clear referent in this instruction."
+      },
+      "notes": "Two independent unresolved pronouns compound into a single needs_clarification=true task with both raised in one clarification_reason, rather than attempting to guess either."
+    },
+    {
+      "id": "edge-clarify-002",
+      "category": "clarification_required",
+      "input": "Do the usual thing with the laundry.",
+      "expected_output": {
+        "task_type": "single",
+        "task_id": null,
+        "goal": null,
+        "object": "laundry",
+        "target": null,
+        "source_location": null,
+        "target_location": null,
+        "attributes": null,
+        "constraints": null,
+        "priority": null,
+        "preconditions": null,
+        "postconditions": null,
+        "estimated_goal": null,
+        "needs_clarification": true,
+        "clarification_reason": "'The usual thing' relies on unstated shared context (a habitual routine) this module has no access to -- what action to perform on the laundry is unknown."
+      },
+      "notes": "Unlike edge-unknown-obj-001/edge-unknown-loc-001 (unfamiliar but STATED content, parsed faithfully), this instruction's core verb is genuinely absent from the text itself, replaced by a reference to implicit shared context. 'goal' must be null here, and the ambiguity is in the ACTION, not the object."
+    }
+  ]
+}
