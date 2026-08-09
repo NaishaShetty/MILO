@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import Response
@@ -186,4 +187,13 @@ def speak(
         audio_bytes = voice_agent.speak(text)
     except VoiceRuntimeError as exc:
         raise _map_error(exc) from None
-    return Response(content=audio_bytes, media_type="audio/mpeg")
+    return Response(
+        content=audio_bytes,
+        media_type="audio/mpeg",
+        # Lets a caller (the dialogue bubble) show the exact real text
+        # being spoken without a second round trip -- quoted +
+        # percent-encoded since header values must be Latin-1/ASCII
+        # and `text` is arbitrary real content (may include non-ASCII
+        # characters, quotes, or a failure message with punctuation).
+        headers={"X-Milo-Response-Text": quote(text)},
+    )

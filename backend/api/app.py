@@ -351,6 +351,12 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
+    # `POST /api/v1/voice/speak` (routes/voice.py) returns MILO's
+    # spoken response text in this header alongside the audio body --
+    # browsers hide all but a small "safe" set of response headers
+    # from JS by default, so it must be explicitly exposed here or the
+    # dialogue bubble could never read it.
+    expose_headers=["X-Milo-Response-Text"],
 )
 
 app.include_router(health_router)

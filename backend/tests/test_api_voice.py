@@ -132,6 +132,18 @@ def test_speak_with_unknown_task_id_returns_404() -> None:
         app.dependency_overrides.pop(get_voice_agent, None)
 
 
+def test_speak_exposes_the_real_response_text_in_a_header() -> None:
+    fake_agent = VoiceAgent(_FakeClient(audio=b"fake-mp3-bytes"))  # type: ignore[arg-type]
+    app.dependency_overrides[get_voice_agent] = lambda: fake_agent
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/v1/voice/speak", json={"text": "Hello there!"})
+        assert response.status_code == 200
+        assert response.headers["x-milo-response-text"] == "Hello%20there%21"
+    finally:
+        app.dependency_overrides.pop(get_voice_agent, None)
+
+
 def test_speak_maps_synthesis_failure_to_502() -> None:
     fake_agent = VoiceAgent(_FakeClient(raise_on_speak=True))  # type: ignore[arg-type]
     app.dependency_overrides[get_voice_agent] = lambda: fake_agent
