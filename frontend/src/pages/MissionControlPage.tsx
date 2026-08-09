@@ -25,11 +25,13 @@ import { AgentStatusList } from "../components/AgentStatusList";
 import { GlassCard } from "../components/GlassCard";
 import { MiloCharacter } from "../components/MiloCharacter";
 import type { MiloCharacterState } from "../components/MiloCharacter";
+import { MiloDialogue } from "../components/MiloDialogue";
 import { PlanStepsList } from "../components/PlanStepsList";
 import { StatusPill } from "../components/StatusPill";
 import { TalkToMilo } from "../components/TalkToMilo";
 import { VisionPanel } from "../components/VisionPanel";
 import { useTask } from "../state/TaskContext";
+import { useVoice } from "../state/VoiceContext";
 import type { TaskEvent } from "../api/tasksTypes";
 import type { TaskStatus } from "../api/tasksTypes";
 
@@ -75,11 +77,14 @@ function EventRow({ event }: { event: TaskEvent }) {
 
 export function MissionControlPage() {
   const { activeTask, activeTaskId, events, cancelActive, cancelling } = useTask();
+  const voice = useVoice();
 
   const isActive = activeTask !== null && !TERMINAL_STATUSES.has(activeTask.status);
-  const characterState: MiloCharacterState = activeTask
-    ? CHARACTER_STATE_FOR_STATUS[activeTask.status]
-    : "idle";
+  // `voice.state === "speaking"` overrides the task-derived state --
+  // both are real (the task's own status, and whether MILO is
+  // currently actually playing real synthesized audio for it).
+  const characterState: MiloCharacterState =
+    voice.state === "speaking" ? "speaking" : activeTask ? CHARACTER_STATE_FOR_STATUS[activeTask.status] : "idle";
 
   return (
     <main aria-label="Mission Control" className="mission-control">
@@ -137,6 +142,13 @@ export function MissionControlPage() {
               <MiloCharacter state={characterState} size="sm" />
               <AgentStatusList names={STATUS_AGENTS} />
             </section>
+            {voice.spokenText && (
+              <MiloDialogue
+                text={voice.spokenText}
+                caption={voice.state === "speaking" ? "Speaking..." : undefined}
+                className="mission-control__dialogue"
+              />
+            )}
           </GlassCard>
         </div>
 

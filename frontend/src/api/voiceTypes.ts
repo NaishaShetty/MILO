@@ -13,3 +13,16 @@ export interface VoiceStatus {
   provider: string;
   voice_id: string;
 }
+
+// Mirrors `backend/voice/models.py`'s `VoiceTranscription`.
+export interface VoiceTranscription {
+  text: string;
+  language_code: string | null;
+  latency_ms: number;
+}
+
+/** Result of `speak()` -- both the real audio and the real text that produced it. */
+export interface SpokenResponse {
+  audioBlob: Blob;
+  text: string;
+}

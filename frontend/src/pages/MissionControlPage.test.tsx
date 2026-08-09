@@ -8,8 +8,10 @@ import { MissionControlPage } from "./MissionControlPage";
 import { AgentsProvider } from "../state/AgentsContext";
 import { SpeechProvider } from "../state/SpeechContext";
 import { TaskProvider } from "../state/TaskContext";
+import { VoiceProvider } from "../state/VoiceContext";
 import * as tasksApi from "../api/tasks";
 import * as agentsApi from "../api/agents";
+import * as voiceApi from "../api/voice";
 
 vi.mock("../api/tasks", async () => {
   const actual = await vi.importActual<typeof import("../api/tasks")>("../api/tasks");
@@ -28,13 +30,20 @@ vi.mock("../api/agents", async () => {
   return { ...actual, listAgents: vi.fn() };
 });
 
+vi.mock("../api/voice", async () => {
+  const actual = await vi.importActual<typeof import("../api/voice")>("../api/voice");
+  return { ...actual, speak: vi.fn() };
+});
+
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/mission-control"]}>
       <AgentsProvider>
         <TaskProvider>
           <SpeechProvider>
-            <MissionControlPage />
+            <VoiceProvider>
+              <MissionControlPage />
+            </VoiceProvider>
           </SpeechProvider>
         </TaskProvider>
       </AgentsProvider>
@@ -107,6 +116,7 @@ beforeEach(() => {
     { name: "vision", state: "active" },
     { name: "navigation", state: "idle" },
   ]);
+  vi.mocked(voiceApi.speak).mockReset().mockRejectedValue(new Error("voice unavailable in tests"));
 });
 
 describe("MissionControlPage", () => {
