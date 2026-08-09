@@ -1599,28 +1599,48 @@ body {
 }
 
 /* Activity page */
+.activity-page__layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 3fr);
+  gap: var(--milo-space-lg);
+  align-items: start;
+  margin-top: var(--milo-space-lg);
+}
+
+@media (max-width: 900px) {
+  .activity-page__layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.activity-page__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--milo-space-lg);
+}
+
 .activity-page__toolbar {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  margin: 1rem 0;
+  margin: 0 0 var(--milo-space-md);
 }
 
 .activity-page__toolbar input {
   flex: 1;
   padding: 0.5rem 0.7rem;
-  border-radius: 6px;
-  border: 1px solid #2a2e38;
-  background: #0f1115;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-border);
+  background: var(--milo-bg-elevated);
   color: inherit;
 }
 
 .activity-page__toolbar button {
   padding: 0.5rem 1rem;
-  border-radius: 6px;
-  border: 1px solid #4f7cff;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-accent);
   background: transparent;
-  color: #4f7cff;
+  color: var(--milo-accent-text);
   cursor: pointer;
 }
 
@@ -1639,26 +1659,58 @@ body {
 
 .activity-page__filters {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 1rem;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .activity-page__filter {
-  padding: 0.3rem 0.7rem;
-  border-radius: 999px;
-  border: 1px solid #2a2e38;
-  background: #1e2129;
-  color: inherit;
-  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--milo-text-muted);
+  font-size: 0.85rem;
   cursor: pointer;
+  transition: background var(--milo-transition-fast);
+}
+
+.activity-page__filter:hover {
+  background: var(--milo-surface-hover);
 }
 
 .activity-page__filter--active {
-  background: #4f7cff;
-  border-color: #4f7cff;
-  color: #0f1115;
+  background: var(--milo-accent-soft);
+  border-color: var(--milo-border-strong);
+  color: var(--milo-accent-text);
   font-weight: 600;
+}
+
+.activity-page__filter-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--milo-text-faint);
+}
+
+.activity-page__summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem var(--milo-space-md);
+  margin: 0;
+}
+
+.activity-page__summary dt {
+  font-size: 0.72rem;
+  color: var(--milo-text-faint);
+  grid-row: 1;
+}
+
+.activity-page__summary dd {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  grid-row: 2;
 }
 
 .activity-page__body {
@@ -1667,7 +1719,7 @@ body {
   gap: 1.5rem;
 }
 
-@media (max-width: 800px) {
+@media (max-width: 1200px) {
   .activity-page__body {
     grid-template-columns: 1fr;
   }
@@ -1689,43 +1741,41 @@ body {
   gap: 0.6rem;
   width: 100%;
   text-align: left;
-  padding: 0.4rem 0.6rem;
-  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--milo-radius-sm);
   border: 1px solid transparent;
-  background: #14161c;
+  background: var(--milo-surface);
   color: inherit;
   cursor: pointer;
   font-size: 0.85rem;
+  transition: border-color var(--milo-transition-fast);
+}
+
+.activity-page__item:hover {
+  border-color: var(--milo-border);
 }
 
 .activity-page__item--selected {
-  border-color: #4f7cff;
+  border-color: var(--milo-accent);
+  background: var(--milo-accent-soft);
 }
 
 .activity-page__item-time {
-  color: #9aa0a6;
+  color: var(--milo-text-faint);
   font-variant-numeric: tabular-nums;
 }
 
 .activity-page__item-agent {
-  color: #4f7cff;
+  color: var(--milo-accent-text);
 }
 
-.activity-page__details {
-  padding: 1rem;
-  border-radius: 8px;
-  background: #14161c;
-  border: 1px solid #1e2129;
-  align-self: start;
-}
-
-.activity-page__details dt {
+.activity-page__detail-list dt {
   font-size: 0.75rem;
-  color: #9aa0a6;
+  color: var(--milo-text-faint);
   margin-top: 0.6rem;
 }
 
-.activity-page__details dd {
+.activity-page__detail-list dd {
   margin: 0.1rem 0 0;
 }
 
