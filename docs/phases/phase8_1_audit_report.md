@@ -1,6 +1,6 @@
 # Phase 8.1 — System Audit, Cleanup & Architecture Freeze
 
-Status: **Discovery + audit complete. No destructive changes made yet — pending approval on the action list in §16.**
+Status: **Complete. Cleanup items 1–6 executed and verified (§16/§17); item 7 deferred as unnecessary, item 8 deferred to Phase 8.5 as planned.**
 Date: 2026-08-09
 Scope: full repository at time of audit (270 backend `.py` files / ~43K lines, 88 backend test files, frontend React/TS app, `models/`, `datasets/`, `experiments/`, `docs/`).
 
@@ -217,15 +217,39 @@ docker/, deployment/, .github/workflows/
 
 ---
 
-## 16. Proposed action list (nothing executed yet — awaiting your go-ahead)
+## 16. Cleanup actions executed
 
-1. **Untrack the 213MB `.whl`** at `backend/scripts/torch-2.5.1+cu124-cp39-cp39-linux_x86_64.whl`, add `*.whl` to `.gitignore`.
-2. **Untrack** `backend/outputs/memory/memory.db` and `backend/outputs/memory/vector_store/vectors.db`, extend `.gitignore` to cover `outputs/**/*.db`.
-3. **Delete or implement** the empty `backend/scripts/download_model.py`.
-4. **Decide on `experiments/results/` policy**: gitignore future run output (matching `results/`) vs. keep this specific run as a tracked example — your call.
-5. **Fix `docker/README.md`** to match the Dockerfile's actual Phase 3.7 FastAPI coverage.
-6. **Add the ElevenLabs placeholder block** to `backend/.env.example` (text drafted in §7), no code changes.
-7. (Optional, low priority) Rename/relocate the manual smoke-test scripts (§3) to avoid ambiguity with the pytest suite.
-8. (Deferred to Phase 8.5, not now) Write `docs/phases/phase3_language.md` and `docs/phases/phase7_agents_orchestration.md`.
+Executed on top of the baseline commit (`5c5257e`) plus the audit-report commit (`8f2e4da`), each change verified individually before moving to the next (§17). Nothing outside this list was touched.
 
-Everything else audited (dependencies, architecture, memory/planner/vision layering, logging, tests) needs **no changes** — it's already at the baseline quality Phase 8.1 is meant to establish.
+1. **Untracked the 213MB `.whl`** (`git rm --cached backend/scripts/torch-2.5.1+cu124-cp39-cp39-linux_x86_64.whl`) — file kept on disk (still reproducible via `backend/scripts/download_torch.py`). Added `*.whl` to `.gitignore`.
+2. **Untracked** `backend/outputs/memory/memory.db` and `backend/outputs/memory/vector_store/vectors.db` (`git rm --cached`) — both kept on disk (they're the live local memory store; deleting them would have wiped local runtime state, not just a git artifact). Extended `.gitignore` with `backend/outputs/**/*.db`.
+   - **Bonus fix while verifying**: the pre-existing `outputs/*.png`/`*.jpg`/`*.jpeg`/`!outputs/.gitkeep` rules were themselves broken — a gitignore pattern containing a non-trailing slash is rooted at the `.gitignore`'s own directory (repo root here), so `outputs/*.png` only ever matched a top-level `outputs/` directory, never the actual `backend/outputs/`. Confirmed via `git check-ignore` returning no match even on a fresh throwaway file before the fix. Rewrote all four rules as `backend/outputs/*.png` etc. and reconfirmed with `git check-ignore -v` that they now match.
+3. **Deleted** `backend/scripts/download_model.py` — confirmed 0 bytes and zero references anywhere in the repo (`grep -rn "download_model"` across `.py`/`.md`/`.yml`/`.toml`/`.json` returns nothing outside this report) before removal, per your "only if confirmed empty/unused" condition.
+4. **`experiments/results/` policy** — inspected contents: `benchmark_20260809T120511Z.json` and `_episodes.csv` are directly cited by `experiments/reports/phase6_4_report.md` ("Generated from a real, reproducible run of [`experiments/results/benchmark_20260809T120511Z.json`]...") as that report's reproducibility source. **Decision: keep these two specific files tracked** (deleting/untracking them would break the report's citation and reproducibility), but ignore all *future* run output in that directory so it doesn't silently accumulate. Implemented as `experiments/results/*` + explicit `!` exceptions for the two cited files (same pattern already used for `results/`). Verified: the two cited files remain un-ignored; a throwaway new file in the same directory is correctly ignored.
+5. **Updated `docker/README.md`** — replaced the stale "Phases 1-3.5 ... no FastAPI service (Phase 3.7+)" claim (which contradicted the Dockerfile's own header comment and `CMD`) with an accurate description read directly from `docker/Dockerfile`: build/run commands, that `COPY backend/ ./` packages the whole current backend tree (not a phase snapshot) so Phase 6/7 additions needed no Dockerfile change since they added no new dependency, the default `uvicorn` FastAPI entrypoint on port 8000, the `503 configuration_error` degrade-gracefully behavior for missing LLM keys, and the non-root `appuser`/frontend-excluded facts already true in the Dockerfile. Nothing invented — every claim added was cross-checked against `docker/Dockerfile`'s actual content.
+6. **Added the ElevenLabs placeholder block** to `backend/.env.example`, disabled/commented by default, no code reading it yet:
+   ```
+   # ---- Voice output (ElevenLabs -- planned, not yet implemented) ----
+   # Off by default; no code currently reads these. Reserved config
+   # structure staged ahead of the Phase 8 voice integration -- the
+   # voice ID is not a secret and is fixed for MILO, but never commit a
+   # real ELEVENLABS_API_KEY value here or anywhere else.
+   # ELEVENLABS_API_KEY=
+   # ELEVENLABS_VOICE_ID=ISnQja0Ank6t1FE2Wj07
+   ```
+7. **Not done (correctly deferred)**: renaming the manual smoke-test scripts — judged unnecessary; they don't collide with CI (which scopes to `backend/tests/` only) and renaming ~10 files for a cosmetic ambiguity risk wasn't worth the diff noise right now.
+8. **Not started (correctly deferred to Phase 8.5)**: the missing `docs/phases/phase3_language.md` / `phase7_agents_orchestration.md`.
+
+## 17. Post-cleanup verification
+
+All run after items 1–6, before committing:
+
+- **`git status`**: exactly the 6 intended files changed (`​.gitignore`, `backend/.env.example`, `docker/README.md`, plus 4 untracked/removed: `memory.db`, `vectors.db`, `download_model.py`, the `.whl`) — `git diff --stat HEAD` confirms no other file was swept in. (One unrelated pre-existing local change, `.claude/settings.local.json`, is session tooling config, not part of this audit, and was left untouched.)
+- **No files accidentally removed**: `ls -la` confirms the `.whl` and both `.db` files still exist on disk at their original sizes — only their git tracking changed, per your explicit "do not delete if still required locally" instruction.
+- **`.gitignore` rules verified working**: `git check-ignore -v` confirms the `.whl`, both `.db` files, and a fresh throwaway `backend/outputs/*.png` test file are now correctly ignored; the two cited `experiments/results/*` files remain un-ignored while a fresh throwaway file in the same directory is correctly ignored.
+- **Application startup**: `from api.app import app; TestClient(app).get("/health")` → `200 {"status": "ok", "llm_provider_configured": true}`.
+- **Test suite**: `857 passed, 8 skipped, 0 failed` — identical to the pre-cleanup baseline (§9). No regressions.
+- **Reference check**: `grep -rn "download_model"` across the repo returns no hits outside this report — nothing imports or calls the deleted script.
+- **Secret scan**: diff of the three edited files checked for key/secret/token patterns — clean; `ELEVENLABS_API_KEY=` was added with no value, only the voice ID (not a secret) was filled in.
+
+Everything else audited in §1–15 (dependencies, architecture, memory/planner/vision layering, logging, tests, model/dataset provenance) needed **no changes** — already at the baseline quality Phase 8.1 is meant to establish.
