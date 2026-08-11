@@ -353,27 +353,28 @@ UI state (e.g. "plan mid-execution"). Neither category fabricates data
 values; the mocked set only fixes *which* real UI state renders.
 
 **A real mission, driven through the actual UI** (live AI2-THOR, real LLM parse, real plan/execution):
+
 | Instruction typed | Executing | Complete |
 |---|---|---|
-| ![Instruction typed](docs/screenshots/demo/live-01-instruction-typed.png) | ![Task in progress](docs/screenshots/demo/live-02-task-in-progress.png) | ![Task complete](docs/screenshots/demo/live-03-task-complete.png) |
+| ![Instruction typed](../docs/screenshots/demo/live-01-instruction-typed.png) | ![Task in progress](../docs/screenshots/demo/live-02-task-in-progress.png) | ![Task complete](../docs/screenshots/demo/live-03-task-complete.png) |
 
 **Mission Control** (agent status, live plan, activity feed):
 
-![Mission Control](docs/screenshots/ui/mission-control.png)
+![Mission Control](../docs/screenshots/ui/mission-control.png)
 
 **Memory** (episodic/semantic/failure memory, real retrieval):
 
-![Memory](docs/screenshots/ui/memory.png)
+![Memory](../docs/screenshots/ui/memory.png)
 
 **Home**, **Activity**, **MILO Lab**, **About MILO**, **Settings**:
 
 | Home | Activity |
 |---|---|
-| ![Home](docs/screenshots/ui/home.png) | ![Activity](docs/screenshots/ui/activity.png) |
+| ![Home](../docs/screenshots/ui/home.png) | ![Activity](../docs/screenshots/ui/activity.png) |
 
 | MILO Lab | Settings |
 |---|---|
-| ![MILO Lab](docs/screenshots/ui/lab.png) | ![Settings](docs/screenshots/ui/settings.png) |
+| ![MILO Lab](../docs/screenshots/ui/lab.png) | ![Settings](../docs/screenshots/ui/settings.png) |
 
 ## License
 
