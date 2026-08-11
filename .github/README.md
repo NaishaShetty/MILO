@@ -353,7 +353,6 @@ UI state (e.g. "plan mid-execution"). Neither category fabricates data
 values; the mocked set only fixes *which* real UI state renders.
 
 **A real mission, driven through the actual UI** (live AI2-THOR, real LLM parse, real plan/execution):
-
 | Instruction typed | Executing | Complete |
 |---|---|---|
 | ![Instruction typed](docs/screenshots/demo/live-01-instruction-typed.png) | ![Task in progress](docs/screenshots/demo/live-02-task-in-progress.png) | ![Task complete](docs/screenshots/demo/live-03-task-complete.png) |
