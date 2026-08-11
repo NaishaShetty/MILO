@@ -30,6 +30,7 @@ import { useAgents } from "../state/AgentsContext";
 import { useMiloState } from "../state/MiloStateContext";
 import { MiloAvatar } from "./MiloAvatar";
 import { MiloStatus, type MiloConnectionState } from "./MiloStatus";
+import { MiloWordmark } from "./MiloWordmark";
 
 const NAV_LINKS: Array<{ to: string; label: string; end?: boolean }> = [
   { to: "/", label: "Home", end: true },
@@ -70,8 +71,11 @@ export function NavBar() {
   return (
     <header className="milo-navbar">
       <div className="milo-navbar__brand">
-        <span className="milo-navbar__title">MILO</span>
-        <span className="milo-navbar__subtitle">Memory Integrated Language Oriented Robot</span>
+        <MiloWordmark className="milo-navbar__title" />
+        <span className="milo-navbar__tagline">
+          <span>Memory Integrated</span>
+          <span>Language Oriented Robot</span>
+        </span>
       </div>
       <nav className="milo-navbar__links" aria-label="Main navigation">
         {NAV_LINKS.map((link) => (

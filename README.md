@@ -256,6 +256,29 @@ setup walkthroughs, and the security model):
 Deployment/Docker: [`docker/README.md`](docker/README.md) and
 [`deployment/README.md`](deployment/README.md).
 
+## Deployment
+
+The frontend and backend deploy separately -- they are not required to
+share a host, only a reverse-proxy contract (`/api`, `/health`; see
+`frontend/src/api/client.ts`'s "relative URLs only" rule).
+
+- **Frontend**: a static Vite build, deployable to Vercel --
+  [`frontend/README.md`](frontend/README.md#deployment-vercel) and
+  `frontend/vercel.json`.
+- **Backend**: stays on a regular long-lived host (a VM/container, not
+  serverless) -- see `docker/README.md`. It is **not** deployable to
+  Vercel: task execution runs in a background thread inside the FastAPI
+  process (`backend/api/routes/tasks.py`) that outlives the triggering
+  request, `MemoryConfig`/`SQLiteMemoryStore` persist to a local file
+  (`backend/outputs/memory/memory.db`), and `VISION_ENABLE_SIMULATOR=true`
+  launches a real AI2-THOR/Unity subprocess (`backend/api/app.py`'s
+  lifespan) -- none of which survive Vercel's stateless,
+  short-lived-per-request serverless execution model.
+
+Wherever the backend runs, point the frontend at it via
+`frontend/vercel.json`'s rewrites and add the frontend's deployed
+origin to that backend's `API_ALLOWED_ORIGINS`.
+
 ## Project Structure
 
 ```

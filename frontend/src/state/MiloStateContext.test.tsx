@@ -31,7 +31,7 @@ vi.mock("../api/agents", async () => {
 
 vi.mock("../api/tasks", async () => {
   const actual = await vi.importActual<typeof import("../api/tasks")>("../api/tasks");
-  return { ...actual, listTasks: vi.fn(), getTask: vi.fn(), getTaskEvents: vi.fn() };
+  return { ...actual, listTasks: vi.fn(), getTask: vi.fn(), getTaskEvents: vi.fn(), cancelTask: vi.fn() };
 });
 
 vi.mock("../api/voice", async () => {
@@ -98,6 +98,35 @@ function baseTask(overrides: Partial<TaskState> = {}) {
     metrics: { actions: 0, failures: 0, replans: 0, attempts: 0, success: false, total_ms: null },
     ...overrides,
   } as unknown as TaskState;
+}
+
+function taskAtStep(action: string, overrides: Partial<TaskState> = {}) {
+  return baseTask({
+    status: "executing",
+    current_step: 0,
+    current_plan: {
+      plan_id: "p1",
+      task_id: "t1",
+      planner_type: "gpt",
+      goal_summary: {},
+      steps: [
+        {
+          step_id: 0,
+          action,
+          target: null,
+          parameters: {},
+          description: action,
+          preconditions: [],
+          postconditions: [],
+          status: "executing",
+        },
+      ],
+      status: "executing",
+      created_at: 0,
+      metadata: {},
+    },
+    ...overrides,
+  } as unknown as Partial<TaskState>);
 }
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -211,5 +240,65 @@ describe("MiloStateContext precedence", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("derives 'navigating' from the current step's real action while executing", async () => {
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([taskAtStep("navigate")]);
+    vi.mocked(tasksApi.getTask).mockResolvedValue(taskAtStep("navigate"));
+
+    const { result } = renderHook(() => useAll(), { wrapper });
+    await waitFor(() => expect(result.current.milo).toBe("navigating"));
+  });
+
+  it("derives 'perceiving' from a 'locate' step while executing", async () => {
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([taskAtStep("locate")]);
+    vi.mocked(tasksApi.getTask).mockResolvedValue(taskAtStep("locate"));
+
+    const { result } = renderHook(() => useAll(), { wrapper });
+    await waitFor(() => expect(result.current.milo).toBe("perceiving"));
+  });
+
+  it("falls back to generic 'executing' for a step action with no dedicated state", async () => {
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([taskAtStep("pickup")]);
+    vi.mocked(tasksApi.getTask).mockResolvedValue(taskAtStep("pickup"));
+
+    const { result } = renderHook(() => useAll(), { wrapper });
+    await waitFor(() => expect(result.current.milo).toBe("executing"));
+  });
+
+  it("maps the real 'retrieving_memory' status to 'recalling_memory'", async () => {
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([baseTask({ status: "retrieving_memory" })]);
+    vi.mocked(tasksApi.getTask).mockResolvedValue(baseTask({ status: "retrieving_memory" }));
+
+    const { result } = renderHook(() => useAll(), { wrapper });
+    await waitFor(() => expect(result.current.milo).toBe("recalling_memory"));
+  });
+
+  it("shows 'pausing' while a real cancel request is in flight, then reflects the outcome", async () => {
+    let resolveCancel!: (task: TaskState) => void;
+    vi.mocked(tasksApi.cancelTask).mockReturnValue(
+      new Promise((resolve) => {
+        resolveCancel = resolve;
+      }),
+    );
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([baseTask({ status: "executing" })]);
+    vi.mocked(tasksApi.getTask).mockResolvedValue(baseTask({ status: "executing" }));
+
+    const { result } = renderHook(() => useAll(), { wrapper });
+    await waitFor(() => expect(result.current.milo).toBe("executing"));
+
+    let cancelPromise!: Promise<void>;
+    act(() => {
+      cancelPromise = result.current.task.cancelActive();
+    });
+    await waitFor(() => expect(result.current.milo).toBe("pausing"));
+
+    vi.mocked(tasksApi.getTask).mockResolvedValue(baseTask({ status: "cancelled" }));
+    await act(async () => {
+      resolveCancel(baseTask({ status: "cancelled" }));
+      await cancelPromise;
+    });
+
+    await waitFor(() => expect(result.current.milo).toBe("idle"));
   });
 });

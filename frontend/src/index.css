@@ -1208,29 +1208,28 @@ body {
   line-height: 1.2;
 }
 
+/* Shared "MILO •" brand wordmark image (135x34, transparent, dot
+ * baked in) -- nav bar on every page, MILO Lab's hero. Each caller
+ * sizes it via its own class (`.milo-navbar__title`, Lab's
+ * `.lab-page__hero-wordmark`); `width: auto` keeps the real aspect
+ * ratio at any height. */
+.milo-wordmark {
+  display: block;
+  height: 1.6rem;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px var(--milo-accent-glow));
+}
+
 .milo-navbar__title {
-  font-size: 1.6rem;
-  font-weight: 300;
-  letter-spacing: 0.22em;
-  color: var(--milo-text);
-  position: relative;
-  text-shadow: 0 0 16px var(--milo-accent-glow);
+  height: 1.6rem;
 }
 
-.milo-navbar__title::after {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-left: 0.4em;
-  margin-bottom: 0.5em;
-  border-radius: 50%;
-  background: var(--milo-accent);
-  box-shadow: 0 0 8px var(--milo-accent-glow);
-}
-
-.milo-navbar__subtitle {
-  font-size: 0.72rem;
+.milo-navbar__tagline {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.68rem;
+  line-height: 1.4;
   color: var(--milo-text-faint);
 }
 
@@ -1285,10 +1284,14 @@ body {
 }
 
 .milo-navbar__avatar {
-  border-radius: var(--milo-radius-md);
+  border-radius: 50%;
   overflow: hidden;
   border: 1px solid var(--milo-border-strong);
   background: var(--milo-bg-elevated);
+}
+
+.milo-navbar__avatar .milo-avatar__image {
+  transform: scale(1.6);
 }
 
 .error-boundary {
@@ -1604,6 +1607,57 @@ body {
   display: none;
 }
 
+/* Home's mockup command console: a slim single-line bar (label above,
+ * input + mic + send all in one row) instead of Mission Control's tall
+ * multi-line command box with the send button below it. */
+.talk-to-milo--compact {
+  padding: 1.05rem 1.25rem 0.9rem;
+}
+
+.talk-to-milo--compact .talk-to-milo__prompt {
+  font-size: 0.78rem;
+  font-weight: 500;
+  margin: 0 0 0.7rem;
+}
+
+.talk-to-milo--compact .talk-to-milo__form {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.talk-to-milo--compact .talk-to-milo__input-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.talk-to-milo--compact .talk-to-milo__input {
+  min-height: 0;
+  width: 100%;
+  height: 38px;
+  padding: 0 0.9rem;
+  border-radius: 10px;
+}
+
+.talk-to-milo--compact .talk-to-milo__mic--compact,
+.talk-to-milo--compact .talk-to-milo__send--compact {
+  flex-shrink: 0;
+  width: 43px;
+  height: 43px;
+  padding: 0;
+}
+
+.talk-to-milo--compact .talk-to-milo__send--compact {
+  background: #7d5de7;
+  border: none;
+  box-shadow: none;
+}
+
+.talk-to-milo--compact .talk-to-milo__send--compact:hover:not(:disabled) {
+  background: #8a6bef;
+  box-shadow: 0 0 14px var(--milo-accent-glow);
+}
+
 /* Shared agent status list (Home / Mission Control / Lab). */
 .agent-status-list {
   list-style: none;
@@ -1655,11 +1709,11 @@ body {
 .home-page__hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.4fr) minmax(0, 0.7fr);
+  grid-template-columns: minmax(0, 40fr) minmax(0, 38fr) minmax(0, 22fr);
   align-items: center;
-  gap: var(--milo-space-xl);
-  margin: var(--milo-space-lg) 0 var(--milo-space-lg);
-  min-height: 560px;
+  gap: var(--milo-space-lg);
+  margin: var(--milo-space-md) 0 var(--milo-space-lg);
+  min-height: 430px;
   overflow: hidden;
 }
 
@@ -1725,18 +1779,19 @@ body {
 .home-page__cta-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: var(--milo-space-lg);
+  gap: 1.1rem;
+  margin-top: 2rem;
 }
 
 .home-page__cta {
   display: inline-flex;
   align-items: center;
   gap: 0.5em;
-  padding: 0.7rem 1.4rem;
-  border-radius: 999px;
-  font-size: 0.92rem;
-  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 24px;
+  border: 1px solid rgba(151, 132, 205, 0.38);
+  font-size: 0.78rem;
+  font-weight: 500;
   text-decoration: none;
   transition:
     transform var(--milo-transition-fast),
@@ -1829,9 +1884,9 @@ body {
   position: relative;
   z-index: 1;
   border: 1px solid var(--milo-border);
-  border-radius: var(--milo-radius-md);
-  background: var(--milo-bg-elevated);
-  padding: var(--milo-space-md) var(--milo-space-lg);
+  border-radius: 13px;
+  background: rgba(20, 19, 31, 0.58);
+  padding: 1.4rem 1.25rem;
   align-self: center;
   box-shadow: var(--milo-shadow-card);
 }
@@ -1849,8 +1904,9 @@ body {
 }
 
 .home-page__ask-panel-title {
-  margin: 0 0 var(--milo-space-sm);
-  font-size: 0.85rem;
+  margin: 0 0 1.1rem;
+  font-size: 0.78rem;
+  font-weight: 500;
   color: var(--milo-text-muted);
 }
 
@@ -1860,9 +1916,9 @@ body {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  font-size: 0.85rem;
-  color: var(--milo-text);
+  gap: 1rem;
+  font-size: 0.78rem;
+  color: #ddd8e5;
 }
 
 .home-page__ask-panel-list li {
@@ -1978,17 +2034,17 @@ body {
 }
 
 .home-page__greeting-eyebrow {
-  margin: 0;
-  font-size: 1.3rem;
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
   color: var(--milo-text-muted);
 }
 
 .home-page__greeting {
-  font-size: 3.4rem;
-  font-weight: 200;
-  letter-spacing: 0.16em;
-  line-height: 1.1;
-  margin: 0.15rem 0 0;
+  font-size: 3.2rem;
+  font-weight: 300;
+  letter-spacing: 0.045em;
+  line-height: 0.85;
+  margin: 0;
   background: linear-gradient(90deg, var(--milo-text), var(--milo-accent-text));
   -webkit-background-clip: text;
   background-clip: text;
@@ -1998,19 +2054,21 @@ body {
 
 @media (min-width: 1100px) {
   .home-page__greeting {
-    font-size: 5rem;
+    font-size: 4.6rem;
   }
 }
 
 .home-page__fullname {
   color: var(--milo-text-muted);
-  margin: 0.1rem 0 0.75rem;
+  font-size: 0.9rem;
+  margin: 1.1rem 0 1.4rem;
 }
 
 .home-page__description {
   color: var(--milo-text-muted);
   max-width: 34ch;
-  line-height: 1.6;
+  font-size: 0.85rem;
+  line-height: 1.8;
 }
 
 .home-page__character {
@@ -2425,6 +2483,138 @@ body {
 
 .mission-control__location-map {
   margin: 0.75rem 0;
+}
+
+/* Mission Control -- visual refinement pass v2 (Phase 8.6-style
+ * mockup). Overrides/extends the block above by cascade, same trick
+ * as the Memory/Lab pages' own v2 sections. Several selectors from
+ * the source mockup targeted class names that don't exist on this
+ * page's real components (`.detected-objects-strip__item` vs the
+ * real `DetectedObjectsStrip`'s `.detected-objects__card`,
+ * `.plan-timeline__step` vs the real `PlanTimeline`'s
+ * `.plan-steps__item`, `.talk-to-milo__submit` vs the real
+ * `TalkToMilo`'s `.talk-to-milo__send`, a `.mission-control__status-
+ * avatar` wrapper and `.mission-control__location-layout` wrapper
+ * that don't exist in this page's JSX) -- those are translated below
+ * to the selectors this page's components actually render, rather
+ * than copied verbatim. This page's existing named-area responsive
+ * breakpoints (1300px/680px) are left alone for the same reason the
+ * Lab page's were: a second, differently-shaped responsive strategy
+ * would fight rather than improve them. */
+.mission-control .glass-card {
+  background: linear-gradient(145deg, rgba(15, 16, 31, 0.88), rgba(7, 8, 18, 0.76));
+  border: 1px solid rgba(151, 126, 235, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.025),
+    0 18px 44px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(18px);
+}
+
+.mission-control__talk .talk-to-milo {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mission-control__talk .talk-to-milo__input {
+  border: 1px solid rgba(145, 126, 211, 0.2);
+  border-radius: 12px;
+  background: rgba(7, 8, 18, 0.76);
+  color: #eeebf5;
+}
+
+.mission-control__talk .talk-to-milo__send {
+  min-height: 48px;
+  border: 1px solid rgba(158, 111, 255, 0.75);
+  border-radius: 11px;
+  background: linear-gradient(135deg, rgba(139, 91, 235, 0.28), rgba(105, 70, 187, 0.18));
+  color: #e9ddff;
+  box-shadow: 0 0 22px rgba(132, 86, 235, 0.1);
+}
+
+.mission-control__talk .talk-to-milo__examples-list {
+  gap: 7px;
+}
+
+.mission-control__talk .talk-to-milo__example {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid rgba(137, 119, 190, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.012);
+  color: #a9a4b5;
+}
+
+.mission-control__mission-request {
+  font-size: 1.15rem;
+}
+
+.mission-control__status-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+}
+
+.mission-control__status .agent-status-list {
+  gap: 5px;
+}
+
+.mission-control__status .agent-status-list__item {
+  justify-content: space-between;
+  padding: 5px 8px;
+  border: 1px solid rgba(139, 118, 184, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.012);
+  font-size: 11px;
+}
+
+.mission-control__plan .plan-steps__item {
+  min-height: 54px;
+  border-radius: 10px;
+}
+
+.mission-control__plan .plan-steps__item--running {
+  border: 1px solid rgba(153, 111, 255, 0.45);
+  background: rgba(132, 83, 229, 0.08);
+}
+
+.mission-control__event {
+  display: grid;
+  grid-template-columns: 18px 68px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.mission-control__event-time {
+  font-size: 11px;
+}
+
+.mission-control__location section[aria-label="Where Is MILO?"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.mission-control__location section[aria-label="Where Is MILO?"] > p {
+  grid-column: 1 / -1;
+  color: #9c96aa;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 680px) {
+  .mission-control__location section[aria-label="Where Is MILO?"] {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mission-control__location-map {
+  width: 100%;
+  min-height: 190px;
+}
+
+.mission-control__location .robot-state-panel {
+  height: 100%;
+  border-radius: 12px;
 }
 
 /* RobotMiniMap -- an honest position readout, not a fabricated
@@ -3479,26 +3669,297 @@ body {
   flex-shrink: 0;
 }
 
+/* Memory page -- visual refinement pass v2 (Phase 8.6-style mockup).
+ * Overrides/extends the block above rather than replacing it, same
+ * cascade trick the source mockup used ("import this after
+ * index.css") -- later declarations at equal specificity win. A few
+ * selectors here (`.memory-page__hero-wrap`, `__hero-copy-text`,
+ * `__eyebrow`, `__hero-steps`, `__suggestions`) target markup this
+ * page's JSX doesn't render yet, so they're inert until that markup
+ * pass lands; nothing below regresses what's currently on screen. */
+:root {
+  --milo-purple: #9a72ff;
+  --milo-purple-2: #b28cff;
+  --milo-line: rgba(164, 145, 255, 0.14);
+}
+
+.memory-page .glass-card {
+  background: linear-gradient(145deg, rgba(18, 18, 36, 0.84), rgba(7, 8, 19, 0.74));
+  border: 1px solid var(--milo-line);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.025),
+    0 20px 50px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(18px);
+}
+
+.memory-page {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding-bottom: 2rem;
+}
+
+.memory-page__header::after {
+  content: "SEE  →  UNDERSTAND  →  REMEMBER  →  ACT  →  LEARN";
+  position: absolute;
+  right: 34px;
+  bottom: 20px;
+  color: rgba(181, 169, 220, 0.38);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+}
+
+.memory-page__title::first-line {
+  color: #f6f3fb;
+}
+
+.memory-page__title-dot {
+  box-shadow: 0 0 18px rgba(154, 114, 255, 0.8);
+  vertical-align: middle;
+}
+
+.memory-page__category {
+  border: 1px solid transparent;
+}
+
+.memory-page__category--active {
+  background: linear-gradient(90deg, rgba(144, 101, 255, 0.18), rgba(144, 101, 255, 0.04));
+  border-color: rgba(154, 114, 255, 0.18);
+  box-shadow: inset 3px 0 0 var(--milo-purple);
+}
+
+.memory-page__feed-card {
+  min-height: 600px;
+}
+
+.memory-page__card {
+  border: 1px solid rgba(154, 114, 255, 0.08);
+  background: rgba(255, 255, 255, 0.018);
+  transition: all 0.18s ease;
+}
+
+.memory-page__card:hover,
+.memory-page__card--selected {
+  background: rgba(147, 103, 255, 0.08);
+  border-color: rgba(154, 114, 255, 0.26);
+  box-shadow: 0 0 28px rgba(129, 83, 255, 0.08);
+}
+
+.memory-page__timeline li {
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(154, 114, 255, 0.08);
+}
+
+.memory-page__pipeline {
+  border: 1px solid rgba(154, 114, 255, 0.1);
+  background: rgba(10, 10, 22, 0.55);
+}
+
+.memory-page__pipeline-steps span:nth-of-type(4) {
+  color: var(--milo-purple-2);
+}
+
+/* Hero grid: title/search copy | character portrait | pipeline-stage
+ * rail -- `.memory-page__hero-wrap` pairs the header with the search
+ * card as two top-level columns instead of nesting search inside the
+ * header. Needs `.memory-page__hero-copy-text`, `__eyebrow`, and
+ * `__hero-steps` in the JSX to take effect (see note above). */
+.memory-page__hero-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 3.25fr) minmax(330px, 1.1fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.memory-page__header {
+  min-height: 300px;
+  margin: 0;
+  padding: 30px 34px;
+  display: block;
+  overflow: hidden;
+}
+
+.memory-page__header-copy {
+  min-height: 238px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(220px, 0.72fr) 92px;
+  align-items: start;
+  gap: 8px;
+}
+
+.memory-page__hero-copy-text {
+  padding-top: 10px;
+  position: relative;
+  z-index: 2;
+}
+
+.memory-page__eyebrow {
+  margin: 0 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: #bba9d9;
+  font-size: 10px;
+}
+
+.memory-page__title {
+  font-size: clamp(44px, 4vw, 60px);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+  font-weight: 300;
+  margin: 0;
+}
+
+.memory-page__hero-character {
+  width: 240px;
+  height: 245px;
+  align-self: start;
+  margin-top: -10px;
+  display: grid;
+  place-items: start center;
+  position: relative;
+}
+
+.memory-page__hero-character::before {
+  content: "";
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  top: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(156, 111, 255, 0.24), transparent 68%);
+  filter: blur(8px);
+}
+
+.memory-page__hero-character .milo-avatar {
+  position: relative;
+  z-index: 1;
+  transform: scale(1.2);
+  transform-origin: top center;
+}
+
+.memory-page__hero-steps {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  color: #827b91;
+  font-size: 10px;
+  padding-top: 5px;
+}
+
+.memory-page__hero-steps span.is-active {
+  color: #b99bff;
+  position: relative;
+}
+
+.memory-page__hero-steps span.is-active::before {
+  content: "";
+  position: absolute;
+  left: -15px;
+  top: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #9a72ff;
+  box-shadow: 0 0 12px #9a72ff;
+}
+
+.memory-page__search-card {
+  min-height: 300px;
+  margin: 0 !important;
+}
+
+.memory-page__search-helper {
+  margin: 9px 0 0;
+  color: #918a9d;
+  font-size: 13px;
+}
+
+.memory-page__search-helper--try {
+  margin-top: 15px;
+}
+
+.memory-page__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.memory-page__suggestion {
+  border: 1px solid rgba(154, 114, 255, 0.12);
+  background: rgba(255, 255, 255, 0.015);
+  color: #d8d2e1;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.memory-page__suggestion:hover {
+  border-color: rgba(154, 114, 255, 0.35);
+  background: rgba(154, 114, 255, 0.07);
+}
+
+@media (max-width: 1100px) {
+  .memory-page__header {
+    grid-template-columns: 1fr;
+  }
+
+  .memory-page__body {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .memory-page__details-col {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .memory-page__header-copy {
+    align-items: flex-start;
+  }
+
+  .memory-page__hero-character {
+    display: none;
+  }
+
+  .memory-page__body {
+    grid-template-columns: 1fr;
+  }
+
+  .memory-page__sidebar,
+  .memory-page__feed-col,
+  .memory-page__details-col {
+    grid-column: auto;
+  }
+
+  .memory-page__timeline {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Activity page -- visual refinement pass: left filters/summary,
  * center timeline, right event details (spec section 4), replacing
  * the earlier sidebar + single main-area 2-column composition. */
 .activity-page {
-  padding-top: 0.25rem;
+  padding-top: 0.4rem;
 }
 
 .activity-page__header {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
   gap: var(--milo-space-lg);
   flex-wrap: wrap;
+  padding-bottom: 1.3rem;
   margin-bottom: var(--milo-space-lg);
+  border-bottom: 1px solid var(--milo-border);
 }
 
 .activity-page__title {
   margin: 0;
-  font-size: 1.4rem;
-  font-weight: 500;
+  font-size: 1.3rem;
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--milo-text);
@@ -3517,7 +3978,7 @@ body {
 
 .activity-page__subtitle {
   margin: 0.35rem 0 0;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   color: var(--milo-text-muted);
 }
 
@@ -3536,13 +3997,14 @@ body {
 
 .activity-page__search input {
   width: 100%;
-  height: 48px;
+  height: 49px;
   padding: 0 2.6rem 0 1rem;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid var(--milo-border);
   background: var(--milo-surface);
   color: var(--milo-text);
   font: inherit;
+  font-size: 0.85rem;
   box-sizing: border-box;
   transition: border-color var(--milo-transition-fast);
 }
@@ -3577,14 +4039,16 @@ body {
 .activity-page__export {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5em;
-  height: 48px;
+  height: 49px;
   padding: 0 1.1rem;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid var(--milo-border);
   background: var(--milo-surface);
   color: var(--milo-text);
   font: inherit;
+  font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
@@ -3603,10 +4067,11 @@ body {
   cursor: not-allowed;
 }
 
-/* Three-column dashboard: sidebar ~21% / timeline ~49% / details ~30%. */
+/* Three-column dashboard: sidebar / timeline / details, matching the
+ * mockup's fixed-ish 296px / flexible / 426px ratio. */
 .activity-page__layout {
   display: grid;
-  grid-template-columns: minmax(250px, 0.85fr) minmax(420px, 2fr) minmax(320px, 1.25fr);
+  grid-template-columns: minmax(260px, 296px) minmax(420px, 1fr) minmax(340px, 426px);
   gap: var(--milo-space-lg);
   align-items: start;
 }
@@ -3656,9 +4121,9 @@ body {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  height: 46px;
-  padding: 0 0.85rem;
-  border-radius: 10px;
+  height: 63px;
+  padding: 0 1.1rem;
+  border-radius: 12px;
   border: 1px solid var(--milo-border);
   background: var(--milo-surface);
   color: var(--milo-text-muted);
@@ -3672,8 +4137,8 @@ body {
 
 .activity-page__all-events-count {
   margin-left: auto;
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 500;
   color: var(--milo-accent-text);
   font-variant-numeric: tabular-nums;
 }
@@ -3688,13 +4153,13 @@ body {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  height: 36px;
+  height: 32px;
   padding: 0 0.65rem;
-  border-radius: 8px;
+  border-radius: 7px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--milo-text-muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   cursor: pointer;
   transition:
     background var(--milo-transition-fast),
@@ -3706,10 +4171,10 @@ body {
 }
 
 .activity-page__filter--active {
-  background: var(--milo-accent-soft);
-  border-color: var(--milo-border-strong);
+  background: linear-gradient(90deg, var(--milo-accent-soft), transparent);
+  border-color: transparent;
   color: var(--milo-text);
-  box-shadow: 0 0 10px rgba(139, 92, 246, 0.12);
+  box-shadow: inset 2px 0 0 var(--milo-accent);
 }
 
 .activity-page__filter-icon {
@@ -3759,29 +4224,32 @@ body {
 .activity-page__summary {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.7rem var(--milo-space-md);
+  gap: 0;
   margin: 0;
 }
 
 .activity-page__summary-item {
-  padding-top: 0.4rem;
+  padding: 0.9rem 0.7rem;
   border-top: 1px solid var(--milo-border);
 }
 
+.activity-page__summary-item:nth-child(odd) {
+  border-right: 1px solid var(--milo-border);
+}
+
 .activity-page__summary-item:nth-child(-n + 2) {
-  padding-top: 0;
   border-top: none;
 }
 
 .activity-page__summary dt {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--milo-text-faint);
 }
 
 .activity-page__summary dd {
-  margin: 0.15rem 0 0;
-  font-size: 1.1rem;
-  font-weight: 600;
+  margin: 0.6rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 400;
 }
 
 /* Center timeline column. */
@@ -3799,25 +4267,31 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--milo-space-md);
-  padding-bottom: var(--milo-space-sm);
+  margin: -1.5rem -1.5rem var(--milo-space-md);
+  padding: 0 1.5rem var(--milo-space-sm);
+  height: 63px;
   border-bottom: 1px solid var(--milo-border);
 }
 
 .activity-page__feed-header-label {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 1.1rem;
+  font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--milo-text-muted);
+  letter-spacing: 0.02em;
+  color: var(--milo-text);
 }
 
 .activity-page__feed-header-date {
   display: inline-flex;
   align-items: center;
-  gap: 0.4em;
+  gap: 0.5em;
+  height: 41px;
+  padding: 0 0.8rem;
+  border-radius: 9px;
+  border: 1px solid var(--milo-border);
+  background: var(--milo-bg-elevated);
   font-size: 0.8rem;
-  color: var(--milo-text-faint);
+  color: var(--milo-text-muted);
 }
 
 .activity-page__loading {
@@ -3867,7 +4341,7 @@ body {
 .activity-page__list-item:not(:last-child)::after {
   content: "";
   position: absolute;
-  left: 4.1rem;
+  left: 5.75rem;
   top: 2.4rem;
   bottom: 0;
   width: 1px;
@@ -3879,12 +4353,12 @@ body {
   align-items: center;
   gap: 0.65rem;
   width: 100%;
-  min-height: 72px;
+  min-height: 69px;
   text-align: left;
   padding: 0.6rem 0.75rem;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.015);
+  background: transparent;
   color: inherit;
   cursor: pointer;
   font-size: 0.85rem;
@@ -3899,31 +4373,35 @@ body {
 }
 
 .activity-page__item--selected {
-  border-color: var(--milo-accent);
-  background: var(--milo-accent-soft);
-  box-shadow: 0 0 14px rgba(139, 92, 246, 0.14);
+  border-color: rgba(151, 97, 255, 0.25);
+  background: linear-gradient(90deg, rgba(86, 47, 180, 0.18), rgba(86, 47, 180, 0.04));
+  box-shadow: none;
 }
 
 .activity-page__item-time {
   flex-shrink: 0;
-  width: 3.2rem;
-  font-size: 0.72rem;
+  width: 3.8rem;
+  text-align: right;
+  font-size: 0.7rem;
   color: var(--milo-text-faint);
   font-variant-numeric: tabular-nums;
 }
 
 .activity-page__item-node {
   flex-shrink: 0;
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--milo-text-faint);
+  box-shadow: 0 0 0 4px var(--milo-bg-elevated);
   z-index: 1;
 }
 
 .activity-page__item--selected .activity-page__item-node {
   background: var(--milo-accent);
-  box-shadow: 0 0 6px var(--milo-accent-glow);
+  box-shadow:
+    0 0 0 4px var(--milo-bg-elevated),
+    0 0 6px var(--milo-accent-glow);
 }
 
 .activity-page__item-icon {
@@ -4003,7 +4481,7 @@ body {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.5rem;
-  padding-bottom: var(--milo-space-md);
+  padding-bottom: var(--milo-space-lg);
   margin-bottom: var(--milo-space-md);
   border-bottom: 1px solid var(--milo-border);
 }
@@ -4012,9 +4490,9 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 46px;
+  height: 46px;
+  border-radius: 11px;
   background: var(--milo-surface);
   border: 1px solid var(--milo-border);
   color: var(--milo-text-faint);
@@ -4046,36 +4524,44 @@ body {
 
 .activity-page__hero-title {
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 400;
   color: var(--milo-text);
 }
 
 .activity-page__metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.6rem;
+  gap: 0;
+  padding-bottom: var(--milo-space-md);
   margin-bottom: var(--milo-space-md);
+  border-bottom: 1px solid var(--milo-border);
 }
 
 .activity-page__metric {
-  padding: 0.5rem 0.6rem;
-  border-radius: 10px;
-  background: var(--milo-surface);
-  border: 1px solid var(--milo-border);
+  padding: 0 0 0 0.8rem;
+  border-radius: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-left: 1px solid var(--milo-border);
+}
+
+.activity-page__metric:first-child {
+  padding-left: 0;
+  border-left: none;
 }
 
 .activity-page__metric dt {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   color: var(--milo-text-faint);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
 .activity-page__metric dd {
-  margin: 0.15rem 0 0;
-  font-size: 0.9rem;
-  font-weight: 600;
+  margin: 0.55rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 400;
   color: var(--milo-text);
   font-variant-numeric: tabular-nums;
 }
@@ -4150,9 +4636,10 @@ body {
 .about-page__hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 0.85fr);
+  grid-template-columns: minmax(0, 35fr) minmax(0, 43fr) minmax(0, 22fr);
   align-items: center;
-  gap: var(--milo-space-xl);
+  gap: var(--milo-space-lg);
+  min-height: 410px;
   margin: var(--milo-space-lg) 0 var(--milo-space-xl);
 }
 
@@ -4185,20 +4672,26 @@ body {
 }
 
 .about-page__greeting {
-  font-size: 2.5rem;
-  font-weight: 700;
+  font-size: 2.6rem;
+  font-weight: 500;
+  letter-spacing: -0.03em;
   margin: 0.5rem 0 0;
-  color: var(--milo-text);
+  background: linear-gradient(90deg, var(--milo-text), var(--milo-accent-text));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .about-page__fullname {
+  font-size: 0.95rem;
+  font-weight: 500;
   color: var(--milo-text-muted);
-  margin: 0.1rem 0 1rem;
+  margin: 0.3rem 0 1rem;
 }
 
 .about-page__pullquote {
   color: var(--milo-accent-text);
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-style: italic;
   border-left: 2px solid var(--milo-border-strong);
   padding-left: 0.85rem;
@@ -4209,35 +4702,52 @@ body {
 .about-page__talk-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.5em;
-  padding: 0.7rem 1.4rem;
-  border-radius: 999px;
-  background: linear-gradient(135deg, var(--milo-accent), #6d4fd6);
-  color: white;
-  font-weight: 600;
+  gap: 0.6em;
+  padding: 0.8rem 1.4rem;
+  border-radius: var(--milo-radius-md);
+  border: 1px solid var(--milo-border-strong);
+  background: var(--milo-accent-soft);
+  color: var(--milo-accent-text);
+  font-weight: 500;
   text-decoration: none;
-  box-shadow: 0 0 14px var(--milo-accent-glow);
   transition:
     transform var(--milo-transition-fast),
-    box-shadow var(--milo-transition-fast);
+    box-shadow var(--milo-transition-fast),
+    background var(--milo-transition-fast);
 }
 
 .about-page__talk-link:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 0 20px var(--milo-accent-glow);
+  background: var(--milo-surface-hover);
+  box-shadow: 0 0 14px var(--milo-accent-glow);
 }
 
 .about-page__traits {
   display: flex;
   flex-direction: column;
-  gap: var(--milo-space-sm);
+  gap: var(--milo-space-md);
 }
 
 .about-page__trait {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: var(--milo-space-sm);
+  align-items: start;
   padding: var(--milo-space-sm) var(--milo-space-md);
   border-radius: var(--milo-radius-sm);
   border: 1px solid var(--milo-border);
   background: var(--milo-surface);
+}
+
+.about-page__trait-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-border);
+  background: var(--milo-bg-elevated);
+  color: var(--milo-accent-text);
 }
 
 .about-page__trait strong {
@@ -4278,7 +4788,9 @@ body {
 .about-page__pipeline-card {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.3rem;
+  min-height: 122px;
+  padding: 0.9rem;
 }
 
 .about-page__pipeline-head {
@@ -4291,8 +4803,8 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--milo-radius-sm);
   background: var(--milo-accent-soft);
   color: var(--milo-accent-text);
@@ -4306,43 +4818,75 @@ body {
 
 .about-page__pipeline-stage {
   color: var(--milo-text);
+  font-size: 0.92rem;
 }
 
 .about-page__pipeline-description {
   margin: 0;
   color: var(--milo-text-muted);
-  font-size: 0.88rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .about-page__expressions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--milo-space-lg);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--milo-space-md);
+}
+
+@media (max-width: 700px) {
+  .about-page__expressions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .about-page__expression {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.4rem;
-  width: 110px;
+  gap: 0.5rem;
 }
 
-.about-page__expression .milo-avatar {
-  width: 96px;
-  height: 110px;
+.about-page__expression-frame {
+  width: 100%;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--milo-border);
+  border-radius: var(--milo-radius-md);
+  background: var(--milo-bg-elevated);
+  overflow: hidden;
+}
+
+.about-page__expression-frame .milo-avatar {
+  width: 100%;
+  height: 100%;
 }
 
 .about-page__expression span {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--milo-text-muted);
 }
 
 .about-page__cta {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--milo-space-xl);
   padding: var(--milo-space-xl);
+  overflow: hidden;
+}
+
+.about-page__cta::before {
+  content: "\201C";
+  position: absolute;
+  top: 0.25rem;
+  left: 1.25rem;
+  font-size: 3.5rem;
+  line-height: 1;
+  color: var(--milo-accent-text);
+  opacity: 0.35;
 }
 
 @media (max-width: 700px) {
@@ -4444,14 +4988,6 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.5em;
-}
-
-.lab-page__hero-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--milo-accent);
-  box-shadow: 0 0 8px var(--milo-accent-glow);
 }
 
 .lab-page__tagline {
@@ -5046,6 +5582,119 @@ body {
   box-shadow: 0 0 16px var(--milo-accent-glow);
 }
 
+/* MILO Lab page -- visual refinement pass v2 (Phase 8.6-style
+ * mockup). Overrides/extends the block above by cascade, same trick
+ * as the Memory page's own v2 section. Two things from the source
+ * mockup are deliberately NOT ported:
+ *  - Its responsive overrides (flat `grid-template-columns` swaps at
+ *    1100px/760px) would fight this page's existing named-area
+ *    responsive layout (1150px/700px for the hero, 1300px/780px for
+ *    the grid) -- that existing mechanism already works, so it's left
+ *    alone rather than layering a second, conflicting strategy.
+ *  - The mockup's hero title treats "MILO" as a wordmark image plus a
+ *    separate "LAB" mark (`.lab-page__hero-wordmark`, `__hero-lab`);
+ *    there's no `/assets/milo-wordmark-exact.png` in this repo (only
+ *    the MiloAvatar character art), so `.lab-page__hero-title` keeps
+ *    rendering its real text ("MILO Lab") -- only the dot's glow below
+ *    is picked up from that block. */
+.lab-page__hero {
+  min-height: 270px;
+  gap: 24px;
+  border-radius: 20px;
+  border: 1px solid var(--milo-line);
+  background:
+    radial-gradient(circle at 28% 55%, rgba(144, 91, 255, 0.15), transparent 26%),
+    linear-gradient(120deg, rgba(11, 11, 25, 0.96), rgba(7, 8, 18, 0.86));
+}
+
+.lab-page__hero-title {
+  font-size: 2.5rem;
+  letter-spacing: -0.035em;
+}
+
+.lab-page__hero-wordmark {
+  height: 2.1rem;
+}
+
+.lab-page__tagline {
+  font-size: 1.15rem;
+  color: #e8e2f2;
+}
+
+.lab-page__hero-description {
+  max-width: 460px;
+  color: #9c97a9;
+  line-height: 1.6;
+}
+
+.lab-page__hero-actions {
+  gap: 12px;
+}
+
+.lab-page__hero-card {
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(154, 114, 255, 0.12);
+  padding: 22px 18px;
+  transition:
+    transform var(--milo-transition-fast),
+    border-color var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.lab-page__hero-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(154, 114, 255, 0.35);
+  box-shadow: 0 0 28px rgba(143, 93, 255, 0.1);
+}
+
+.lab-page__grid {
+  grid-template-columns: 300px minmax(0, 1fr) 320px;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.lab-page__quick-start .glass-card,
+.lab-page__experiments-card,
+.lab-page__sandbox-card,
+.lab-page__stats-card {
+  height: 100%;
+}
+
+.lab-page__quick-item {
+  min-height: 76px;
+  border-radius: 12px;
+}
+
+.lab-page__table-row {
+  min-height: 70px;
+}
+
+.lab-page__table-row--head {
+  min-height: 42px;
+}
+
+.lab-page__terminal {
+  min-height: 180px;
+  border-radius: 12px;
+  background: #05070b;
+  border: 1px solid rgba(82, 255, 133, 0.08);
+  box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.5);
+}
+
+.lab-page__stat-visual {
+  min-height: 100px;
+  border-radius: 13px;
+  justify-content: center;
+}
+
+.lab-page__cta {
+  margin-top: 16px;
+  border: 1px solid rgba(154, 114, 255, 0.13);
+  border-radius: 16px;
+  background: linear-gradient(90deg, rgba(147, 103, 255, 0.08), rgba(255, 255, 255, 0.015));
+}
+
 /* Settings page */
 .settings-page__header {
   margin: var(--milo-space-lg) 0 var(--milo-space-xl);
@@ -5290,6 +5939,61 @@ body {
   cursor: pointer;
 }
 
+/* Settings page -- visual refinement pass v2 (Phase 8.6-style
+ * mockup). Overrides/extends the block above by cascade, same trick
+ * as the Memory/Lab/Mission Control pages' own v2 sections. The
+ * source mockup's header (`.settings-header`, `.top-nav`,
+ * `.brand`, `.ready-pill`, `.header-avatar`,
+ * `.compact-reference-header`) is deliberately NOT ported: this app
+ * has exactly one `NavBar`, mounted once in `App.tsx` above every
+ * route, so it already renders identically on all seven pages --
+ * adding a second, page-specific header here would be the one thing
+ * that actually breaks that consistency. Likewise the mockup's
+ * "MILO At a Glance" / "Quick Toggles" / save-bar / "Reset MILO"
+ * panels aren't ported: they have no backing state in
+ * `SettingsContext`/the backend (there's no memory-reset endpoint,
+ * no "always listen" flag, etc.), and this page's own rule is to
+ * never wire a control to nothing (see its file header). Only the
+ * content area's real elements (category nav, inputs, toggle,
+ * buttons) are restyled below. */
+.settings-page__nav-item--active {
+  background: linear-gradient(90deg, rgba(111, 64, 203, 0.2), rgba(111, 64, 203, 0.04));
+  border-color: transparent;
+  box-shadow: inset 3px 0 0 var(--milo-accent);
+}
+
+.settings-page__card .glass-card__title {
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+}
+
+.settings-page__section input[type="text"],
+.settings-page__section select {
+  height: 44px;
+  border-radius: 11px;
+  border-color: rgba(154, 114, 255, 0.14);
+  background: #080a13;
+}
+
+.settings-page__section input[type="checkbox"] {
+  width: 44px;
+  height: 24px;
+}
+
+.settings-page__section input[type="checkbox"]:checked {
+  background: linear-gradient(90deg, #8650df, #b276ff);
+}
+
+.settings-page__section button {
+  border-radius: 10px;
+  border-color: rgba(169, 67, 73, 0.7);
+  background: rgba(77, 20, 24, 0.13);
+}
+
+.settings-page__section button:hover {
+  background: rgba(255, 93, 97, 0.14);
+}
+
 /* ==================================================================
  * Phase 8.2/8.3 shared components
  *
@@ -5432,20 +6136,42 @@ body {
   animation: milo-sway 1.6s ease-in-out infinite;
 }
 
-/* Thinking/understanding/planning/replanning/reflecting: restrained
- * processing feel -- gentle sway, no spinner. */
+/* Thinking/understanding/planning/reflecting: restrained processing
+ * feel -- gentle sway, no spinner. */
 .milo-avatar--state-thinking .milo-avatar__glow,
 .milo-avatar--state-understanding .milo-avatar__glow,
 .milo-avatar--state-planning .milo-avatar__glow,
-.milo-avatar--state-replanning .milo-avatar__glow,
 .milo-avatar--state-reflecting .milo-avatar__glow {
   animation: milo-glow-soft 1.6s ease-in-out infinite;
 }
 .milo-avatar--state-thinking .milo-avatar__image,
 .milo-avatar--state-understanding .milo-avatar__image,
 .milo-avatar--state-planning .milo-avatar__image,
-.milo-avatar--state-replanning .milo-avatar__image,
 .milo-avatar--state-reflecting .milo-avatar__image {
+  animation: milo-sway 2.6s ease-in-out infinite;
+}
+
+/* Recalling memory: same restrained sway as thinking, but a
+ * distinct violet-blue tint so retrieving real memories (a genuinely
+ * different backend stage, `retrieving_memory`) reads as its own
+ * moment rather than generic "thinking". */
+.milo-avatar--state-recalling_memory .milo-avatar__glow {
+  background: radial-gradient(circle, #7dd3fc, transparent 70%);
+  animation: milo-glow-soft 1.6s ease-in-out infinite;
+}
+.milo-avatar--state-recalling_memory .milo-avatar__image {
+  animation: milo-sway 2.6s ease-in-out infinite;
+}
+
+/* Replanning: a real recoverable failure is being corrected -- same
+ * restrained sway as thinking, but the warning-amber tint (not the
+ * calm accent-purple) so it visibly reads as "something needs
+ * attention," without a flashing/urgent treatment. */
+.milo-avatar--state-replanning .milo-avatar__glow {
+  background: radial-gradient(circle, var(--milo-warning), transparent 70%);
+  animation: milo-glow-soft 1.6s ease-in-out infinite;
+}
+.milo-avatar--state-replanning .milo-avatar__image {
   animation: milo-sway 2.6s ease-in-out infinite;
 }
 
@@ -5453,6 +6179,17 @@ body {
  * -- the character itself stays in its calm idle motion. */
 .milo-avatar--state-perceiving .milo-avatar__glow {
   animation: milo-glow-soft 3.6s ease-in-out infinite;
+}
+
+/* Pausing: a real cancel request is in flight -- fading, not idle's
+ * cheerful float, so the moment MILO is winding down reads distinctly
+ * from "ready and waiting". */
+.milo-avatar--state-pausing .milo-avatar__glow {
+  animation: milo-glow-fade 1s ease-out 1;
+}
+.milo-avatar--state-pausing .milo-avatar__image {
+  animation: none;
+  opacity: 0.75;
 }
 
 /* Executing/navigating: motion, not a loading spinner -- a quick bob
@@ -5601,6 +6338,15 @@ body {
   }
 }
 
+@keyframes milo-glow-fade {
+  0% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0.2;
+  }
+}
+
 /* -- MiloPresence (Phase 8.3) ---------------------------------------- */
 
 .milo-presence {
@@ -5664,11 +6410,23 @@ body {
 .milo-state-indicator--thinking .milo-state-indicator__title,
 .milo-state-indicator--understanding .milo-state-indicator__title,
 .milo-state-indicator--planning .milo-state-indicator__title,
-.milo-state-indicator--replanning .milo-state-indicator__title,
 .milo-state-indicator--reflecting .milo-state-indicator__title,
 .milo-state-indicator--executing .milo-state-indicator__title,
-.milo-state-indicator--navigating .milo-state-indicator__title {
+.milo-state-indicator--navigating .milo-state-indicator__title,
+.milo-state-indicator--perceiving .milo-state-indicator__title {
   color: var(--milo-accent-text);
+}
+
+.milo-state-indicator--recalling_memory .milo-state-indicator__title {
+  color: #7dd3fc;
+}
+
+.milo-state-indicator--replanning .milo-state-indicator__title {
+  color: var(--milo-warning);
+}
+
+.milo-state-indicator--pausing .milo-state-indicator__title {
+  color: var(--milo-text-muted);
 }
 
 /* -- GlassCard ------------------------------------------------------- */

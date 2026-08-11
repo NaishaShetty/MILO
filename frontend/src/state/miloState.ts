@@ -30,6 +30,7 @@ export type MiloState =
   | "understanding"
   | "thinking"
   | "planning"
+  | "recalling_memory"
   | "perceiving"
   | "navigating"
   | "executing"
@@ -37,7 +38,8 @@ export type MiloState =
   | "reflecting"
   | "speaking"
   | "success"
-  | "error";
+  | "error"
+  | "pausing";
 
 /** The eight real asset files under /assets/milo/ (Phase 8.3). */
 export type MiloVisual =
@@ -71,6 +73,7 @@ export const VISUAL_FOR_STATE: Record<MiloState, MiloVisual> = {
   understanding: "thinking",
   thinking: "thinking",
   planning: "thinking",
+  recalling_memory: "thinking",
   perceiving: "idle",
   navigating: "executing",
   executing: "executing",
@@ -79,6 +82,7 @@ export const VISUAL_FOR_STATE: Record<MiloState, MiloVisual> = {
   speaking: "speaking",
   success: "success",
   error: "error",
+  pausing: "idle",
 };
 
 export const MILO_STATE_LABELS: Record<MiloState, string> = {
@@ -89,6 +93,7 @@ export const MILO_STATE_LABELS: Record<MiloState, string> = {
   understanding: "MILO is understanding",
   thinking: "MILO is thinking",
   planning: "MILO is planning",
+  recalling_memory: "MILO is recalling memories",
   perceiving: "MILO is looking",
   navigating: "MILO is navigating",
   executing: "MILO is acting",
@@ -97,6 +102,7 @@ export const MILO_STATE_LABELS: Record<MiloState, string> = {
   speaking: "MILO is speaking",
   success: "MILO succeeded",
   error: "MILO ran into a problem",
+  pausing: "MILO is stopping",
 };
 
 export const MILO_STATE_DESCRIPTIONS: Record<MiloState, string> = {
@@ -107,12 +113,14 @@ export const MILO_STATE_DESCRIPTIONS: Record<MiloState, string> = {
   understanding: "Turning what you said into a goal.",
   thinking: "Recalling what might help.",
   planning: "Breaking the goal into steps.",
+  recalling_memory: "Retrieving relevant memories before planning.",
   perceiving: "Looking at the current scene.",
   navigating: "Moving through the environment.",
   executing: "Carrying out the current step.",
-  replanning: "Something changed -- adjusting the plan.",
+  replanning: "Something needs correcting -- adjusting the plan.",
   reflecting: "Reviewing what just happened.",
   speaking: "Responding out loud.",
   success: "Mission complete.",
   error: "Something went wrong.",
+  pausing: "Stopping the current mission.",
 };

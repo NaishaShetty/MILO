@@ -17,8 +17,11 @@
 // Precedence (highest first) -- every input is real, never invented:
 //   1. `voice.state === "speaking"`      -- MILO is audibly speaking.
 //   2. `speech.state` (mic capture)      -- listening/understanding.
-//   3. `activeTask.status`               -- the task lifecycle.
-//   4. `agents` connectivity              -- offline/idle fallback.
+//   3. `cancelling`                      -- a real cancel request is in flight.
+//   4. success/error hold                -- see below.
+//   5. `activeTask.status`, refined by the current plan step's real
+//      `action` while executing          -- the task lifecycle.
+//   6. `agents` connectivity              -- offline/idle fallback.
 //
 // Success/error are transient the way the SUCCESS/ERROR reference
 // images imply ("allow the state to remain visible briefly, transition
@@ -27,11 +30,21 @@
 // this holds that state for a few seconds (or until the next task
 // starts, if sooner) and then reverts to idle -- a real timer over a
 // real terminal status, not a fabricated one.
+//
+// Finer-than-status execution states (Phase 8.7): the backend's
+// `TaskStatus` enum has one flat "executing" value, but the currently
+// executing step's real `action` (`backend/planner/actions.py`'s
+// registry: "navigate", "locate", "pickup", "open", "close", "place",
+// "put_down", "generic_act") is already on the wire via
+// `activeTask.current_plan.steps[activeTask.current_step]` -- so
+// "navigating" (action === "navigate") and "perceiving" (action ===
+// "locate") are derived from that real field instead of collapsing
+// every execution step into the same generic "executing" visual.
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { ApiError } from "../api/client";
-import type { TaskStatus } from "../api/tasksTypes";
+import type { TaskState, TaskStatus } from "../api/tasksTypes";
 import { TERMINAL_TASK_STATUSES } from "../api/tasksTypes";
 import { useAgents } from "./AgentsContext";
 import { useSpeech } from "./SpeechContext";
@@ -44,11 +57,14 @@ const ERROR_HOLD_MS = 6000;
 
 // Real TaskStatus -> MiloState -- every mapped value is one of
 // TaskState.status's actual enum members (backend/agents/
-// task_state.py::TaskStatus); nothing here is invented.
+// task_state.py::TaskStatus); nothing here is invented. "executing" is
+// the fallback for a step whose action isn't navigate/locate --
+// `stateForExecutingTask` below refines it further using the real
+// current step.
 const STATE_FOR_TASK_STATUS: Record<TaskStatus, MiloState> = {
   created: "initializing",
   parsing: "understanding",
-  retrieving_memory: "thinking",
+  retrieving_memory: "recalling_memory",
   planning: "planning",
   executing: "executing",
   reflecting: "reflecting",
@@ -58,6 +74,23 @@ const STATE_FOR_TASK_STATUS: Record<TaskStatus, MiloState> = {
   cancelled: "idle",
 };
 
+// Action names that map to a dedicated MiloState -- the rest of
+// `actions.ACTION_REGISTRY` (pickup/open/close/place/put_down/
+// generic_act) all render as the generic "executing" state, since
+// none of them have a visually distinct meaning the way "moving
+// through the environment" (navigate) or "looking for something"
+// (locate) do.
+const STATE_FOR_STEP_ACTION: Record<string, MiloState> = {
+  navigate: "navigating",
+  locate: "perceiving",
+};
+
+function stateForExecutingTask(task: TaskState): MiloState {
+  const step =
+    task.current_plan && task.current_step != null ? task.current_plan.steps[task.current_step] : null;
+  return (step && STATE_FOR_STEP_ACTION[step.action]) || "executing";
+}
+
 export interface MiloStateContextValue {
   state: MiloState;
 }
@@ -65,7 +98,7 @@ export interface MiloStateContextValue {
 const MiloStateContext = createContext<MiloStateContextValue | null>(null);
 
 export function MiloStateProvider({ children }: { children: ReactNode }) {
-  const { activeTask, activeTaskId } = useTask();
+  const { activeTask, activeTaskId, cancelling } = useTask();
   const voice = useVoice();
   const speech = useSpeech();
   const { status: agentsStatus, error: agentsError } = useAgents();
@@ -98,19 +131,22 @@ export function MiloStateProvider({ children }: { children: ReactNode }) {
     if (voice.state === "speaking") return "speaking";
     if (speech.state === "listening") return "listening";
     if (speech.state === "processing" || speech.state === "transcribing") return "understanding";
+    if (cancelling) return "pausing";
 
     if (holding && holding.taskId === activeTaskId) {
       return holding.status === "succeeded" ? "success" : "error";
     }
 
     if (activeTask && !TERMINAL_TASK_STATUSES.includes(activeTask.status)) {
-      return STATE_FOR_TASK_STATUS[activeTask.status];
+      return activeTask.status === "executing"
+        ? stateForExecutingTask(activeTask)
+        : STATE_FOR_TASK_STATUS[activeTask.status];
     }
 
     if (isOffline) return "offline";
     if (agentsStatus === "loading" || agentsStatus === "idle") return "initializing";
     return "idle";
-  }, [voice.state, speech.state, holding, activeTaskId, activeTask, isOffline, agentsStatus]);
+  }, [voice.state, speech.state, cancelling, holding, activeTaskId, activeTask, isOffline, agentsStatus]);
 
   const value = useMemo<MiloStateContextValue>(() => ({ state }), [state]);
 

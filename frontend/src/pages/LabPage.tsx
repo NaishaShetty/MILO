@@ -32,6 +32,7 @@ import { AgentStatusList } from "../components/AgentStatusList";
 import { GlassCard } from "../components/GlassCard";
 import { LabIcon } from "../components/LabIcons";
 import { MiloAvatar } from "../components/MiloAvatar";
+import { MiloWordmark } from "../components/MiloWordmark";
 import { StatusPill } from "../components/StatusPill";
 import { getLabStats, listExperiments, runPerceptionExperiment, runSandbox } from "../api/lab";
 import type { ExperimentSummary, LabStatsResponse, SandboxResponse } from "../api/labTypes";
@@ -160,7 +161,7 @@ export function LabPage() {
 
         <div className="lab-page__hero-copy">
           <p className="lab-page__hero-title">
-            MILO Lab <span className="lab-page__hero-dot" aria-hidden="true" />
+            <MiloWordmark className="lab-page__hero-wordmark" /> Lab
           </p>
           <p className="lab-page__tagline">My playground. Your experiments. Our future.</p>
           <p className="lab-page__hero-description">

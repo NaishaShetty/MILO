@@ -141,6 +141,30 @@ Type-checks (`tsc --noEmit`) and produces a static bundle in `dist/`,
 intended to be served behind the same reverse proxy as the backend so
 `/api`/`/health` resolve without any absolute URL configuration.
 
+## Deployment (Vercel)
+
+`vercel.json` (this directory) gives Vercel the same job `nginx.conf.template`
+does in the Docker setup: serve the static build and reverse-proxy `/api` and
+`/health` to the backend, so `src/api/client.ts`'s "relative URLs only" rule
+holds in production too -- no frontend code changes, no absolute backend URL
+baked into the bundle.
+
+Before deploying:
+
+1. In the Vercel project settings, set **Root Directory** to `frontend`.
+2. Edit `vercel.json`'s two `REPLACE_WITH_MILO_BACKEND_HOST` rewrite
+   destinations to the real, already-running MILO backend's HTTPS origin
+   (see the root README / `deployment/` for where that backend runs --
+   it is not deployed by this file; the backend does not run on Vercel,
+   see that README's "Why the backend isn't on Vercel").
+3. Add that backend's origin to its own `API_ALLOWED_ORIGINS` env var so
+   CORS allows requests forwarded from this Vercel deployment's domain.
+
+No other environment variables are read by the frontend build or bundle
+(see "Real data only" above) -- `VITE_BACKEND_URL` is a **local dev-only**
+convenience for `vite.config.ts`'s dev proxy and is never read at runtime by
+the deployed app.
+
 ## Structure
 
 ```

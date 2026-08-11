@@ -87,22 +87,28 @@ const PIPELINE_STAGES: Array<{ stage: string; icon: AboutIconName; description: 
 // Static, truthful product traits -- each maps to a real, already-
 // described part of the architecture above (memory writes, perception,
 // the memory store, replanning); no invented capability or statistic.
-const TRAITS = [
+// Icons reuse `AboutIconName`s already defined for the pipeline stages
+// below (same concepts: learn, perceive, remember, replan).
+const TRAITS: Array<{ title: string; body: string; icon: AboutIconName }> = [
   {
     title: "Always Learning",
     body: "Every task's outcome -- success or failure -- gets written back to memory for next time.",
+    icon: "learn",
   },
   {
     title: "Always Watching",
     body: "The Vision agent perceives the current scene before MILO decides what to do.",
+    icon: "perceive",
   },
   {
     title: "Always Remembering",
     body: "Memory is retrieved before planning and updated after every task, not an afterthought.",
+    icon: "remember",
   },
   {
     title: "Always Adapting",
     body: "When a step fails, the Orchestrator replans instead of giving up on the goal.",
+    icon: "replan",
   },
 ];
 
@@ -141,8 +147,13 @@ export function AboutPage() {
         <div className="about-page__traits">
           {TRAITS.map((trait) => (
             <div key={trait.title} className="about-page__trait">
-              <strong>{trait.title}</strong>
-              <p>{trait.body}</p>
+              <span className="about-page__trait-icon" aria-hidden="true">
+                <AboutIcon name={trait.icon} />
+              </span>
+              <div>
+                <strong>{trait.title}</strong>
+                <p>{trait.body}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -190,7 +201,9 @@ export function AboutPage() {
         <div className="about-page__expressions">
           {EXPRESSION_SHOWCASE.map(({ state, label }) => (
             <div key={state} className="about-page__expression">
-              <MiloAvatar state={state} size="md" />
+              <div className="about-page__expression-frame">
+                <MiloAvatar state={state} size="md" />
+              </div>
               <span>{label}</span>
             </div>
           ))}

@@ -99,6 +99,11 @@ export interface TalkToMiloProps {
    * with a trailing chevron ("list"); Home's mockup shows them as
    * wrapped inline pills ("pills"). Same data, different mockup. */
   examplesVariant?: "list" | "pills";
+  /** "console" (default) is Mission Control's multi-line command box
+   * with the send button below it. "compact" is Home's mockup: a slim
+   * single-line input with the mic/send as small square buttons inline
+   * to its right. */
+  layout?: "console" | "compact";
 }
 
 export function TalkToMilo({
@@ -107,6 +112,7 @@ export function TalkToMilo({
   prompt = "Give me an instruction in natural language.",
   examplesLabel = "Try these examples",
   examplesVariant = "list",
+  layout = "console",
 }: TalkToMiloProps) {
   const navigate = useNavigate();
   const { submitInstruction, submitting, submitError } = useTask();
@@ -147,15 +153,17 @@ export function TalkToMilo({
     }
   }
 
-  function handleTextareaKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+  function handleTextareaKeyDown(event: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       void submit(instruction);
     }
   }
 
+  const isCompact = layout === "compact";
+
   return (
-    <section className="talk-to-milo" aria-label="Talk to MILO">
+    <section className={"talk-to-milo" + (isCompact ? " talk-to-milo--compact" : "")} aria-label="Talk to MILO">
       <p className="talk-to-milo__prompt">{prompt}</p>
 
       <form className="talk-to-milo__form" onSubmit={handleFormSubmit}>
@@ -163,38 +171,78 @@ export function TalkToMilo({
           {inputLabel}
         </label>
         <div className="talk-to-milo__input-wrap">
-          <textarea
-            id="talk-to-milo-input"
-            className="talk-to-milo__input"
-            placeholder="Type your instruction here..."
-            value={instruction}
-            onChange={(event) => setInstruction(event.target.value)}
-            onKeyDown={handleTextareaKeyDown}
-            disabled={submitting}
-            rows={3}
-          />
-          <button
-            type="button"
-            className={"talk-to-milo__mic" + (isListening ? " talk-to-milo__mic--active" : "")}
-            onClick={handleMicClick}
-            disabled={isBusySpeaking}
-            aria-pressed={isListening}
-            aria-label={isListening ? "Stop listening" : "Speak an instruction"}
-          >
-            <MicIcon />
-          </button>
+          {isCompact ? (
+            <input
+              id="talk-to-milo-input"
+              type="text"
+              className="talk-to-milo__input"
+              placeholder="Type your instruction here..."
+              value={instruction}
+              onChange={(event) => setInstruction(event.target.value)}
+              onKeyDown={handleTextareaKeyDown}
+              disabled={submitting}
+            />
+          ) : (
+            <textarea
+              id="talk-to-milo-input"
+              className="talk-to-milo__input"
+              placeholder="Type your instruction here..."
+              value={instruction}
+              onChange={(event) => setInstruction(event.target.value)}
+              onKeyDown={handleTextareaKeyDown}
+              disabled={submitting}
+              rows={3}
+            />
+          )}
+          {!isCompact && (
+            <button
+              type="button"
+              className={"talk-to-milo__mic" + (isListening ? " talk-to-milo__mic--active" : "")}
+              onClick={handleMicClick}
+              disabled={isBusySpeaking}
+              aria-pressed={isListening}
+              aria-label={isListening ? "Stop listening" : "Speak an instruction"}
+            >
+              <MicIcon />
+            </button>
+          )}
         </div>
-        <button
-          type="submit"
-          className="talk-to-milo__send"
-          disabled={submitting || instruction.trim().length === 0}
-          aria-label={submitting ? "Sending..." : "Send"}
-        >
-          <span aria-hidden="true">{submitting ? "Sending..." : "Send to MILO"}</span>
-          <span aria-hidden="true" className="talk-to-milo__send-icon">
-            <SendIcon />
-          </span>
-        </button>
+        {isCompact ? (
+          <>
+            <button
+              type="button"
+              className={"talk-to-milo__mic talk-to-milo__mic--compact" + (isListening ? " talk-to-milo__mic--active" : "")}
+              onClick={handleMicClick}
+              disabled={isBusySpeaking}
+              aria-pressed={isListening}
+              aria-label={isListening ? "Stop listening" : "Speak an instruction"}
+            >
+              <MicIcon />
+            </button>
+            <button
+              type="submit"
+              className="talk-to-milo__send talk-to-milo__send--compact"
+              disabled={submitting || instruction.trim().length === 0}
+              aria-label={submitting ? "Sending..." : "Send"}
+            >
+              <span className="talk-to-milo__send-icon" aria-hidden="true">
+                <SendIcon />
+              </span>
+            </button>
+          </>
+        ) : (
+          <button
+            type="submit"
+            className="talk-to-milo__send"
+            disabled={submitting || instruction.trim().length === 0}
+            aria-label={submitting ? "Sending..." : "Send"}
+          >
+            <span aria-hidden="true">{submitting ? "Sending..." : "Send to MILO"}</span>
+            <span aria-hidden="true" className="talk-to-milo__send-icon">
+              <SendIcon />
+            </span>
+          </button>
+        )}
       </form>
 
       {speech.state !== "idle" && (

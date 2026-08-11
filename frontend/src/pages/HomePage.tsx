@@ -175,6 +175,7 @@ export function HomePage() {
         prompt="What would you like me to do?"
         examplesLabel="Try an example:"
         examplesVariant="pills"
+        layout="compact"
       />
 
       <div className="home-page__grid">

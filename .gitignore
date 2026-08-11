@@ -8,6 +8,16 @@ __pycache__/
 .ruff_cache/
 
 # ----------------------------
+# Windows/WSL NTFS "mark of the web" alternate-data-stream artifacts --
+# appear as literal `<file>:Zone.Identifier` files when a file
+# downloaded via a Windows browser is copied into WSL (e.g. a MILO
+# asset dragged into frontend/public/). Not project content; if one
+# ever ends up inside public/, Vite copies it verbatim into the
+# production build otherwise.
+# ----------------------------
+*:Zone.Identifier
+
+# ----------------------------
 # Locally downloaded wheels (e.g. backend/scripts/download_torch.py's
 # output) -- large binaries, reproducible via that script, never
 # committed.
@@ -107,6 +117,10 @@ frontend/dist/
 frontend/coverage/
 frontend/.env
 frontend/.env.local
+
+# Vercel CLI project link/cache (`vercel link`/`vercel dev`) -- local
+# machine state, not project configuration (that's `vercel.json`).
+frontend/.vercel/
 
 # Playwright E2E (frontend/tests/e2e/) -- generated reports/artifacts,
 # never source. Chromium itself installs to ~/.cache/ms-playwright/
