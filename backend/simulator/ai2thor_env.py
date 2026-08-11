@@ -47,6 +47,19 @@ this depth is meant to be wired into (via `simulator.get_depth` passed in as
 a `depth_provider` callable -- see that module's docstring for why it isn't
 a direct `Simulator` reference).
 
+Headless GPU deployment (`platform`)
+-------------------------------------
+Locally (WSLg, a real desktop) `Controller()` auto-detects a usable
+display and needs no `platform` argument -- the default (`None`) is
+left unchanged so nothing about existing local/CI behavior changes.
+A real cloud GPU server typically has no X server at all, and
+AI2-THOR's own answer to that is its `CloudRendering` platform (EGL-
+based, no X11 required) -- passed straight through from `Simulator`,
+which reads it from `VISION_SIMULATOR_PLATFORM` (see
+`api/app.py`'s lifespan). Unset/default keeps today's auto-detected
+behavior; only a deployment that actually is a headless GPU box needs
+to set this.
+
 Object interaction + navigation (Phase 5)
 -------------------------------------------
 Phase 1-4 only ever needed the movement/look primitives above. Phase 5
@@ -86,12 +99,14 @@ class AI2ThorEnv:
         width=640,
         height=480,
         render_depth=False,
+        platform=None,
     ):
 
         self.scene = scene
         self.width = width
         self.height = height
         self.render_depth = render_depth
+        self.platform = platform
 
         self.controller = None
 
@@ -118,6 +133,7 @@ class AI2ThorEnv:
             rotateStepDegrees=90,
             fieldOfView=90,
             renderDepthImage=self.render_depth,
+            platform=self.platform,
         )
 
     ####################################################

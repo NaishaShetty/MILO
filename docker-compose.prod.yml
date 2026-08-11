@@ -1,0 +1,123 @@
+# docker-compose.prod.yml
+#
+# Purpose
+# -------
+# Production compose file for the GPU-hosted backend ONLY. The
+# frontend is not built or served here -- it's a static Vite bundle
+# deployed separately on Vercel (see frontend/vercel.json,
+# frontend/README.md's "Deployment (Vercel)" section). This file is
+# the counterpart to the existing docker-compose.yml's "backend"
+# service, but:
+#   - builds docker/Dockerfile.gpu (CUDA/AI2-THOR-capable), not
+#     docker/Dockerfile (the intentionally CPU-only, no-simulator
+#     image docker-compose.yml uses for local dev).
+#   - requests GPU access from the Docker daemon (needs
+#     nvidia-container-toolkit installed on the host -- see
+#     deployment/gpu_host_setup.md).
+#   - exposes the backend to the internet via a Cloudflare Quick
+#     Tunnel (cloudflared, no named tunnel / no token / no Cloudflare
+#     account domain required) rather than a public port. The tunnel
+#     makes an outbound connection to Cloudflare's edge, so the GPU
+#     host needs no public IP and no open inbound ports. Cloudflare
+#     assigns a random `https://<random-name>.trycloudflare.com`
+#     hostname each time the tunnel starts -- there is no persistent
+#     hostname to configure. See "Quick Tunnel limitations" below
+#     before treating this as a production deployment.
+#   - persists backend/outputs/ (SQLite memory store) in a named
+#     volume, so memory survives container restarts/redeploys instead
+#     of resetting every time (see MemoryConfig's docstring on why
+#     that path is where it is).
+#
+# Usage
+# -----
+#   cp backend/.env.example backend/.env   # fill in real values -- see
+#                                           # that file and the root
+#                                           # deployment report for
+#                                           # which variables production
+#                                           # needs (LLM key,
+#                                           # API_ALLOWED_ORIGINS set to
+#                                           # the real Vercel domain,
+#                                           # VISION_ENABLE_SIMULATOR=true,
+#                                           # VISION_SIMULATOR_PLATFORM=cloud_rendering)
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml logs -f cloudflared
+#   # ^ watch this for the "https://<random-name>.trycloudflare.com"
+#   # line -- that is the public URL for this run. No token, no
+#   # Cloudflare API key, and no domain are needed to start it.
+#
+# Quick Tunnel limitations (read before relying on this)
+# ------------------------------------------------------------
+# This is a free development/demo tunnel, NOT an always-on hosted
+# backend:
+#   - the public URL is temporary and changes every time this
+#     `cloudflared` container (re)starts -- there is nothing to pin it
+#     to.
+#   - the tunnel only exists while this Docker Compose stack is
+#     running, which means it only exists while: this Windows PC is
+#     powered on, WSL/Ubuntu is running, Docker is running, and the
+#     `backend` container is healthy.
+#   - if any of the above stops (PC sleeps/shuts down, WSL is closed,
+#     Docker Desktop quits), MILO becomes unreachable until they're
+#     all back up and this stack is restarted.
+#   - internet connectivity on this PC is required for the tunnel to
+#     exist at all.
+#   - the GPU (RTX 4050) driving AI2-THOR is this machine's own GPU --
+#     there is no separate cloud GPU host backing this deployment.
+#   - see Cloudflare's own documented Quick Tunnel limitations (rate
+#     limits, no SLA, intended for testing) before sharing the URL
+#     widely.
+#   - every time the URL changes, `frontend/vercel.json`'s rewrite
+#     destinations must be updated to the new hostname and the Vercel
+#     frontend redeployed -- see that file's comments.
+#
+# Do NOT run this without first reading deployment/gpu_host_setup.md --
+# it assumes the host already has an NVIDIA driver and
+# nvidia-container-toolkit installed.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.gpu
+    env_file:
+      - path: backend/.env
+        required: true
+    volumes:
+      # Bind-mounts the same path MemoryConfig.from_env() defaults to
+      # inside the container (/app/outputs, since WORKDIR is /app and
+      # backend/memory/config.py resolves to <backend-root>/outputs) --
+      # a named volume so `docker compose down`/redeploys never lose
+      # MILO's memory.db, only `docker compose down -v` would.
+      - milo_backend_outputs:/app/outputs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # Recovers from a real process crash or host reboot (Docker's own
+    # daemon auto-starts on boot; this policy then brings the
+    # container back up with it) -- the same protection
+    # docker-compose.yml's existing services already rely on, just
+    # named explicitly here since this file has no frontend service to
+    # inherit conventions from.
+    restart: unless-stopped
+    expose:
+      - "8000"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    # A Quick Tunnel: no `TUNNEL_TOKEN`, no named tunnel, no Cloudflare
+    # account domain. `--url` points it at the backend by its Compose
+    # service name (resolved over the default Compose network, not
+    # localhost) and Cloudflare hands back a random
+    # `https://<random-name>.trycloudflare.com` on every start -- see
+    # "Quick Tunnel limitations" above.
+    command: tunnel --no-autoupdate --url http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  milo_backend_outputs:

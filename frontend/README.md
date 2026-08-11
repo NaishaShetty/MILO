@@ -160,6 +160,37 @@ Before deploying:
 3. Add that backend's origin to its own `API_ALLOWED_ORIGINS` env var so
    CORS allows requests forwarded from this Vercel deployment's domain.
 
+### If the backend is exposed via a Cloudflare Quick Tunnel
+
+`docker-compose.prod.yml`'s `cloudflared` service (see that file's header
+comment) can run as a free Quick Tunnel instead of a named tunnel on a
+purchased domain -- no Cloudflare account token, no DNS setup. The
+trade-off: Cloudflare assigns a **new random**
+`https://<random-name>.trycloudflare.com` hostname every time that
+container (re)starts, and `vercel.json`'s rewrite destinations are static
+at build/deploy time -- there is no runtime env var Vercel reads for this.
+
+So every time the tunnel restarts (backend redeploy, container restart, PC
+reboot, ...), you must manually:
+
+1. Run `docker compose -f docker-compose.prod.yml logs -f cloudflared` on
+   the backend host and copy the `https://<random-name>.trycloudflare.com`
+   line it prints on startup.
+2. Replace both `REPLACE_WITH_MILO_BACKEND_HOST` occurrences in
+   `vercel.json` with that hostname (no `https://` prefix, no trailing
+   slash).
+3. Update that same host in `API_ALLOWED_ORIGINS` — the Vercel deployment
+   itself doesn't need to be in `API_ALLOWED_ORIGINS` here; the *tunnel
+   hostname* does not need to be there either since CORS is checked by
+   origin (the Vercel domain), not destination — no change needed there
+   unless the Vercel domain itself changes.
+4. Redeploy this Vercel project so the new rewrite destinations take
+   effect (`vercel --prod` or push to the connected branch).
+
+This is a free development/demo tunnel, not an always-on hosted backend —
+see `docker-compose.prod.yml`'s "Quick Tunnel limitations" comment for the
+full list of what has to stay running for it to work at all.
+
 No other environment variables are read by the frontend build or bundle
 (see "Real data only" above) -- `VITE_BACKEND_URL` is a **local dev-only**
 convenience for `vite.config.ts`'s dev proxy and is never read at runtime by

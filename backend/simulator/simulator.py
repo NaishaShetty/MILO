@@ -46,7 +46,7 @@ from simulator.ai2thor_env import AI2ThorEnv
 
 class Simulator:
 
-    def __init__(self, render_depth=False):
+    def __init__(self, render_depth=False, platform=None):
         """Builds the underlying AI2-THOR env.
 
         Args:
@@ -54,9 +54,14 @@ class Simulator:
                 default (matches prior behavior/perf); pass `True` when a
                 ground-truth `DepthEstimator` (Phase 3.x) needs `get_depth()`
                 to work.
+            platform: Passed straight through to `AI2ThorEnv` -- an
+                `ai2thor.platform` class (e.g. `CloudRendering`) for a
+                headless GPU deployment, or `None` (default) to keep
+                today's local auto-detected behavior. See
+                `ai2thor_env.py`'s "Headless GPU deployment" note.
         """
 
-        self.env = AI2ThorEnv(render_depth=render_depth)
+        self.env = AI2ThorEnv(render_depth=render_depth, platform=platform)
 
     def start(self):
         self.env.start()

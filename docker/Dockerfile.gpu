@@ -1,0 +1,123 @@
+# syntax=docker/dockerfile:1
+#
+# GPU-enabled production Dockerfile for the backend -- the
+# `VISION_ENABLE_SIMULATOR=true` / real-AI2-THOR counterpart to
+# `docker/Dockerfile`. That file is deliberately CPU-only and
+# explicitly never launches the simulator (see its own header comment
+# and docker/README.md) -- this is a separate image, not a modified
+# copy of it, so nothing about the existing CPU/no-simulator
+# deployment path changes.
+#
+# Build from the repository root (same convention as docker/Dockerfile):
+#
+#   docker build -f docker/Dockerfile.gpu -t milo-backend-gpu .
+#
+# Run with GPU access (host needs the NVIDIA driver + nvidia-container-
+# toolkit installed -- see deployment/gpu_host_setup.md):
+#
+#   docker run --gpus all --env-file backend/.env -p 8000:8000 milo-backend-gpu
+#
+# Why NVIDIA_DRIVER_CAPABILITIES=all
+# ------------------------------------
+# nvidia-container-toolkit's default capability set is "compute,utility"
+# -- enough for CUDA (torch's use of the GPU), but NOT enough for
+# AI2-THOR's `CloudRendering` platform, which needs EGL/OpenGL/Vulkan
+# to actually render Unity frames headlessly. Without "graphics"/"all"
+# here, AI2-THOR's Controller can start (torch/CUDA works) but scene
+# rendering fails. Declared as an image ENV so it applies whenever this
+# image runs with `--gpus all`, without every `docker run`/compose
+# invocation needing to repeat it.
+#
+# Honest caveat (read before you deploy this)
+# ------------------------------------------------
+# This Dockerfile was written and reviewed against AI2-THOR's
+# documented CloudRendering/headless-GPU requirements, but has not
+# been build-and-run verified against a real GPU in this environment
+# (none is available here -- see the deployment report). Treat the
+# first real run on your actual GPU host as a validation step, not a
+# guarantee: AI2-THOR version/driver-version mismatches are a known
+# source of headless-rendering issues industry-wide, and the exact
+# system library set below is a best-effort list, not something this
+# repository's own CI (which never runs a real simulator -- see
+# api/app.py's docstring) has exercised.
+
+FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04
+
+LABEL org.opencontainers.image.description="MILO backend (GPU / AI2-THOR CloudRendering enabled)"
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    # See "Why NVIDIA_DRIVER_CAPABILITIES=all" above.
+    NVIDIA_DRIVER_CAPABILITIES=all \
+    NVIDIA_VISIBLE_DEVICES=all
+
+# Python 3.9 (deadsnakes -- Ubuntu 22.04's own repos default to 3.10;
+# matches the cp39 interpreter the rest of this project's tooling
+# targets, see docker/README.md) + the system libraries opencv-python
+# needs at import time (matches docker/Dockerfile) + the EGL/GL/Vulkan
+# libraries AI2-THOR's CloudRendering platform renders through.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        python3.9 \
+        python3.9-venv \
+        python3.9-distutils \
+        python3-pip \
+        libgl1 \
+        libglib2.0-0 \
+        libglvnd0 \
+        libegl1 \
+        libgles2 \
+        libvulkan1 \
+        libx11-6 \
+        libxext6 \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1
+
+# Isolate MILO's Python dependencies in a venv instead of installing
+# into Ubuntu's system Python. The apt-get above pulls in system
+# packages (e.g. blinker) as Debian/Ubuntu distutils-installed
+# packages, which pip is not allowed to uninstall/upgrade in place --
+# a plain `python3.9 -m pip install` that needs a newer version of one
+# of those fails with "uninstall-distutils-installed-package". A venv
+# sidesteps this entirely: its pip only ever touches the venv's own
+# site-packages, never the system ones. Prepending it to PATH means
+# every subsequent `python3.9`/`pip` invocation in this image --
+# including the HEALTHCHECK and CMD below -- resolves to the venv's
+# interpreter automatically, with no need to qualify each command or
+# activate anything.
+RUN python3.9 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+COPY backend/requirements.txt ./requirements.txt
+
+# CUDA-enabled torch/torchvision (the opposite choice from
+# docker/Dockerfile's CPU-only install -- this image has a real GPU to
+# use). cu121 matches this image's CUDA 12.1 base. All three commands
+# run inside /opt/venv (see PATH above), not the system Python.
+RUN pip install --upgrade pip \
+    && pip install "torch>=2.5.1" "torchvision>=0.20.1" \
+        --index-url https://download.pytorch.org/whl/cu121 \
+    && pip install -r requirements.txt
+
+COPY backend/ ./
+
+RUN useradd --create-home --shell /bin/bash appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+    CMD python3.9 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)" || exit 1
+
+CMD ["python3.9", "-m", "uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8000"]

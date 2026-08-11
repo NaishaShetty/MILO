@@ -162,6 +162,31 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 logger = logging.getLogger(__name__)
 
 
+#: Deployment targets that need an explicit `ai2thor.platform` (a real
+#: headless GPU server, no X server -- see `simulator/ai2thor_env.py`'s
+#: "Headless GPU deployment" note). Anything else (unset, "auto") keeps
+#: today's local auto-detected behavior by passing `platform=None`
+#: through unchanged.
+_SIMULATOR_PLATFORMS = {"cloud_rendering": "CloudRendering", "linux64": "Linux64"}
+
+
+def _resolve_simulator_platform():
+    """
+    Reads `VISION_SIMULATOR_PLATFORM` and resolves it to the matching
+    `ai2thor.platform` class, or `None` if unset/unrecognized -- the
+    same "keep existing behavior unless explicitly opted into" pattern
+    `VISION_ENABLE_SIMULATOR`/`VISION_DEPTH_SOURCE` already use just
+    below. Only a real headless GPU deployment needs to set this.
+    """
+    raw = os.environ.get("VISION_SIMULATOR_PLATFORM", "").strip().lower()
+    class_name = _SIMULATOR_PLATFORMS.get(raw)
+    if class_name is None:
+        return None
+    import ai2thor.platform
+
+    return getattr(ai2thor.platform, class_name)
+
+
 def _allowed_origins() -> list[str]:
     """
     Reads `API_ALLOWED_ORIGINS` (comma-separated) from the environment,
@@ -257,7 +282,8 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         depth_source = os.environ.get("VISION_DEPTH_SOURCE", DEPTH_SOURCE_GROUND_TRUTH)
         try:
             simulator = Simulator(
-                render_depth=(depth_source == DEPTH_SOURCE_GROUND_TRUTH)
+                render_depth=(depth_source == DEPTH_SOURCE_GROUND_TRUTH),
+                platform=_resolve_simulator_platform(),
             )
             simulator.start()
             # Stored on `app.state` (not just closed over as a local),
