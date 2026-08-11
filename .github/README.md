@@ -142,8 +142,12 @@ for the full research-contribution breakdown and final evaluation.
 
 ## Current Results
 
-- **Tests**: backend `893 passed, 8 skipped, 0 failed`; frontend
-  `181 passed, 0 failed` (29 files); production build clean.
+- **Tests**: backend `889 passed, 2 skipped, 0 failed`; frontend
+  `186 passed, 0 failed` (29 files); production build clean. (Run
+  backend tests with `VISION_ENABLE_SIMULATOR` unset/`false` -- a local
+  `.env` with the simulator enabled for interactive use will cause 3
+  simulator-availability tests to see a real, working simulator instead
+  of the "unavailable" case they're testing for.)
 - **Real AI2-THOR mission, driven through the actual UI** (not a mocked
   test): found and fixed a critical bug where the orchestrator/plan
   validator ignored the LLM's parsed `target_location`, causing every
@@ -256,6 +260,39 @@ setup walkthroughs, and the security model):
 Deployment/Docker: [`docker/README.md`](docker/README.md) and
 [`deployment/README.md`](deployment/README.md).
 
+## Deployment
+
+**MILO is not currently deployed publicly.** Running it against a real
+GPU host turned out to require infrastructure (a dedicated CUDA-capable
+machine, always-on hosting) that isn't feasible to maintain at this
+stage, so the project's priority right now is local reproducibility --
+anyone cloning this repo can run the full stack on their own machine
+via [Quick Start](#quick-start).
+
+The deployment configuration below is real and was build/run-verified
+against a real backend, but is not currently running anywhere public:
+
+- **Frontend**: a static Vite build, deployable to Vercel --
+  [`frontend/README.md`](frontend/README.md#deployment-vercel) and
+  `frontend/vercel.json`.
+- **Backend**: a GPU-enabled Docker image (`docker/Dockerfile.gpu`,
+  CUDA 12.1 + headless AI2-THOR `CloudRendering`) and
+  `docker-compose.prod.yml`, which fronts it with a Cloudflare Quick
+  Tunnel (no purchased domain required) rather than a public port. It
+  is **not** deployable to Vercel: task execution runs in a background
+  thread inside the FastAPI process (`backend/api/routes/tasks.py`)
+  that outlives the triggering request, `MemoryConfig`/
+  `SQLiteMemoryStore` persist to a local file
+  (`backend/outputs/memory/memory.db`), and
+  `VISION_ENABLE_SIMULATOR=true` launches a real AI2-THOR/Unity
+  subprocess (`backend/api/app.py`'s lifespan) -- none of which
+  survive Vercel's stateless, short-lived-per-request serverless
+  execution model.
+
+Wherever the backend runs, point the frontend at it via
+`frontend/vercel.json`'s rewrites and add the frontend's deployed
+origin to that backend's `API_ALLOWED_ORIGINS`.
+
 ## Project Structure
 
 ```
@@ -305,6 +342,39 @@ Full roadmap with rationale for every open item:
 - [`docs/development_history.md`](docs/development_history.md) — phase-by-phase development narrative
 - [`docs/repository_structure.md`](docs/repository_structure.md) — full module-by-module repository map
 - [`docker/README.md`](docker/README.md) / [`deployment/README.md`](deployment/README.md) — deployment
+
+## Screenshots
+
+All screenshots below are real renders of the actual frontend/backend
+code -- see [`docs/screenshots/README.md`](docs/screenshots/README.md)
+for exactly which are captured against a live backend + real AI2-THOR
+run versus a mocked API response used to reliably reproduce a specific
+UI state (e.g. "plan mid-execution"). Neither category fabricates data
+values; the mocked set only fixes *which* real UI state renders.
+
+**A real mission, driven through the actual UI** (live AI2-THOR, real LLM parse, real plan/execution):
+
+| Instruction typed | Executing | Complete |
+|---|---|---|
+| ![Instruction typed](docs/screenshots/demo/live-01-instruction-typed.png) | ![Task in progress](docs/screenshots/demo/live-02-task-in-progress.png) | ![Task complete](docs/screenshots/demo/live-03-task-complete.png) |
+
+**Mission Control** (agent status, live plan, activity feed):
+
+![Mission Control](docs/screenshots/ui/mission-control.png)
+
+**Memory** (episodic/semantic/failure memory, real retrieval):
+
+![Memory](docs/screenshots/ui/memory.png)
+
+**Home**, **Activity**, **MILO Lab**, **About MILO**, **Settings**:
+
+| Home | Activity |
+|---|---|
+| ![Home](docs/screenshots/ui/home.png) | ![Activity](docs/screenshots/ui/activity.png) |
+
+| MILO Lab | Settings |
+|---|---|
+| ![MILO Lab](docs/screenshots/ui/lab.png) | ![Settings](docs/screenshots/ui/settings.png) |
 
 ## License
 
