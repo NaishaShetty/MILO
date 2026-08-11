@@ -44,6 +44,13 @@ backend/outputs/**/*.db
 .vscode/
 
 # ----------------------------
+# Local Claude Code tooling state (permission allowlist, task locks) --
+# machine-local, not project source; removed from tracking in the
+# Phase 8.7 authorship/attribution cleanup.
+# ----------------------------
+.claude/
+
+# ----------------------------
 # Local design references (Phase 8.2 visual mockups) -- reference-only,
 # never part of the shipped product; removed from tracking in Phase 8.1
 # and must not be reintroduced (see Phase 8.7 audit).
