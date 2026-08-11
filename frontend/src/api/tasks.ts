@@ -14,6 +14,7 @@
 import { ApiError, request } from "./client";
 import type {
   CreateTaskRequestBody,
+  RobotState,
   TaskEvent,
   TaskMemoryResponse,
   TaskState,
@@ -57,6 +58,17 @@ export async function getTaskPlan(taskId: string): Promise<Plan | null> {
 /** `GET /api/v1/tasks/{id}/memory` -- memories retrieved/created for this task. */
 export async function getTaskMemory(taskId: string): Promise<TaskMemoryResponse> {
   return request<TaskMemoryResponse>(`/api/v1/tasks/${encodeURIComponent(taskId)}/memory`);
+}
+
+/**
+ * `GET /api/v1/tasks/{id}/robot` -- the shared simulator's current
+ * position/rotation/held-object/visible-objects. Throws `ApiError`
+ * (503, category `execution_unavailable`) when no simulator is running --
+ * callers should treat that as "simulator not connected," not a generic
+ * error.
+ */
+export async function getTaskRobotState(taskId: string): Promise<RobotState> {
+  return request<RobotState>(`/api/v1/tasks/${encodeURIComponent(taskId)}/robot`);
 }
 
 /** `GET /api/v1/tasks/{id}/events` -- the structured event log. */

@@ -16,8 +16,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TalkToMilo } from "./TalkToMilo";
 import { SpeechProvider } from "../state/SpeechContext";
 import { TaskProvider } from "../state/TaskContext";
+import { VoiceProvider } from "../state/VoiceContext";
 import * as tasksApi from "../api/tasks";
 import * as speechApi from "../api/speech";
+import * as voiceApi from "../api/voice";
 
 vi.mock("../api/tasks", async () => {
   const actual = await vi.importActual<typeof import("../api/tasks")>("../api/tasks");
@@ -33,6 +35,11 @@ vi.mock("../api/tasks", async () => {
 vi.mock("../api/speech", async () => {
   const actual = await vi.importActual<typeof import("../api/speech")>("../api/speech");
   return { ...actual, transcribeAudio: vi.fn() };
+});
+
+vi.mock("../api/voice", async () => {
+  const actual = await vi.importActual<typeof import("../api/voice")>("../api/voice");
+  return { ...actual, speak: vi.fn(), transcribe: vi.fn() };
 });
 
 class FakeMediaRecorder {
@@ -58,10 +65,12 @@ function renderTalkToMilo() {
     <MemoryRouter initialEntries={["/"]}>
       <TaskProvider>
         <SpeechProvider>
-          <Routes>
-            <Route path="/" element={<TalkToMilo />} />
-            <Route path="/mission-control" element={<div>Mission Control Page</div>} />
-          </Routes>
+          <VoiceProvider>
+            <Routes>
+              <Route path="/" element={<TalkToMilo />} />
+              <Route path="/mission-control" element={<div>Mission Control Page</div>} />
+            </Routes>
+          </VoiceProvider>
         </SpeechProvider>
       </TaskProvider>
     </MemoryRouter>,
@@ -99,6 +108,7 @@ beforeEach(() => {
   vi.mocked(tasksApi.getTask).mockReset();
   vi.mocked(tasksApi.getTaskEvents).mockReset().mockResolvedValue([]);
   vi.mocked(tasksApi.createTask).mockReset();
+  vi.mocked(voiceApi.speak).mockReset();
 });
 
 afterEach(() => {

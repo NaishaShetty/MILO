@@ -17,14 +17,17 @@
 // before anything renders), Agents, Task, Speech, Voice (Phase 8.2) --
 // Speech/Voice are innermost since both only ever call into Task
 // (`submitInstruction`, `useTask()`) from page code/other providers,
-// never the reverse. `ErrorBoundary` wraps `<Routes>` only, not the
-// providers themselves, so a render crash inside one page can't take
-// down navigation.
+// never the reverse. `MiloStateProvider` (Phase 8.3) is innermost of
+// all: it reads Agents/Task/Speech/Voice to derive the one canonical
+// `MiloState`, so it must sit inside every context it reads from.
+// `ErrorBoundary` wraps `<Routes>` only, not the providers themselves,
+// so a render crash inside one page can't take down navigation.
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { NavBar } from "./components/NavBar";
 import { AgentsProvider } from "./state/AgentsContext";
+import { MiloStateProvider } from "./state/MiloStateContext";
 import { SettingsProvider } from "./state/SettingsContext";
 import { SpeechProvider } from "./state/SpeechContext";
 import { TaskProvider } from "./state/TaskContext";
@@ -44,23 +47,25 @@ export default function App() {
         <TaskProvider>
           <SpeechProvider>
             <VoiceProvider>
-              <BrowserRouter>
-                <div className="milo-app">
-                  <NavBar />
-                  <ErrorBoundary>
-                    <Routes>
-                      <Route path="/" element={<HomePage />} />
-                      <Route path="/mission-control" element={<MissionControlPage />} />
-                      <Route path="/memory" element={<MemoryPage />} />
-                      <Route path="/activity" element={<ActivityPage />} />
-                      <Route path="/about" element={<AboutPage />} />
-                      <Route path="/lab" element={<LabPage />} />
-                      <Route path="/settings" element={<SettingsPage />} />
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                  </ErrorBoundary>
-                </div>
-              </BrowserRouter>
+              <MiloStateProvider>
+                <BrowserRouter>
+                  <div className="milo-app">
+                    <NavBar />
+                    <ErrorBoundary>
+                      <Routes>
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/mission-control" element={<MissionControlPage />} />
+                        <Route path="/memory" element={<MemoryPage />} />
+                        <Route path="/activity" element={<ActivityPage />} />
+                        <Route path="/about" element={<AboutPage />} />
+                        <Route path="/lab" element={<LabPage />} />
+                        <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                      </Routes>
+                    </ErrorBoundary>
+                  </div>
+                </BrowserRouter>
+              </MiloStateProvider>
             </VoiceProvider>
           </SpeechProvider>
         </TaskProvider>

@@ -139,6 +139,7 @@ from api.routes.tasks import router as tasks_router
 from api.routes.vision import router as vision_router
 from api.routes.voice import router as voice_router
 from language.agent import LanguageAgent
+from language.config import LanguageRuntimeConfig
 from memory.agent import MemoryAgent
 from memory.config import MemoryConfig
 from simulator.simulator import Simulator
@@ -176,11 +177,17 @@ def _allowed_origins() -> list[str]:
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # Constructed once per process. `LanguageAgent.from_config()` reads
-    # `LanguageRuntimeConfig.from_env()` internally -- this app never
-    # touches provider/model/prompt configuration directly, per this
-    # package's "do not duplicate Phase 3 configuration" boundary.
-    app.state.language_agent = LanguageAgent.from_config()
+    # Built explicitly (rather than letting `LanguageAgent.from_config()`
+    # read the environment internally) so `app.state.language_config` is
+    # also available to `routes/language.py`'s `GET /language` status
+    # endpoint (Phase 8.5) -- it needs `provider`/`model`/
+    # `api_key_env_var` to report safe status without either
+    # reconstructing config a second time or reaching into
+    # `LanguageAgent`'s private collaborators. `from_config()` still
+    # does the exact same wiring either way (see its own docstring).
+    language_config = LanguageRuntimeConfig.from_env()
+    app.state.language_config = language_config
+    app.state.language_agent = LanguageAgent.from_config(language_config)
 
     # Built unconditionally (matches `language_agent` above): memory
     # needs no simulator, and `MemoryAgent.from_config()` never raises
@@ -194,9 +201,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # method's own docstring) -- when `SPEECH_ENABLE_WHISPER` is unset
     # (default) or the model fails to load, `SpeechAgent.is_available()`
     # is simply `False` and `routes/speech.py` reports a clean 503.
-    app.state.speech_agent = SpeechAgent(
-        WhisperTranscriber.from_config(SpeechConfig.from_env())
-    )
+    # `speech_config` is also retained on its own (mirroring
+    # `voice_config` below) so `GET /api/v1/speech`'s status endpoint
+    # (Phase 8.5) can report the configured `stt_provider` without
+    # re-reading the environment a second time.
+    speech_config = SpeechConfig.from_env()
+    app.state.speech_config = speech_config
+    app.state.speech_agent = SpeechAgent(WhisperTranscriber.from_config(speech_config))
 
     # Built unconditionally, same rationale as `speech_agent` above:
     # `ElevenLabsClient.from_config()` never raises -- when

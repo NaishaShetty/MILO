@@ -11,11 +11,62 @@
 // successfully (text or speech) navigates to Mission Control, the live
 // dashboard for whatever task was just created.
 import { useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { HomeIcon } from "./HomeIcons";
+import type { HomeIconName } from "./HomeIcons";
 import { useSpeechToTask } from "../hooks/useSpeechToTask";
 import { useTask } from "../state/TaskContext";
+import { useVoice } from "../state/VoiceContext";
+
+// Decorative only -- a keyword match on the example's own fixed
+// wording (never derived from backend data), same idiom as
+// HomePage.tsx's EXAMPLE_ICON map, generalized here since TalkToMilo
+// is reused with different example copy per page.
+function iconForExample(text: string): HomeIconName {
+  const lower = text.toLowerCase();
+  if (lower.includes("apple")) return "apple";
+  if (lower.includes("mug") || lower.includes("cup")) return "mug";
+  if (lower.includes("bottle")) return "bottle";
+  return "question";
+}
+
+function SendIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+      <path
+        d="M17.5 2.5 2.5 8.75l5.5 2.25 2.25 5.5L17.5 2.5Z M8 11l4.5-4.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function MicIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true">
+      <rect x="7.5" y="2" width="5" height="9" rx="2.5" fill="currentColor" />
+      <path
+        d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="12" height="12" fill="none" aria-hidden="true">
+      <path d="M6 3.5 10.5 8 6 12.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 const SPEECH_STATUS_LABEL: Record<string, string> = {
   idle: "",
@@ -39,12 +90,28 @@ const SPEECH_ERROR_LABEL: Record<string, string> = {
 export interface TalkToMiloProps {
   quickExamples?: string[];
   inputLabel?: string;
+  /** The prompt line above the input -- Home's mockup ("What would you
+   * like me to do?") and Mission Control's ("Give me an instruction in
+   * natural language.") use different copy for the same shared panel. */
+  prompt?: string;
+  examplesLabel?: string;
+  /** Mission Control's mockup shows each example as a full-width row
+   * with a trailing chevron ("list"); Home's mockup shows them as
+   * wrapped inline pills ("pills"). Same data, different mockup. */
+  examplesVariant?: "list" | "pills";
 }
 
-export function TalkToMilo({ quickExamples, inputLabel = "Instruction for MILO" }: TalkToMiloProps) {
+export function TalkToMilo({
+  quickExamples,
+  inputLabel = "Instruction for MILO",
+  prompt = "Give me an instruction in natural language.",
+  examplesLabel = "Try these examples",
+  examplesVariant = "list",
+}: TalkToMiloProps) {
   const navigate = useNavigate();
   const { submitInstruction, submitting, submitError } = useTask();
   const speech = useSpeechToTask();
+  const voice = useVoice();
   const [instruction, setInstruction] = useState("");
 
   const isListening = speech.state === "listening";
@@ -71,28 +138,40 @@ export function TalkToMilo({ quickExamples, inputLabel = "Instruction for MILO" 
     if (isListening) {
       speech.stopListening();
     } else {
+      // Barge-in: starting to talk to MILO while it's still speaking
+      // interrupts that playback rather than fighting for the user's
+      // attention alongside a fresh recording.
+      if (voice.state === "speaking") voice.stop();
       speech.reset();
       void speech.startListening();
     }
   }
 
+  function handleTextareaKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      void submit(instruction);
+    }
+  }
+
   return (
     <section className="talk-to-milo" aria-label="Talk to MILO">
-      <p className="talk-to-milo__prompt">What would you like me to do?</p>
+      <p className="talk-to-milo__prompt">{prompt}</p>
 
       <form className="talk-to-milo__form" onSubmit={handleFormSubmit}>
         <label htmlFor="talk-to-milo-input" className="talk-to-milo__label">
           {inputLabel}
         </label>
-        <div className="talk-to-milo__row">
-          <input
+        <div className="talk-to-milo__input-wrap">
+          <textarea
             id="talk-to-milo-input"
-            type="text"
             className="talk-to-milo__input"
             placeholder="Type your instruction here..."
             value={instruction}
             onChange={(event) => setInstruction(event.target.value)}
+            onKeyDown={handleTextareaKeyDown}
             disabled={submitting}
+            rows={3}
           />
           <button
             type="button"
@@ -102,16 +181,20 @@ export function TalkToMilo({ quickExamples, inputLabel = "Instruction for MILO" 
             aria-pressed={isListening}
             aria-label={isListening ? "Stop listening" : "Speak an instruction"}
           >
-            🎤
-          </button>
-          <button
-            type="submit"
-            className="talk-to-milo__send"
-            disabled={submitting || instruction.trim().length === 0}
-          >
-            {submitting ? "Sending..." : "Send"}
+            <MicIcon />
           </button>
         </div>
+        <button
+          type="submit"
+          className="talk-to-milo__send"
+          disabled={submitting || instruction.trim().length === 0}
+          aria-label={submitting ? "Sending..." : "Send"}
+        >
+          <span aria-hidden="true">{submitting ? "Sending..." : "Send to MILO"}</span>
+          <span aria-hidden="true" className="talk-to-milo__send-icon">
+            <SendIcon />
+          </span>
+        </button>
       </form>
 
       {speech.state !== "idle" && (
@@ -134,17 +217,23 @@ export function TalkToMilo({ quickExamples, inputLabel = "Instruction for MILO" 
 
       {quickExamples && quickExamples.length > 0 && (
         <div className="talk-to-milo__examples">
-          <p className="talk-to-milo__examples-label">Try an example:</p>
-          <div className="talk-to-milo__examples-list">
+          <p className="talk-to-milo__examples-label">{examplesLabel}</p>
+          <div className={`talk-to-milo__examples-list talk-to-milo__examples-list--${examplesVariant}`}>
             {quickExamples.map((example) => (
               <button
                 key={example}
                 type="button"
-                className="talk-to-milo__example"
+                className={`talk-to-milo__example talk-to-milo__example--${examplesVariant}`}
                 onClick={() => void submit(example)}
                 disabled={submitting}
               >
-                {example}
+                <span className="talk-to-milo__example-icon" aria-hidden="true">
+                  <HomeIcon name={iconForExample(example)} />
+                </span>
+                <span className="talk-to-milo__example-text">{example}</span>
+                <span className="talk-to-milo__example-chevron" aria-hidden="true">
+                  <ChevronIcon />
+                </span>
               </button>
             ))}
           </div>

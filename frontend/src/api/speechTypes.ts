@@ -15,6 +15,15 @@ export interface TranscriptionResult {
   latency_ms: number;
 }
 
+// Mirrors `routes/speech.py`'s `SpeechStatusResponse` -- which STT
+// backend (Phase 8.5's `STT_PROVIDER`) the mic pipeline is currently
+// configured to call. Never a secret.
+export interface SpeechStatus {
+  provider: "whisper" | "elevenlabs";
+  enabled: boolean;
+  available: boolean;
+}
+
 // The frontend-only speech lifecycle state machine this UI drives the
 // mic/upload flow through (spec: IDLE -> LISTENING -> PROCESSING ->
 // TRANSCRIBING -> TRANSCRIBED -> TASK_CREATED, or ERROR at any point).

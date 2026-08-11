@@ -21,6 +21,7 @@ from typing import Iterator, Union
 from unittest.mock import MagicMock
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from api.app import app
@@ -257,6 +258,64 @@ def test_get_task_memory_reports_created_memory(client: TestClient, tmp_path) ->
     body = memory_response.json()
     assert "retrieved" in body and "created" in body
     assert len(body["created"]) == 1
+
+
+def test_get_task_robot_state_reflects_current_simulator_metadata(
+    client: TestClient,
+) -> None:
+    fake_sim = FakeSimulator(objects=_mug_table_scene())
+    _wire(fake_sim, SingleTask(goal="find", object="mug"))
+    response = client.post("/api/v1/tasks", json={"instruction": "find the mug"})
+    task_id = response.json()["task_id"]
+    _wait_for_terminal_status(client, task_id)
+
+    robot_response = client.get(f"/api/v1/tasks/{task_id}/robot")
+    assert robot_response.status_code == 200
+    body = robot_response.json()
+    assert body["position"] == {"x": 0, "y": 0, "z": 0}
+    assert body["held_object"] is None
+    assert body["visible_objects"] == []
+
+
+def test_get_task_robot_state_reports_held_object(client: TestClient) -> None:
+    fake_sim = FakeSimulator(objects=_mug_table_scene())
+    _wire(fake_sim, SingleTask(goal="find", object="mug"))
+    response = client.post("/api/v1/tasks", json={"instruction": "find the mug"})
+    task_id = response.json()["task_id"]
+    _wait_for_terminal_status(client, task_id)
+
+    fake_sim.objects[0]["isPickedUp"] = True
+    robot_response = client.get(f"/api/v1/tasks/{task_id}/robot")
+    body = robot_response.json()
+    assert body["held_object"] == {"object_id": "Mug|1", "object_type": "Mug"}
+
+
+def test_get_task_robot_state_without_simulator_returns_503(
+    client: TestClient,
+) -> None:
+    fake_sim = FakeSimulator(objects=_mug_table_scene())
+    _wire(fake_sim, SingleTask(goal="find", object="mug"))
+    response = client.post("/api/v1/tasks", json={"instruction": "find the mug"})
+    task_id = response.json()["task_id"]
+    _wait_for_terminal_status(client, task_id)
+
+    app.dependency_overrides[get_simulator] = lambda: (_ for _ in ()).throw(
+        HTTPException(
+            status_code=503,
+            detail={"category": "execution_unavailable", "message": "no sim"},
+        )
+    )
+    robot_response = client.get(f"/api/v1/tasks/{task_id}/robot")
+    assert robot_response.status_code == 503
+
+
+def test_get_task_robot_state_404s_for_unknown_task(client: TestClient) -> None:
+    # Simulator must be wired for the dependency itself to resolve before
+    # the route body's 404 check ever runs -- same ordering as every
+    # other simulator-backed route in this module.
+    _wire(FakeSimulator(objects=_mug_table_scene()), SingleTask(goal="find", object="mug"))
+    response = client.get("/api/v1/tasks/does-not-exist/robot")
+    assert response.status_code == 404
 
 
 def test_second_create_task_while_one_is_running_returns_409(

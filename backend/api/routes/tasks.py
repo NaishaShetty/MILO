@@ -335,6 +335,55 @@ def get_task_memory(task_id: str) -> Dict[str, List[Dict[str, Any]]]:
 
 
 @router.get(
+    "/{task_id}/robot",
+    summary="Get the current simulator/robot state (position, rotation, held object, visible objects)",
+    description=(
+        "Curated view of AI2-THOR's raw metadata (Simulator.get_metadata()) "
+        "for the shared simulator this task ran/is running on -- agent "
+        "position/rotation/camera tilt, the currently held object (if "
+        "any), and which known objects are presently visible. Note this "
+        "reads the *current* simulator state, not a snapshot from when "
+        "this task last acted -- if another task has since moved the "
+        "robot, this reflects that. 503s under the same "
+        "'no simulator running' contract as POST /tasks."
+    ),
+    responses={503: {"description": "No simulator is running."}},
+)
+def get_task_robot_state(
+    task_id: str, simulator: Simulator = Depends(get_simulator)
+) -> Dict[str, Any]:
+    _require_task_state(task_id)  # 404s for an unknown task_id
+    metadata = simulator.get_metadata()
+    agent = metadata.get("agent") or {}
+    objects = metadata.get("objects") or []
+    held = next((obj for obj in objects if obj.get("isPickedUp")), None)
+    visible = [
+        {
+            "object_id": obj.get("objectId"),
+            "object_type": obj.get("objectType"),
+            "position": obj.get("position"),
+            "distance": obj.get("distance"),
+        }
+        for obj in objects
+        if obj.get("visible")
+    ]
+    return {
+        "position": agent.get("position"),
+        "rotation": agent.get("rotation"),
+        "camera_horizon": agent.get("cameraHorizon"),
+        "held_object": (
+            {
+                "object_id": held.get("objectId"),
+                "object_type": held.get("objectType"),
+            }
+            if held is not None
+            else None
+        ),
+        "visible_objects": visible,
+    }
+
+
+@router.get(
     "/{task_id}/events",
     summary="Get the structured event log for a task",
 )

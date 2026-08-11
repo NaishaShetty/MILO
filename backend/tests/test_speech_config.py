@@ -42,3 +42,21 @@ def test_invalid_model_size_raises(monkeypatch):
     monkeypatch.setenv("WHISPER_MODEL_SIZE", "gigantic")
     with pytest.raises(ValueError):
         SpeechConfig.from_env()
+
+
+def test_stt_provider_defaults_to_whisper(monkeypatch):
+    monkeypatch.delenv("STT_PROVIDER", raising=False)
+    config = SpeechConfig.from_env()
+    assert config.stt_provider == "whisper"
+
+
+def test_stt_provider_accepts_elevenlabs(monkeypatch):
+    monkeypatch.setenv("STT_PROVIDER", "elevenlabs")
+    config = SpeechConfig.from_env()
+    assert config.stt_provider == "elevenlabs"
+
+
+def test_invalid_stt_provider_raises(monkeypatch):
+    monkeypatch.setenv("STT_PROVIDER", "deepgram")
+    with pytest.raises(ValueError):
+        SpeechConfig.from_env()

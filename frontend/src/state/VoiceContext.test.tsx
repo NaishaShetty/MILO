@@ -1,5 +1,5 @@
 // VoiceContext.test.tsx
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -57,6 +57,21 @@ beforeEach(() => {
   vi.mocked(tasksApi.getTask).mockReset().mockResolvedValue(terminalTask() as never);
   vi.mocked(tasksApi.getTaskEvents).mockReset().mockResolvedValue([]);
   vi.mocked(voiceApi.speak).mockReset();
+  // jsdom does not implement real media playback -- `play()` rejects
+  // with "Not implemented" by default, which `VoiceContext` already
+  // treats as "autoplay blocked" and reverts to idle. Stubbed here so
+  // `state` reliably reaches (and stays at) "speaking" for tests that
+  // need to observe it, e.g. `stop()`'s interruption behavior below.
+  vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+  // jsdom also has no real `URL.createObjectURL`/`revokeObjectURL` --
+  // left unmocked, `VoiceContext`'s try/catch around object-URL setup
+  // silently catches that and reverts straight back to "idle" (which
+  // is why the pre-existing "speaks..." test below only ever asserted
+  // on `spokenText`, never `state`). Stubbed here so `state` can
+  // actually be observed at "speaking".
+  URL.createObjectURL = vi.fn(() => "blob:fake-url");
+  URL.revokeObjectURL = vi.fn();
 });
 
 // TaskContext only auto-adopts an in-flight task on mount (see that
@@ -95,6 +110,32 @@ describe("VoiceContext", () => {
 
     await waitFor(() => expect(result.current.voice.state).toBe("error"));
     expect(result.current.voice.spokenText).toBeNull();
+  });
+
+  it("stop() pauses playback and returns to idle while speaking", async () => {
+    vi.mocked(voiceApi.speak).mockResolvedValue({
+      audioBlob: new Blob(["fake-audio"]),
+      text: "I finished: bring the mug.",
+    });
+
+    const { result } = renderHook(() => useTaskAndVoice(), { wrapper });
+    result.current.task.setActiveTaskId("t1");
+
+    await waitFor(() => expect(result.current.voice.state).toBe("speaking"));
+
+    act(() => {
+      result.current.voice.stop();
+    });
+
+    expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+    expect(result.current.voice.state).toBe("idle");
+  });
+
+  it("stop() is a no-op when nothing is currently speaking", () => {
+    const { result } = renderHook(() => useTaskAndVoice(), { wrapper });
+
+    expect(() => act(() => result.current.voice.stop())).not.toThrow();
+    expect(result.current.voice.state).toBe("idle");
   });
 
   it("throws a clear error when used outside the provider", () => {

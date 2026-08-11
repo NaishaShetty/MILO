@@ -1,0 +1,18 @@
+# Keeps the frontend image's build context to just what's needed to
+# run `npm ci && npm run build` -- see Dockerfile.
+node_modules/
+dist/
+
+# Version control / editor / CI
+.git/
+.vscode/
+.idea/
+
+# Test artifacts
+coverage/
+
+# Env / secrets -- the frontend has no server-side secrets (see
+# src/api/client.ts's relative-URL contract), but never copy an env
+# file into an image regardless.
+.env
+.env.*

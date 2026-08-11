@@ -44,6 +44,14 @@ export interface VoiceContextValue {
   state: VoiceOutputState;
   /** The real text MILO most recently spoke (or is speaking), or `null` before anything has. */
   spokenText: string | null;
+  /**
+   * Stops current playback immediately (e.g. for barge-in: the user
+   * starts speaking while MILO is still talking). A no-op if nothing
+   * is currently playing. Does not replay/re-fetch anything -- the
+   * `spokenTaskIds` dedup guard below still prevents this task from
+   * being spoken again.
+   */
+  stop: () => void;
 }
 
 const VoiceContext = createContext<VoiceContextValue | null>(null);
@@ -92,6 +100,11 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
           const url = URL.createObjectURL(audioBlob);
           objectUrlRef.current = url;
           if (audioRef.current) {
+            // Explicit stop before swapping `src` -- defense in depth
+            // on top of the browser's own implicit "changing `src`
+            // mid-playback aborts the previous playback" behavior, so
+            // this doesn't silently depend on that alone.
+            audioRef.current.pause();
             audioRef.current.src = url;
             void audioRef.current.play().catch(() => {
               // Autoplay can be blocked by the browser -- not a voice
@@ -117,8 +130,13 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => releaseObjectUrl, [releaseObjectUrl]);
 
+  const stop = useCallback(() => {
+    audioRef.current?.pause();
+    setState((previous) => (previous === "speaking" ? "idle" : previous));
+  }, []);
+
   return (
-    <VoiceContext.Provider value={{ state, spokenText }}>
+    <VoiceContext.Provider value={{ state, spokenText, stop }}>
       {children}
       <audio
         ref={audioRef}

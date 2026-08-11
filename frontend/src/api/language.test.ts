@@ -11,7 +11,7 @@
 // preserved.
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LanguageApiError, parseInstruction } from "./language";
+import { getLanguageStatus, LanguageApiError, parseInstruction } from "./language";
 
 function mockFetchOnce(status: number, body: unknown): void {
   vi.stubGlobal(
@@ -91,5 +91,20 @@ describe("parseInstruction", () => {
     await expect(parseInstruction("x")).rejects.toMatchObject({
       category: "internal_error",
     });
+  });
+});
+
+describe("getLanguageStatus", () => {
+  it("GETs the language status endpoint and resolves with the body", async () => {
+    const body = { provider: "openai", model: "gpt-4o-mini", configured: true, available: true };
+    mockFetchOnce(200, body);
+
+    await expect(getLanguageStatus()).resolves.toEqual(body);
+    expect(fetch).toHaveBeenCalledWith("/api/v1/language");
+  });
+
+  it("throws on a non-2xx response", async () => {
+    mockFetchOnce(500, { category: "internal_error", message: "boom" });
+    await expect(getLanguageStatus()).rejects.toThrow();
   });
 });

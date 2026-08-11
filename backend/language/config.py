@@ -166,14 +166,16 @@ class LLMRuntimeConfig:
     def from_env(cls) -> "LLMRuntimeConfig":
         """
         Builds this config from environment variables. `provider`
-        selects between this project's two supported providers
+        selects between this project's three supported providers
         (`"openai"` -- the default, for backward compatibility with
-        every Phase 3.4 deployment -- or `"gemini"`, added in Phase
-        3.5, see `gemini_client.py`); every other field defaults to a
-        value appropriate for *that* provider unless explicitly
-        overridden, so setting only `LANGUAGE_LLM_PROVIDER=gemini` is
-        enough to switch providers without also having to know
-        Gemini's base URL or default API-key variable name by heart.
+        every Phase 3.4 deployment -- `"gemini"`, added in Phase 3.5
+        (see `gemini_client.py`), or `"qwen"`, a local/self-hosted
+        OpenAI-API-compatible server added in Phase 8.5); every other
+        field defaults to a value appropriate for *that* provider
+        unless explicitly overridden, so setting only
+        `LANGUAGE_LLM_PROVIDER=gemini` is enough to switch providers
+        without also having to know Gemini's base URL or default
+        API-key variable name by heart.
         No default exists for the API key itself -- deliberately: an
         application that runs without ever calling
         `LLMClient.complete()` (every test in this repository) must
@@ -199,6 +201,22 @@ class LLMRuntimeConfig:
             default_model = "gemini-flash-latest"
             default_base_url = "https://generativelanguage.googleapis.com/v1beta"
             default_api_key_env_var = "GEMINI_API_KEY"
+        elif provider == "qwen":
+            # Local/self-hosted Qwen via an OpenAI-API-compatible server
+            # (vLLM, Ollama, ...) -- see `provider_factory.py`, which
+            # reuses `OpenAICompatibleLLMClient` unchanged for this
+            # provider. `localhost:8000/v1` is vLLM's own default
+            # OpenAI-compatible endpoint; override with
+            # LANGUAGE_LLM_BASE_URL for a different host/port. Many
+            # local servers do not enforce the bearer token at all --
+            # if so, set QWEN_API_KEY to any placeholder value (e.g.
+            # "not-needed"); `_resolve_api_key` still requires *some*
+            # value to be set, deliberately (see that method's
+            # docstring) so this provider's credential handling stays
+            # identical to every other provider's.
+            default_model = "qwen2.5-7b-instruct"
+            default_base_url = "http://localhost:8000/v1"
+            default_api_key_env_var = "QWEN_API_KEY"
         else:
             default_model = "gpt-4o-mini"
             default_base_url = "https://api.openai.com/v1"

@@ -13,6 +13,7 @@ vi.mock("../api/tasks", async () => {
     listTasks: vi.fn(),
     getTask: vi.fn(),
     getTaskEvents: vi.fn(),
+    getTaskRobotState: vi.fn(),
     createTask: vi.fn(),
     cancelTask: vi.fn(),
   };
@@ -107,6 +108,43 @@ describe("TaskContext", () => {
 
     expect(result.current.submitError).toBe("Task already running.");
     expect(result.current.activeTaskId).toBeNull();
+  });
+
+  it("rejects a second submitInstruction() while the first is still in flight", async () => {
+    vi.mocked(tasksApi.listTasks).mockReset().mockResolvedValue([]);
+    let resolveCreateTask!: (value: TaskState) => void;
+    vi.mocked(tasksApi.createTask)
+      .mockReset()
+      .mockReturnValue(
+        new Promise<TaskState>((resolve) => {
+          resolveCreateTask = resolve;
+        }),
+      );
+    vi.mocked(tasksApi.getTask).mockReset().mockResolvedValue(baseTask({ task_id: "t2", status: "created" }));
+    vi.mocked(tasksApi.getTaskEvents).mockReset().mockResolvedValue([]);
+
+    const { result } = renderHook(() => useTask(), { wrapper: TaskProvider });
+    await waitFor(() => expect(result.current.historyStatus).toBe("success"));
+
+    let firstCall: Promise<TaskState>;
+    act(() => {
+      firstCall = result.current.submitInstruction("find the mug", "text");
+    });
+    await waitFor(() => expect(result.current.submitting).toBe(true));
+
+    await act(async () => {
+      await expect(result.current.submitInstruction("second one", "text")).rejects.toThrow(
+        "A task submission is already in progress.",
+      );
+    });
+    // Only the first call ever reached the backend.
+    expect(tasksApi.createTask).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveCreateTask(baseTask({ task_id: "t2", status: "created" }));
+      await firstCall;
+    });
+    expect(result.current.activeTaskId).toBe("t2");
   });
 
   it("cancelActive calls the cancel endpoint for the active task", async () => {

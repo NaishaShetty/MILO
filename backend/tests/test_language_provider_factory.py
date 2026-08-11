@@ -42,6 +42,13 @@ def test_gemini_provider_returns_gemini_client() -> None:
     assert isinstance(client, GeminiLLMClient)
 
 
+def test_qwen_provider_returns_openai_compatible_client() -> None:
+    # Local/self-hosted Qwen (vLLM/Ollama, ...) speaks the same
+    # OpenAI-compatible contract -- no dedicated client class needed.
+    client = create_llm_client(_config("qwen"))
+    assert isinstance(client, OpenAICompatibleLLMClient)
+
+
 def test_unsupported_provider_raises_configuration_error() -> None:
     with pytest.raises(ConfigurationError):
         create_llm_client(_config("anthropic"))

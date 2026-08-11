@@ -12,10 +12,15 @@
 // pipeline (see this project's explicit "do not duplicate the
 // orchestrator" rule).
 
-import { ApiError, requestForm } from "./client";
-import type { SpeechErrorKind, TranscriptionResult } from "./speechTypes";
+import { ApiError, request, requestForm } from "./client";
+import type { SpeechErrorKind, SpeechStatus, TranscriptionResult } from "./speechTypes";
 
 export { ApiError as SpeechApiError };
+
+/** `GET /api/v1/speech` -- which STT backend is active. Never 503s. */
+export async function getSpeechStatus(): Promise<SpeechStatus> {
+  return request<SpeechStatus>("/api/v1/speech");
+}
 
 /**
  * `POST /api/v1/speech/transcribe` (multipart/form-data, field `file`).

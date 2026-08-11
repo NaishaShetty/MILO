@@ -174,7 +174,7 @@ class Orchestrator:
             input_source=input_source,
             goal=task.goal,
             objects=[o for o in (task.object,) if o],
-            target=task.target,
+            target=task.target or task.target_location,
             status=TaskStatus.CREATED,
         )
         if on_created is not None:

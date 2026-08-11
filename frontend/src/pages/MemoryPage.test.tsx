@@ -7,16 +7,52 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryPage } from "./MemoryPage";
 import * as memoryApi from "../api/memory";
 import type { Memory } from "../api/memoryTypes";
+import { AgentsProvider } from "../state/AgentsContext";
+import { MiloStateProvider } from "../state/MiloStateContext";
+import { SpeechProvider } from "../state/SpeechContext";
+import { TaskProvider } from "../state/TaskContext";
+import { VoiceProvider } from "../state/VoiceContext";
 
 vi.mock("../api/memory", async () => {
   const actual = await vi.importActual<typeof import("../api/memory")>("../api/memory");
   return { ...actual, listMemory: vi.fn(), searchMemory: vi.fn() };
 });
 
+vi.mock("../api/tasks", async () => {
+  const actual = await vi.importActual<typeof import("../api/tasks")>("../api/tasks");
+  return {
+    ...actual,
+    listTasks: vi.fn().mockResolvedValue([]),
+    getTask: vi.fn(),
+    getTaskEvents: vi.fn(),
+    createTask: vi.fn(),
+  };
+});
+
+vi.mock("../api/agents", async () => {
+  const actual = await vi.importActual<typeof import("../api/agents")>("../api/agents");
+  return { ...actual, listAgents: vi.fn().mockResolvedValue([]) };
+});
+
+vi.mock("../api/voice", async () => {
+  const actual = await vi.importActual<typeof import("../api/voice")>("../api/voice");
+  return { ...actual, speak: vi.fn() };
+});
+
 function renderPage() {
   return render(
     <MemoryRouter>
-      <MemoryPage />
+      <AgentsProvider>
+        <TaskProvider>
+          <SpeechProvider>
+            <VoiceProvider>
+              <MiloStateProvider>
+                <MemoryPage />
+              </MiloStateProvider>
+            </VoiceProvider>
+          </SpeechProvider>
+        </TaskProvider>
+      </AgentsProvider>
     </MemoryRouter>,
   );
 }

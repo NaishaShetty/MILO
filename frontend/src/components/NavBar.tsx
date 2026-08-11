@@ -27,7 +27,8 @@ import { NavLink } from "react-router-dom";
 
 import { ApiError } from "../api/client";
 import { useAgents } from "../state/AgentsContext";
-import { MiloCharacter } from "./MiloCharacter";
+import { useMiloState } from "../state/MiloStateContext";
+import { MiloAvatar } from "./MiloAvatar";
 import { MiloStatus, type MiloConnectionState } from "./MiloStatus";
 
 const NAV_LINKS: Array<{ to: string; label: string; end?: boolean }> = [
@@ -64,6 +65,7 @@ function deriveConnectionState(
 export function NavBar() {
   const { agents, status, error } = useAgents();
   const connectionState = deriveConnectionState(status, agents, error);
+  const miloState = useMiloState();
 
   return (
     <header className="milo-navbar">
@@ -88,10 +90,7 @@ export function NavBar() {
       <div className="milo-navbar__meta">
         <MiloStatus state={connectionState} />
         <div className="milo-navbar__avatar">
-          <MiloCharacter
-            state={connectionState === "disconnected" ? "offline" : "idle"}
-            size="sm"
-          />
+          <MiloAvatar state={connectionState === "disconnected" ? "offline" : miloState} size="sm" />
         </div>
       </div>
     </header>

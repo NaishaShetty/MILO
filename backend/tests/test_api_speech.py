@@ -112,3 +112,38 @@ def test_transcribe_unintelligible_audio_returns_422(client: TestClient) -> None
 
     assert response.status_code == 422
     assert response.json()["category"] == "unintelligible"
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/speech -- Phase 8.5 STT provider status
+# ---------------------------------------------------------------------------
+
+
+def test_speech_status_defaults_to_whisper_unavailable(monkeypatch) -> None:
+    monkeypatch.delenv("STT_PROVIDER", raising=False)
+    monkeypatch.delenv("SPEECH_ENABLE_WHISPER", raising=False)
+
+    with TestClient(app) as fresh_client:
+        response = fresh_client.get("/api/v1/speech")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "provider": "whisper",
+        "enabled": False,
+        "available": False,
+    }
+
+
+def test_speech_status_reports_elevenlabs_when_selected(monkeypatch) -> None:
+    monkeypatch.setenv("STT_PROVIDER", "elevenlabs")
+    monkeypatch.delenv("VOICE_ENABLE_ELEVENLABS", raising=False)
+
+    with TestClient(app) as fresh_client:
+        response = fresh_client.get("/api/v1/speech")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "provider": "elevenlabs",
+        "enabled": False,
+        "available": False,
+    }

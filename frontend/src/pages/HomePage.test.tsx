@@ -6,8 +6,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HomePage } from "./HomePage";
 import { AgentsProvider } from "../state/AgentsContext";
+import { MiloStateProvider } from "../state/MiloStateContext";
 import { SpeechProvider } from "../state/SpeechContext";
 import { TaskProvider } from "../state/TaskContext";
+import { VoiceProvider } from "../state/VoiceContext";
 import * as tasksApi from "../api/tasks";
 import * as agentsApi from "../api/agents";
 
@@ -27,13 +29,22 @@ vi.mock("../api/agents", async () => {
   return { ...actual, listAgents: vi.fn() };
 });
 
+vi.mock("../api/voice", async () => {
+  const actual = await vi.importActual<typeof import("../api/voice")>("../api/voice");
+  return { ...actual, speak: vi.fn() };
+});
+
 function renderHome() {
   return render(
     <MemoryRouter initialEntries={["/"]}>
       <AgentsProvider>
         <TaskProvider>
           <SpeechProvider>
-            <HomePage />
+            <VoiceProvider>
+              <MiloStateProvider>
+                <HomePage />
+              </MiloStateProvider>
+            </VoiceProvider>
           </SpeechProvider>
         </TaskProvider>
       </AgentsProvider>

@@ -326,3 +326,62 @@ def test_unexpected_exception_returns_generic_500(client: TestClient) -> None:
     assert body["category"] == "internal_error"
     assert "sk-should-never-appear" not in response.text
     assert "Traceback" not in response.text
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/language -- Phase 8.5 provider status
+# ---------------------------------------------------------------------------
+# Bypasses the shared `client` fixture: these tests must control the
+# environment *before* the app's lifespan constructs `language_config`,
+# so they build their own `TestClient` after monkeypatching, exactly
+# like `test_api_voice.py`'s equivalent status tests.
+
+
+def test_language_status_reports_unconfigured_openai_by_default(monkeypatch) -> None:
+    for name in (
+        "LANGUAGE_LLM_PROVIDER",
+        "OPENAI_API_KEY",
+        "GEMINI_API_KEY",
+        "QWEN_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    with TestClient(app) as fresh_client:
+        response = fresh_client.get("/api/v1/language")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "provider": "openai",
+        "model": "gpt-4o-mini",
+        "configured": False,
+        "available": False,
+    }
+
+
+def test_language_status_reports_configured_when_key_present(monkeypatch) -> None:
+    monkeypatch.delenv("LANGUAGE_LLM_PROVIDER", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-should-never-appear")
+
+    with TestClient(app) as fresh_client:
+        response = fresh_client.get("/api/v1/language")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["configured"] is True
+    assert body["available"] is True
+    assert "sk-should-never-appear" not in response.text
+
+
+def test_language_status_reports_qwen_provider(monkeypatch) -> None:
+    for name in ("OPENAI_API_KEY", "GEMINI_API_KEY", "QWEN_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("LANGUAGE_LLM_PROVIDER", "qwen")
+
+    with TestClient(app) as fresh_client:
+        response = fresh_client.get("/api/v1/language")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider"] == "qwen"
+    assert body["model"] == "qwen2.5-7b-instruct"
+    assert body["configured"] is False

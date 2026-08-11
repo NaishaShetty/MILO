@@ -89,7 +89,9 @@ def test_transcribe_raises_unintelligible_for_empty_transcript():
 
 
 def test_from_config_disabled_is_unavailable():
-    config = SpeechConfig(enabled=False, model_size="base", device="cpu")
+    config = SpeechConfig(
+        enabled=False, model_size="base", device="cpu", stt_provider="whisper"
+    )
     transcriber = WhisperTranscriber.from_config(config)
     assert transcriber.is_available() is False
 
@@ -99,6 +101,8 @@ def test_from_config_enabled_without_whisper_installed_degrades_gracefully():
     # environment this suite runs in (see requirements.txt's comment) --
     # from_config() must never raise even when enabled=True and the
     # import/load fails.
-    config = SpeechConfig(enabled=True, model_size="base", device="cpu")
+    config = SpeechConfig(
+        enabled=True, model_size="base", device="cpu", stt_provider="whisper"
+    )
     transcriber = WhisperTranscriber.from_config(config)
     assert isinstance(transcriber.is_available(), bool)

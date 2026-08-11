@@ -150,6 +150,44 @@ class TestLLMRuntimeConfigGeminiProvider:
         assert config.api_key_env_var == "OPENAI_API_KEY"
 
 
+class TestLLMRuntimeConfigQwenProvider:
+    """Local/self-hosted Qwen provider, added in Phase 8.5 -- see
+    `provider_factory.py`, which reuses `OpenAICompatibleLLMClient`
+    unchanged for this provider name."""
+
+    def test_qwen_provider_selects_qwen_defaults(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        for name in (
+            "LANGUAGE_LLM_MODEL",
+            "LANGUAGE_LLM_BASE_URL",
+            "LANGUAGE_LLM_API_KEY_ENV_VAR",
+        ):
+            monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv("LANGUAGE_LLM_PROVIDER", "qwen")
+
+        config = LLMRuntimeConfig.from_env()
+
+        assert config.provider == "qwen"
+        assert config.model == "qwen2.5-7b-instruct"
+        assert config.base_url == "http://localhost:8000/v1"
+        assert config.api_key_env_var == "QWEN_API_KEY"
+
+    def test_qwen_provider_still_allows_explicit_overrides(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("LANGUAGE_LLM_PROVIDER", "qwen")
+        monkeypatch.setenv("LANGUAGE_LLM_MODEL", "qwen2.5-72b-instruct")
+        monkeypatch.setenv("LANGUAGE_LLM_BASE_URL", "http://gpu-box:8001/v1")
+        monkeypatch.setenv("LANGUAGE_LLM_API_KEY_ENV_VAR", "MY_QWEN_KEY")
+
+        config = LLMRuntimeConfig.from_env()
+
+        assert config.model == "qwen2.5-72b-instruct"
+        assert config.base_url == "http://gpu-box:8001/v1"
+        assert config.api_key_env_var == "MY_QWEN_KEY"
+
+
 class TestRecoveryConfig:
     def test_default_max_retries(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("LANGUAGE_RUNTIME_MAX_RETRIES", raising=False)

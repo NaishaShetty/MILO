@@ -1,14 +1,50 @@
 // AboutPage.test.tsx
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { AboutPage } from "./AboutPage";
+import { AgentsProvider } from "../state/AgentsContext";
+import { MiloStateProvider } from "../state/MiloStateContext";
+import { SpeechProvider } from "../state/SpeechContext";
+import { TaskProvider } from "../state/TaskContext";
+import { VoiceProvider } from "../state/VoiceContext";
+
+vi.mock("../api/tasks", async () => {
+  const actual = await vi.importActual<typeof import("../api/tasks")>("../api/tasks");
+  return {
+    ...actual,
+    listTasks: vi.fn().mockResolvedValue([]),
+    getTask: vi.fn(),
+    getTaskEvents: vi.fn(),
+    createTask: vi.fn(),
+  };
+});
+
+vi.mock("../api/agents", async () => {
+  const actual = await vi.importActual<typeof import("../api/agents")>("../api/agents");
+  return { ...actual, listAgents: vi.fn().mockResolvedValue([]) };
+});
+
+vi.mock("../api/voice", async () => {
+  const actual = await vi.importActual<typeof import("../api/voice")>("../api/voice");
+  return { ...actual, speak: vi.fn() };
+});
 
 function renderPage() {
   return render(
     <MemoryRouter>
-      <AboutPage />
+      <AgentsProvider>
+        <TaskProvider>
+          <SpeechProvider>
+            <VoiceProvider>
+              <MiloStateProvider>
+                <AboutPage />
+              </MiloStateProvider>
+            </VoiceProvider>
+          </SpeechProvider>
+        </TaskProvider>
+      </AgentsProvider>
     </MemoryRouter>,
   );
 }

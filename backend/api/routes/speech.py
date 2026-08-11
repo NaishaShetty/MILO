@@ -27,6 +27,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from pydantic import BaseModel, ConfigDict
 
 from agents.speech_agent import SpeechAgent
 from speech.errors import SpeechRuntimeError
@@ -53,6 +54,44 @@ _STATUS_FOR_CODE = {
     "TRANSCRIPTION_FAILED": 502,
     "UNINTELLIGIBLE": 422,
 }
+
+
+class SpeechStatusResponse(BaseModel):
+    """Response body for `GET /speech` -- which STT backend the
+    frontend's live mic pipeline is currently configured to call
+    (Phase 8.5's `STT_PROVIDER` switch, `speech/config.py`). Never
+    includes a key/credential -- `provider` is one of "whisper"/
+    "elevenlabs", never the ElevenLabs API key value."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    enabled: bool
+    available: bool
+
+
+@router.get(
+    "",
+    summary="Real STT provider configuration status",
+    description=(
+        "Never 503s -- reports which STT backend (whisper or "
+        "elevenlabs, per STT_PROVIDER) is currently selected and "
+        "whether it is actually available, so the frontend's mic "
+        "pipeline (SpeechContext) and Settings' Speech & Voice section "
+        "can route to the right backend and show an honest status."
+    ),
+)
+def get_speech_status(request: Request) -> SpeechStatusResponse:
+    provider = request.app.state.speech_config.stt_provider
+    if provider == "elevenlabs":
+        voice_agent = request.app.state.voice_agent
+        enabled = request.app.state.voice_config.enabled
+        available = voice_agent is not None and voice_agent.is_available()
+    else:
+        speech_agent: SpeechAgent = request.app.state.speech_agent
+        enabled = request.app.state.speech_config.enabled
+        available = speech_agent is not None and speech_agent.is_available()
+    return SpeechStatusResponse(provider=provider, enabled=enabled, available=available)
 
 
 def get_speech_agent(request: Request) -> SpeechAgent:

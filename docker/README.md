@@ -36,6 +36,17 @@ Current contents
   since none of them added a new system/Python dependency beyond what
   `backend/requirements.txt` already declared.
 
+  `torch`/`torchvision` in `backend/requirements.txt` have no index
+  constraint, so a plain `pip install -r requirements.txt` would pull
+  PyPI's default (CUDA-bundled) wheels into this CPU-only, no-GPU
+  image (Phase 8.5 fix). The `Dockerfile` installs the CPU-only build
+  from PyTorch's own package index
+  (`--index-url https://download.pytorch.org/whl/cpu`) *before* the
+  general `requirements.txt` install, so that install is a no-op for
+  those two packages -- local/GPU development
+  (`backend/scripts/download_torch.py`) is unaffected, since only this
+  image's install order changed.
+
   By default the container runs the FastAPI service (`uvicorn
   api.app:app --host 0.0.0.0 --port 8000`, published on `EXPOSE 8000`)
   -- `GET /health` answers immediately with no configuration; routes
@@ -64,12 +75,44 @@ clean `503 execution_unavailable` in this image, exactly like the
 Vision API already does, until `VISION_ENABLE_SIMULATOR=true` is set
 against a simulator-capable host.
 
+Phase 8.4 (Docker, Deployment & CI/CD)
+----------------------------------------
+- `../frontend/Dockerfile` -- the frontend's own production image
+  (multi-stage: `npm run build`, then nginx serving the static
+  output). Lives in `frontend/` rather than here so its build context
+  is just that project, not the whole repo -- see that Dockerfile's
+  own docstring.
+- `../docker-compose.yml` (repo root) -- runs both images together,
+  wired the way `frontend/nginx.conf.template` expects (the frontend
+  reverse-proxies `/api`/`/health` to the backend by its compose
+  service name, `backend`, so the frontend never needs an absolute
+  backend URL -- same relative-URL contract as local dev's Vite
+  proxy). Usage:
+
+  ```
+  cp backend/.env.example backend/.env   # fill in a real LLM API key
+  docker compose up --build
+  # frontend: http://localhost:8080
+  # backend directly (optional): http://localhost:8000/health
+  ```
+
+  Both images now define a `HEALTHCHECK` (backend: `GET /health` via
+  Python's stdlib, no curl/wget dependency; frontend: `GET /` via
+  nginx's own image). `.github/workflows/ci.yml`'s `docker` job builds
+  both on every push/PR (no registry push) and smoke-tests the backend
+  container with zero credentials configured.
+- Secrets: `backend/.env` is read only at container *run* time via
+  `docker-compose.yml`'s `env_file:` (marked `required: false`, so
+  compose still starts without it) -- never copied into either image
+  (see `.dockerignore` at the repo root and `frontend/.dockerignore`'s
+  "Env / secrets" sections).
+
 Planned contents
 -----------------
 - A GPU-enabled variant for running the perception pipeline (Grounding
   DINO, SAM2) with CUDA, and AI2-THOR/Unity's own dependencies (not yet
   needed -- the current `Dockerfile` covers the code that can run
-  headless).
-- `docker-compose` (or equivalent) wiring, once more than one service
-  needs to run together (e.g. simulator + perception + a future API
-  server).
+  headless). AI2-THOR/Unity itself still needs a display/GPU
+  environment neither container here provides -- see the Phase 5 note
+  above; docker-compose's two services cover the API + web UI, not the
+  simulator.

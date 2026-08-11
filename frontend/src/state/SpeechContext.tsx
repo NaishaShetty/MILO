@@ -19,11 +19,12 @@
 // Every failure mode (no `mediaDevices` API, permission denied, no
 // speech captured, a transcription/backend error) is caught and
 // mapped to a `SpeechErrorKind` -- never left to throw into the UI.
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
-import { mapSpeechError, transcribeAudio } from "../api/speech";
+import { getSpeechStatus, mapSpeechError, transcribeAudio } from "../api/speech";
 import type { SpeechErrorKind } from "../api/speechTypes";
+import { transcribe as transcribeElevenLabs } from "../api/voice";
 
 export type SpeechState =
   | "idle"
@@ -58,6 +59,39 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
   const chunksRef = useRef<BlobPart[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
+  // Bumped every time a new recording starts (or the context is reset)
+  // -- mirrors `usePolling.ts`'s `generationRef` pattern. Without this,
+  // a *stale* `handleRecordingStopped()` call (from a first recording
+  // whose transcription request is still in flight) can resolve after
+  // a second, newer recording has already started, and unconditionally
+  // overwrite `transcript`/`state` with the stale result. Every state
+  // update inside `handleRecordingStopped()` checks the generation it
+  // was called with against this ref first, so a stale resolution is a
+  // silent no-op instead of clobbering newer state.
+  const generationRef = useRef(0);
+
+  // Which STT backend to call once a recording finishes -- fetched
+  // once via `GET /api/v1/speech` (Phase 8.5's `STT_PROVIDER` switch).
+  // Defaults to "whisper" (this context's original, always-working
+  // behavior) so a failed/slow status fetch never blocks recording --
+  // it only ever changes which backend a *completed* recording is sent
+  // to, never whether recording itself works.
+  const sttProviderRef = useRef<"whisper" | "elevenlabs">("whisper");
+
+  useEffect(() => {
+    let cancelled = false;
+    getSpeechStatus()
+      .then((status) => {
+        if (!cancelled) sttProviderRef.current = status.provider;
+      })
+      .catch(() => {
+        // Stay on the "whisper" default -- see comment above.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const micSupported =
     typeof navigator !== "undefined" &&
     !!navigator.mediaDevices &&
@@ -75,7 +109,7 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
     streamRef.current = null;
   }
 
-  const handleRecordingStopped = useCallback(async () => {
+  const handleRecordingStopped = useCallback(async (generation: number) => {
     stopStream();
     setState("processing");
 
@@ -90,7 +124,14 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
 
     setState("transcribing");
     try {
-      const result = await transcribeAudio(audioBlob);
+      const result =
+        sttProviderRef.current === "elevenlabs"
+          ? await transcribeElevenLabs(audioBlob)
+          : await transcribeAudio(audioBlob);
+      // A newer recording may have started (and even finished) while
+      // this request was in flight -- if so, this result is stale and
+      // must not overwrite the newer attempt's state.
+      if (generation !== generationRef.current) return;
       if (!result.text.trim()) {
         fail("no_speech_detected", "MILO didn't hear anything intelligible.");
         return;
@@ -98,11 +139,18 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
       setTranscript(result.text);
       setState("transcribed");
     } catch (error) {
+      if (generation !== generationRef.current) return;
       fail(mapSpeechError(error), error instanceof Error ? error.message : "Transcription failed.");
     }
   }, []);
 
   const startListening = useCallback(async () => {
+    // Bumped immediately -- invalidates any still-in-flight
+    // transcription from a previous recording right away, not just
+    // once this recording's own `onstop` eventually fires.
+    generationRef.current += 1;
+    const generation = generationRef.current;
+
     setErrorKind(null);
     setErrorMessage(null);
     setTranscript(null);
@@ -141,7 +189,7 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
       if (event.data.size > 0) chunksRef.current.push(event.data);
     };
     recorder.onstop = () => {
-      void handleRecordingStopped();
+      void handleRecordingStopped(generation);
     };
     recorderRef.current = recorder;
     recorder.start();
@@ -159,6 +207,7 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
   const markTaskCreated = useCallback(() => setState("task_created"), []);
 
   const reset = useCallback(() => {
+    generationRef.current += 1;
     stopStream();
     recorderRef.current = null;
     chunksRef.current = [];

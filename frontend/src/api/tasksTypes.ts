@@ -154,3 +154,27 @@ export interface CreateTaskRequestBody {
   instruction: string;
   input_source?: InputSource;
 }
+
+// `GET /{task_id}/robot`'s response shape -- a curated view of AI2-THOR's
+// raw metadata (see `backend/api/routes/tasks.py::get_task_robot_state`).
+// `position`/`rotation`/`camera_horizon` are `null` when the simulator
+// hasn't reported an agent pose yet.
+export interface RobotVisibleObject {
+  object_id: string | null;
+  object_type: string | null;
+  position: { x: number; y: number; z: number } | null;
+  distance: number | null;
+}
+
+export interface RobotHeldObject {
+  object_id: string | null;
+  object_type: string | null;
+}
+
+export interface RobotState {
+  position: { x: number; y: number; z: number } | null;
+  rotation: { x: number; y: number; z: number } | null;
+  camera_horizon: number | null;
+  held_object: RobotHeldObject | null;
+  visible_objects: RobotVisibleObject[];
+}

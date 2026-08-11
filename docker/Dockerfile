@@ -45,7 +45,24 @@ WORKDIR /app
 # Copy only the dependency manifest first so this layer is cached
 # across builds unless requirements.txt actually changes.
 COPY backend/requirements.txt ./requirements.txt
-RUN pip install -r requirements.txt
+
+# Install CPU-only torch/torchvision wheels *before* the general
+# requirements.txt install (Phase 8.5 fix). requirements.txt pins
+# `torch>=2.5.1`/`torchvision>=0.20.1` with no index constraint, so a
+# bare `pip install -r requirements.txt` pulls PyPI's default wheels,
+# which bundle multi-GB CUDA runtime libraries -- dead weight in this
+# image, which never launches AI2-THOR/Unity and has no GPU to use
+# them with (see this file's own note below on why the simulator isn't
+# bundled here). Installing the CPU-only build from PyTorch's own
+# index first satisfies the requirement before pip ever considers the
+# default index, so the general install below is a no-op for these two
+# packages. Local/GPU development is unaffected: this only changes
+# what this Docker image installs, not backend/requirements.txt or
+# backend/scripts/download_torch.py (which developers use to fetch a
+# CUDA build for actual GPU work).
+RUN pip install "torch>=2.5.1" "torchvision>=0.20.1" \
+        --index-url https://download.pytorch.org/whl/cpu \
+    && pip install -r requirements.txt
 
 # Now copy the backend source itself. .dockerignore (repo root) keeps
 # caches, test artifacts, and unrelated top-level directories (models/,
@@ -59,6 +76,13 @@ USER appuser
 
 # Published by the Phase 3.7 FastAPI service (uvicorn, below).
 EXPOSE 8000
+
+# GET /health (backend/api/routes/health.py) never calls the LLM
+# provider or the simulator -- see that module's docstring -- so this
+# stays a cheap, purely-local liveness probe. Uses Python's stdlib
+# rather than curl/wget, neither of which this slim image installs.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)" || exit 1
 
 # Runs the Phase 3.7 API by default. No LLM provider credential is
 # baked into the image or required to build/start it -- the container

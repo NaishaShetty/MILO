@@ -23,6 +23,16 @@
 // project's Phase 3.7 requirements ask for ("do NOT blindly duplicate
 // the entire Pydantic implementation").
 
+// Mirrors `routes/language.py`'s `LanguageStatusResponse`
+// (`GET /api/v1/language`, Phase 8.5) -- real, current LLM provider
+// status. Never a secret.
+export interface LanguageStatus {
+  provider: string;
+  model: string;
+  configured: boolean;
+  available: boolean;
+}
+
 export type TaskType = "single" | "multi";
 
 export interface TaskAttributes {
@@ -105,6 +115,10 @@ export type ErrorCategory =
   | "configuration_error"
   | "upstream_invalid_response"
   | "internal_error"
+  // Deliberate "loose autocomplete" idiom: keeps IDE suggestions for
+  // the known categories above while still accepting any backend-sent
+  // string.
+  // eslint-disable-next-line @typescript-eslint/ban-types
   | (string & {});
 
 // Mirrors `backend/api/models/language.py`'s `ErrorResponse`.

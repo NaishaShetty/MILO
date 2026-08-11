@@ -46,8 +46,10 @@ today.
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, ConfigDict
 
 from api.models.language import ParseDiagnostics, ParseRequest, ParseResponse
 from language.agent import LanguageAgent
@@ -68,6 +70,45 @@ from schemas.task import ParsedInstruction
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+class LanguageStatusResponse(BaseModel):
+    """Response body for `GET /language` -- real, current LLM provider
+    configuration (Phase 8.5). Never includes the API key itself: only
+    the *name* of the environment variable it would live in is ever
+    known to `LLMRuntimeConfig` in the first place (see
+    `language/config.py`'s Security note), and this endpoint only
+    reports whether that variable is currently set, not its value."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    model: str
+    configured: bool
+    available: bool
+
+
+@router.get(
+    "",
+    summary="Real LLM provider configuration status",
+    description=(
+        "Never 503s -- reports the currently configured provider/model "
+        "and whether an API key is present for it (e.g. for Settings' "
+        '"LLM Provider" section), without ever exposing the key '
+        "itself. `available` does not make a live call to the "
+        "provider (that would be a billable request just to render a "
+        "status pill) -- it currently mirrors `configured`."
+    ),
+)
+def get_language_status(request: Request) -> LanguageStatusResponse:
+    config = request.app.state.language_config.llm
+    configured = bool(os.environ.get(config.api_key_env_var))
+    return LanguageStatusResponse(
+        provider=config.provider,
+        model=config.model,
+        configured=configured,
+        available=configured,
+    )
 
 
 def get_language_agent(request: Request) -> LanguageAgent:

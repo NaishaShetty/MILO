@@ -42,5 +42,13 @@ results/
 deployment/
 docker/
 
-# Env / secrets
+# Env / secrets. Listed both unanchored and with an explicit
+# `backend/` prefix (Phase 8.5 fix) -- verified empirically that the
+# bare `.env` pattern alone did NOT exclude `backend/.env` from the
+# build context with this project's Docker version, which meant real
+# API keys were being baked into the backend image layer on every
+# build. `**/.env` is added as well for defense in depth against any
+# other nested `.env` file.
 .env
+backend/.env
+**/.env

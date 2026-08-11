@@ -18,12 +18,15 @@ export interface GlassCardProps {
   title?: ReactNode;
   /** Right-aligned slot next to `title` (e.g. "View All ->", a count). */
   titleAction?: ReactNode;
+  /** Forwarded to the root element -- lets a page anchor-link/scroll
+   * directly to a specific card (e.g. a hero CTA jumping to it). */
+  id?: string;
 }
 
-export function GlassCard({ children, className, title, titleAction }: GlassCardProps) {
+export function GlassCard({ children, className, title, titleAction, id }: GlassCardProps) {
   const classes = ["glass-card", className].filter(Boolean).join(" ");
   return (
-    <div className={classes}>
+    <div className={classes} id={id}>
       {(title || titleAction) && (
         <div className="glass-card__header">
           {title && <h3 className="glass-card__title">{title}</h3>}

@@ -24,7 +24,7 @@
 // path is expected to be served behind a reverse proxy in front of
 // both the built frontend and the FastAPI process.
 
-import type { ApiErrorBody, HealthResponse, ParseResponse } from "./types";
+import type { ApiErrorBody, HealthResponse, LanguageStatus, ParseResponse } from "./types";
 
 /**
  * Thrown by `parseInstruction()` for any non-2xx response. Carries the
@@ -105,4 +105,17 @@ export async function checkHealth(): Promise<HealthResponse> {
     throw new Error("Health check failed.");
   }
   return (await response.json()) as HealthResponse;
+}
+
+/**
+ * `GET /api/v1/language` -- real, current LLM provider status (Phase
+ * 8.5). Never 503s, never includes a key -- see `routes/language.py`'s
+ * `get_language_status` docstring. Backs Settings' "LLM Provider" card.
+ */
+export async function getLanguageStatus(): Promise<LanguageStatus> {
+  const response = await fetch("/api/v1/language");
+  if (!response.ok) {
+    throw new Error("Failed to fetch language provider status.");
+  }
+  return (await response.json()) as LanguageStatus;
 }

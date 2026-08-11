@@ -35,7 +35,7 @@ from language.llm_client import LLMClient, OpenAICompatibleLLMClient
 # fails loudly and immediately -- a misconfigured deployment should
 # never silently fall back to OpenAI's contract for a provider name it
 # doesn't recognize.
-_SUPPORTED_PROVIDERS = ("openai", "gemini")
+_SUPPORTED_PROVIDERS = ("openai", "gemini", "qwen")
 
 
 def create_llm_client(config: LLMRuntimeConfig) -> LLMClient:
@@ -51,6 +51,13 @@ def create_llm_client(config: LLMRuntimeConfig) -> LLMClient:
         return OpenAICompatibleLLMClient(config)
     if config.provider == "gemini":
         return GeminiLLMClient(config)
+    if config.provider == "qwen":
+        # A local/self-hosted Qwen server (vLLM, Ollama, ...) speaks
+        # the same OpenAI-compatible chat-completions contract as
+        # OpenAI itself -- see `llm_client.py`'s module docstring for
+        # why `OpenAICompatibleLLMClient` already covers this case with
+        # no new client class needed.
+        return OpenAICompatibleLLMClient(config)
     raise ConfigurationError(
         f"Unsupported LLM provider {config.provider!r} (configured via "
         f"LANGUAGE_LLM_PROVIDER). Supported providers: "

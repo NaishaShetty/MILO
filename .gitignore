@@ -44,6 +44,20 @@ backend/outputs/**/*.db
 .vscode/
 
 # ----------------------------
+# Local design references (Phase 8.2 visual mockups) -- reference-only,
+# never part of the shipped product; removed from tracking in Phase 8.1
+# and must not be reintroduced (see Phase 8.7 audit).
+# ----------------------------
+MOCKUPS/
+
+# ----------------------------
+# Stray root-level Playwright run marker (the real E2E config runs from
+# frontend/, see frontend/test-results/ above; this is generated if
+# `playwright test` is ever invoked from the repo root by mistake).
+# ----------------------------
+/test-results/
+
+# ----------------------------
 # Secrets / environment
 # ----------------------------
 .env
@@ -72,6 +86,13 @@ experiments/results/*
 !experiments/results/benchmark_20260809T120511Z_episodes.csv
 
 # ----------------------------
+# Stray root-level node_modules/.vite cache -- created if a Node
+# tool is ever invoked from the repo root by mistake; the real
+# frontend dependency tree lives in frontend/node_modules/ below.
+# ----------------------------
+/node_modules/
+
+# ----------------------------
 # Frontend (Phase 3.7 -- frontend/, Vite + React + TypeScript)
 # ----------------------------
 frontend/node_modules/
@@ -79,3 +100,11 @@ frontend/dist/
 frontend/coverage/
 frontend/.env
 frontend/.env.local
+
+# Playwright E2E (frontend/tests/e2e/) -- generated reports/artifacts,
+# never source. Chromium itself installs to ~/.cache/ms-playwright/
+# (outside the repo entirely, via `npx playwright install`), so
+# nothing browser-binary-related ever needs ignoring here.
+frontend/playwright-report/
+frontend/test-results/
+frontend/blob-report/

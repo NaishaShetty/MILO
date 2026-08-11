@@ -6,7 +6,7 @@
 // backend-error-to-`SpeechErrorKind` mapping.
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { mapSpeechError, transcribeAudio } from "./speech";
+import { getSpeechStatus, mapSpeechError, transcribeAudio } from "./speech";
 import { ApiError } from "./client";
 
 function mockFetchOnce(status: number, body: unknown): void {
@@ -23,6 +23,19 @@ function mockFetchOnce(status: number, body: unknown): void {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("getSpeechStatus", () => {
+  it("GETs the speech status endpoint and resolves with the body", async () => {
+    const body = { provider: "whisper", enabled: false, available: false };
+    mockFetchOnce(200, body);
+
+    await expect(getSpeechStatus()).resolves.toEqual(body);
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/v1/speech",
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
+    );
+  });
 });
 
 describe("transcribeAudio", () => {

@@ -57,7 +57,7 @@ def _norm(value: Optional[str]) -> Optional[str]:
 
 
 def _goal_store(task: SingleTask, state: WorldState) -> bool:
-    obj, target = _norm(task.object), _norm(task.target)
+    obj, target = _norm(task.object), _norm(task.target) or _norm(task.target_location)
     if not obj or not target:
         return False
     o = state.object(obj)

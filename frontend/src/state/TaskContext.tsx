@@ -27,8 +27,8 @@ import {
 import type { ReactNode } from "react";
 
 import { ApiError } from "../api/client";
-import { cancelTask, createTask, getTask, getTaskEvents } from "../api/tasks";
-import type { InputSource, TaskEvent, TaskState } from "../api/tasksTypes";
+import { cancelTask, createTask, getTask, getTaskEvents, getTaskRobotState } from "../api/tasks";
+import type { InputSource, RobotState, TaskEvent, TaskState } from "../api/tasksTypes";
 import { TERMINAL_TASK_STATUSES } from "../api/tasksTypes";
 import { useTaskHistory } from "../hooks/useTaskHistory";
 import type { PollingStatus } from "../hooks/usePolling";
@@ -36,6 +36,7 @@ import { usePolling } from "../hooks/usePolling";
 
 const TASK_POLL_INTERVAL_MS = 1000;
 const EVENTS_POLL_INTERVAL_MS = 1500;
+const ROBOT_POLL_INTERVAL_MS = 2000;
 
 export interface TaskContextValue {
   activeTaskId: string | null;
@@ -52,6 +53,10 @@ export interface TaskContextValue {
   submitError: string | null;
   cancelActive: () => Promise<void>;
   cancelling: boolean;
+  /** `null` while loading or once the simulator reports unavailable -- see `robotStateStatus`/`robotStateError`. */
+  robotState: RobotState | null;
+  robotStateStatus: PollingStatus;
+  robotStateError: unknown;
 }
 
 const TaskContext = createContext<TaskContextValue | null>(null);
@@ -99,6 +104,22 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     enabled: activeTaskId !== null && !isActiveTerminal,
   });
 
+  const robotStateFetcher = useCallback(() => {
+    if (!activeTaskId) return Promise.reject(new Error("no active task"));
+    return getTaskRobotState(activeTaskId);
+  }, [activeTaskId]);
+
+  // Kept polling through terminal status too (unlike `eventsPoll`) --
+  // the simulator's live pose is still meaningful to show right after a
+  // task finishes, not just while one is running. A 503 here (no
+  // simulator) surfaces as `robotStateStatus === "error"`; callers
+  // should render "simulator not connected," matching `AgentsContext`'s
+  // `agents_unavailable` convention -- never fabricate a pose.
+  const robotStatePoll = usePolling(robotStateFetcher, {
+    intervalMs: ROBOT_POLL_INTERVAL_MS,
+    enabled: activeTaskId !== null,
+  });
+
   function setActiveTaskId(taskId: string | null) {
     hasBootstrapped.current = true;
     setActiveTaskIdState(taskId);
@@ -108,6 +129,14 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     instruction: string,
     inputSource: InputSource = "text",
   ): Promise<TaskState> {
+    // Context-level re-entrancy guard -- `TalkToMilo.tsx` already
+    // disables its submit/mic controls while `submitting` is true, but
+    // that's a UI-level courtesy, not a guarantee every caller
+    // replicates. This closes the gap so two overlapping
+    // `submitInstruction()` calls can never both reach the backend.
+    if (submitting) {
+      throw new Error("A task submission is already in progress.");
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -157,6 +186,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       submitError,
       cancelActive,
       cancelling,
+      robotState: robotStatePoll.data,
+      robotStateStatus: robotStatePoll.status,
+      robotStateError: robotStatePoll.error,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -170,6 +202,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       submitting,
       submitError,
       cancelling,
+      robotStatePoll.data,
+      robotStatePoll.status,
+      robotStatePoll.error,
     ],
   );
 

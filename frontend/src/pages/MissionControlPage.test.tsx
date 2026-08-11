@@ -6,12 +6,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MissionControlPage } from "./MissionControlPage";
 import { AgentsProvider } from "../state/AgentsContext";
+import { MiloStateProvider } from "../state/MiloStateContext";
 import { SpeechProvider } from "../state/SpeechContext";
 import { TaskProvider } from "../state/TaskContext";
 import { VoiceProvider } from "../state/VoiceContext";
 import * as tasksApi from "../api/tasks";
 import * as agentsApi from "../api/agents";
 import * as voiceApi from "../api/voice";
+import { ApiError } from "../api/client";
 
 vi.mock("../api/tasks", async () => {
   const actual = await vi.importActual<typeof import("../api/tasks")>("../api/tasks");
@@ -20,6 +22,7 @@ vi.mock("../api/tasks", async () => {
     listTasks: vi.fn(),
     getTask: vi.fn(),
     getTaskEvents: vi.fn(),
+    getTaskRobotState: vi.fn(),
     createTask: vi.fn(),
     cancelTask: vi.fn(),
   };
@@ -42,7 +45,9 @@ function renderPage() {
         <TaskProvider>
           <SpeechProvider>
             <VoiceProvider>
-              <MissionControlPage />
+              <MiloStateProvider>
+                <MissionControlPage />
+              </MiloStateProvider>
             </VoiceProvider>
           </SpeechProvider>
         </TaskProvider>
@@ -111,6 +116,11 @@ beforeEach(() => {
   vi.mocked(tasksApi.listTasks).mockReset().mockResolvedValue([]);
   vi.mocked(tasksApi.getTask).mockReset();
   vi.mocked(tasksApi.getTaskEvents).mockReset().mockResolvedValue([]);
+  vi.mocked(tasksApi.getTaskRobotState)
+    .mockReset()
+    .mockRejectedValue(
+      new ApiError(503, { category: "execution_unavailable", message: "No simulator is running." }),
+    );
   vi.mocked(tasksApi.cancelTask).mockReset();
   vi.mocked(agentsApi.listAgents).mockReset().mockResolvedValue([
     { name: "vision", state: "active" },
@@ -148,7 +158,10 @@ describe("MissionControlPage", () => {
 
   it("renders real agent status, not a hardcoded value", async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByText("Active")).toBeInTheDocument());
+    // "Active" now appears both in the flat AgentStatusList and the
+    // AgentArchitectureDiagram graph (Phase 8.6) -- both real views of
+    // the same AgentsContext data, so at least one match is expected.
+    await waitFor(() => expect(screen.getAllByText("Active").length).toBeGreaterThan(0));
   });
 
   it("shows location and target from the active task", async () => {

@@ -10,10 +10,24 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SpeechProvider, useSpeech } from "./SpeechContext";
 import * as speechApi from "../api/speech";
+import * as voiceApi from "../api/voice";
 
 vi.mock("../api/speech", async () => {
   const actual = await vi.importActual<typeof import("../api/speech")>("../api/speech");
-  return { ...actual, transcribeAudio: vi.fn() };
+  return {
+    ...actual,
+    transcribeAudio: vi.fn(),
+    // Defaults to "whisper" (never resolves eagerly) so every existing
+    // test below -- written before the Phase 8.5 STT provider switch
+    // existed -- keeps exercising the Whisper path unless a test
+    // explicitly overrides this mock to resolve "elevenlabs".
+    getSpeechStatus: vi.fn().mockResolvedValue({ provider: "whisper", enabled: true, available: true }),
+  };
+});
+
+vi.mock("../api/voice", async () => {
+  const actual = await vi.importActual<typeof import("../api/voice")>("../api/voice");
+  return { ...actual, transcribe: vi.fn() };
 });
 
 class FakeMediaRecorder {
@@ -51,6 +65,16 @@ const fakeStream = { getTracks: () => [{ stop: vi.fn() }] } as unknown as MediaS
 afterEach(() => {
   vi.unstubAllGlobals();
   FakeMediaRecorder.instances = [];
+  // Reset back to the shared "whisper" default in case a test
+  // overrode it (see the "routes transcription to ElevenLabs" test) --
+  // mocks otherwise persist across tests in this file (no
+  // `clearMocks`/`resetMocks` configured for this project's Vitest
+  // setup).
+  vi.mocked(speechApi.getSpeechStatus).mockResolvedValue({
+    provider: "whisper",
+    enabled: true,
+    available: true,
+  });
 });
 
 describe("SpeechContext", () => {
@@ -146,6 +170,87 @@ describe("SpeechContext", () => {
 
     await waitFor(() => expect(result.current.state).toBe("error"));
     expect(result.current.errorKind).toBe("whisper_unavailable");
+  });
+
+  it("routes transcription to ElevenLabs when STT_PROVIDER selects it", async () => {
+    vi.mocked(speechApi.getSpeechStatus).mockResolvedValue({
+      provider: "elevenlabs",
+      enabled: true,
+      available: true,
+    });
+    vi.mocked(voiceApi.transcribe).mockResolvedValue({
+      text: "find the mug",
+      language_code: "en",
+      latency_ms: 12,
+    });
+
+    const getUserMedia = vi.fn().mockResolvedValue(fakeStream);
+    stubMic(getUserMedia);
+
+    const { result } = renderHook(() => useSpeech(), { wrapper: SpeechProvider });
+    await waitFor(() => expect(speechApi.getSpeechStatus).toHaveBeenCalled());
+
+    await act(async () => {
+      await result.current.startListening();
+    });
+    await act(async () => {
+      result.current.stopListening();
+    });
+
+    await waitFor(() => expect(result.current.state).toBe("transcribed"));
+    expect(result.current.transcript).toBe("find the mug");
+    expect(voiceApi.transcribe).toHaveBeenCalled();
+  });
+
+  it("does not let a stale first transcription overwrite a newer second recording", async () => {
+    const getUserMedia = vi.fn().mockResolvedValue(fakeStream);
+    stubMic(getUserMedia);
+
+    let resolveFirst!: (value: { text: string; language: string | null; duration_seconds: number | null; latency_ms: number }) => void;
+    const firstPromise = new Promise<{
+      text: string;
+      language: string | null;
+      duration_seconds: number | null;
+      latency_ms: number;
+    }>((resolve) => {
+      resolveFirst = resolve;
+    });
+    vi.mocked(speechApi.transcribeAudio)
+      .mockReturnValueOnce(firstPromise)
+      .mockResolvedValueOnce({ text: "second recording", language: "en", duration_seconds: 1, latency_ms: 5 });
+
+    const { result } = renderHook(() => useSpeech(), { wrapper: SpeechProvider });
+
+    // First recording: starts, stops, and its transcription request
+    // hangs (simulating a slow first request).
+    await act(async () => {
+      await result.current.startListening();
+    });
+    await act(async () => {
+      result.current.stopListening();
+    });
+    await waitFor(() => expect(result.current.state).toBe("transcribing"));
+
+    // Second recording starts (and finishes) while the first request
+    // is still in flight -- this is the race: without the generation
+    // guard, the first request's eventual resolution would clobber
+    // this newer transcript.
+    await act(async () => {
+      await result.current.startListening();
+    });
+    await act(async () => {
+      result.current.stopListening();
+    });
+    await waitFor(() => expect(result.current.transcript).toBe("second recording"));
+
+    // Now the stale first request finally resolves -- it must be a no-op.
+    await act(async () => {
+      resolveFirst({ text: "stale first recording", language: "en", duration_seconds: 1, latency_ms: 5 });
+      await Promise.resolve();
+    });
+
+    expect(result.current.transcript).toBe("second recording");
+    expect(result.current.state).toBe("transcribed");
   });
 
   it("markTaskCreated/reset move the state machine as expected", async () => {

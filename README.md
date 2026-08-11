@@ -57,6 +57,212 @@ Grounding DINO for a different detector, or adding depth estimation,
 should never require touching the planner, the memory system, or any
 other module.
 
+## Phase 8.7 — Final Research Readiness Status (2026-08-11)
+
+This project ships today as **MILO** (Memory Integrated Language
+Oriented Robot) -- the name used by the frontend, the voice pipeline,
+and every Phase 7/8 doc; the sections below this one are the project's
+phase-by-phase engineering log and predate that rebrand in places, so
+treat this section as the authoritative statement of current system
+state and everything below it as historical development narrative
+(kept for its accurate technical detail, not as a live status report).
+
+### Research Question
+
+Can a modular embodied agent -- with independently swappable
+perception, language-understanding, planning, navigation, execution,
+memory, and reflection stages -- perceive an AI2-THOR scene, understand
+a natural-language instruction, retrieve and use relevant past
+experience, generate and validate a multi-step plan, execute it with
+step-by-step precondition/result checking against simulator ground
+truth, detect its own execution failures, and replan in response --
+producing a structured, traceable record of every decision along the
+way? This is deliberately scoped to what the implemented system and
+its experiments can actually evaluate: it is a question about
+*architecture and integration*, not about generalization across many
+environments (the platform runs against AI2-THOR's `FloorPlan1` by
+default; see Limitations).
+
+### Research Contributions
+
+| Type | Contribution |
+|---|---|
+| **Research** | A modular agent architecture with an explicit, inspectable failure taxonomy and a reflection step that decides `continue`/`retry`/`replan`/`abort` from structured execution failures rather than a hardcoded retry count (`backend/agents/reflection_agent.py`, `backend/orchestration/orchestrator.py`) |
+| **Research** | A memory system with distinct episodic, semantic, and failure memory types, ranked retrieval (similarity + confidence + recency + provenance + context, `backend/memory/retrieval.py`), and an honestly-labeled ablation harness comparing memory-on vs memory-off behavior (`experiments/results/benchmark_20260809T120511Z.json`, run against a documented `FakeSimulator`, not production AI2-THOR -- see Limitations) |
+| **Research** | A provider-agnostic LLM abstraction (`backend/language/provider_factory.py`) letting the same planner/agent code run against OpenAI, Gemini, or a local OpenAI-compatible server (Qwen/vLLM/Ollama) purely through configuration |
+| **Engineering** | Three interchangeable planner strategies behind one interface (`RuleBasedPlanner`, `ReActPlanner`, `BehaviorTreePlanner`, `backend/planner/factory.py`) with shared plan validation (`backend/planner/validator.py`) against a symbolic `WorldState` |
+| **Engineering** | A real-time frontend (7 pages) driven entirely by backend polling with no fabricated/mocked state in production paths (verified route-by-route in the Phase 8.7 connectivity audit below) |
+| **Product** | MILO Lab -- a research interface exposing perception benchmarks, planner evaluation, and a parse/plan sandbox as real, runnable operations rather than static mockups |
+| **Product** | Voice interaction (ElevenLabs TTS, Whisper/ElevenLabs STT) with the API key resolved server-side only, never exposed to the frontend |
+
+### Verified System Capabilities (as of this audit)
+
+Confirmed by direct code inspection and a real, live run (backend
+pytest, frontend vitest/build, and one real AI2-THOR mission driven
+through the actual browser UI -- not a mocked test):
+
+- **Data flow is real end to end**: `Orchestrator.run()`
+  (`backend/orchestration/orchestrator.py`) genuinely executes
+  Language → Memory retrieval → Planning → (Vision/Execute loop) →
+  AI2-THOR → Reflection → Memory write, and every step publishes a
+  real event consumed by the frontend's Activity Feed.
+- **Planners**: `RULE_BASED`, `REACT` (real Gemini/OpenAI-backed LLM
+  loop with fallback to rule-based on LLM failure), and
+  `BEHAVIOR_TREE` are all implemented (`backend/planner/factory.py`).
+  **HTN is not implemented** despite being one of this project's
+  originally scoped planning strategies.
+- **Memory**: episodic, semantic, and failure memory types exist and
+  are wired into the orchestrator (not a standalone, unused module) --
+  `_retrieve_memory`/`_remember_terminal` in `orchestrator.py`
+  genuinely read and write memory on every real task.
+- **Reflection and replanning are real**: confirmed live during the
+  audit's E2E mission run below (`replans: 1`, driven by a real
+  AI2-THOR execution error, not a scripted failure).
+- **LLM provider abstraction is real**, not OpenAI-hardcoded:
+  `LANGUAGE_LLM_PROVIDER=openai|gemini|qwen` all resolve to working
+  client classes (`backend/language/provider_factory.py`); this
+  deployment's default is Gemini.
+- **Voice**: ElevenLabs TTS/STT and Whisper STT are both wired; the
+  configured voice ID default (`ELEVENLABS_VOICE_ID`) is
+  `ISnQja0Ank6t1FE2Wj07`, resolved from the environment server-side
+  only (`backend/voice/config.py`, `backend/voice/elevenlabs_client.py`).
+- **Frontend↔backend connectivity**: every dynamic value on every one
+  of MILO's 7 pages (Home, Mission Control, Memory, Activity, About,
+  MILO Lab, Settings) traces to a real backend route with no
+  mock/fake/fabricated data in a production code path; polling
+  (`frontend/src/hooks/usePolling.ts`) correctly cancels on unmount.
+  The only non-live UI content is explicitly-static copy (example
+  prompts, the About page, architecture diagrams) -- never presented
+  as live state.
+
+### Real End-to-End Mission (verified through the actual UI)
+
+Run live during this audit: backend started with
+`VISION_ENABLE_SIMULATOR=true` (real AI2-THOR, `FloorPlan1`), real
+Gemini configured, frontend dev server driving the actual browser UI
+via Playwright (typing into the real "Talk to MILO" box and clicking
+the real send button -- backend internals were never called directly).
+"Bring me the red mug" was **not used**: no fixture or scene metadata
+in this repository shows a Mug object actually present in
+`FloorPlan1` (only `Apple` and `Fridge` are runtime-verified present,
+via `backend/simulator/test_execution_e2e.py`), so the audit used
+**"Put the apple in the fridge"** instead and documents that
+substitution here rather than presenting an unverified object as a
+working example.
+
+**First run found a critical, reproducible bug**: the LLM parsed the
+instruction correctly (`goal=pick_and_place`, `object=apple`,
+`target_location=fridge`), but `Orchestrator.run()`
+(`orchestration/orchestrator.py`, then line 177) only copied
+`task.target` into `TaskState`, never `task.target_location`, so
+`target` came out `null` and planning failed in ~2ms with no plan ever
+generated. `planner/validator.py`'s `_goal_store()` had the same gap.
+Net effect: **every "put/place X in/on Y" instruction with no
+secondary object -- the platform's own suggested example prompts --
+failed 100% of the time.** This was fixed (both call sites now fall
+back to `target_location`, consistent with how
+`planner/rule_based.py`'s own `_goal_place` already handled it) and
+verified with a second live run:
+
+- Task created, memory retrieval ran, planning succeeded with
+  `target="fridge"` correctly resolved.
+- A 6-step rule-based plan executed against real AI2-THOR: locate →
+  navigate → pick up apple → locate → navigate → place apple in
+  fridge.
+- Real AI2-THOR rejected the final placement
+  (`"Target openable Receptacle is CLOSED, can't place if target is
+  not open!"`) -- reflection correctly classified this as a
+  recoverable `ACTION_FAILURE` and triggered one real replan.
+- The replanned attempt hit the same failure and the mission ended in
+  `status: failed` after 2 attempts / 12 actions / 1 replan (~26s
+  total).
+
+This is an honest, traceable result, not a fabricated success: the
+critical parsing bug is fixed and confirmed working end to end, but it
+surfaced a **separate, pre-existing planner limitation** -- the
+rule-based planner's "place" plan template never inserts an
+open-receptacle step before placing into a closed container. That gap
+was not fixed in this pass (it's a planner-logic change, not the
+narrow bug this audit was scoped to correct) and is recorded under
+Limitations below.
+
+### Test Suite Results (this audit)
+
+- Backend: `python -m pytest -q` → **893 passed, 8 skipped, 0 failed**
+  (previous audited baseline: 857 passed, 8 skipped, 0 failed -- net
+  new tests, no regressions).
+- Frontend: `npm test` (vitest) → **181 passed, 0 failed** across 29
+  test files.
+- Frontend production build (`npm run build`, `tsc --noEmit && vite
+  build`): succeeds cleanly.
+
+### Limitations (honest, as of this audit)
+
+- **AI2-THOR simulation gap**: nothing in this system has been
+  validated on a physical robot; all execution results are simulator
+  results.
+- **Single default scene**: the platform runs against `FloorPlan1` by
+  default; broader environment/task diversity is unvalidated.
+- **Rule-based planner's "place" template can fail against closed
+  receptacles** (see the mission run above) -- a real, reproduced gap,
+  not yet fixed.
+- **ReAct planner does not consume retrieved memory**: `memory_context`
+  is accepted by `ReActPlanner.plan()` but not threaded into the LLM
+  prompt (`backend/planner/react.py`); only the rule-based fallback
+  path benefits from memory today, so "memory improves planning"
+  claims apply to that path only, not the LLM planner.
+- **Memory-vs-no-memory benchmark results run on a fake harness**:
+  `experiments/results/benchmark_20260809T120511Z.json` is explicit
+  that it uses `FakeSimulator` (a deterministic in-memory fake, not
+  real AI2-THOR) and `HashingEmbedder` (a deterministic lexical
+  embedder, not a learned model) -- good research hygiene (it's
+  labeled, not hidden), but it means those specific numbers describe a
+  simplified harness, not the full stack.
+- **HTN planning was never implemented**, despite being part of this
+  project's originally scoped planning strategies.
+- **Two orchestration entry points coexist**:
+  `backend/orchestration/orchestrator.py` (current, used by the API)
+  and an older `backend/orchestration/task_runner.py` (single-attempt,
+  kept for backward compatibility) -- unexplained duplication worth
+  resolving in a future pass.
+- **External-service dependence**: ElevenLabs and the LLM providers are
+  paid third-party APIs; this audit's real-mission and real-parse
+  tests depended on live credentials being present in the local,
+  gitignored `backend/.env` and are not something CI can reproduce
+  without its own credentials.
+- **No statistical claims are made from a single run**: the one real
+  E2E mission and the existing benchmark artifacts each represent
+  their own documented run count -- see each result's own methodology
+  section for sample size before treating any number as more than
+  illustrative.
+
+### Final Research Evaluation
+
+**Does the system answer its research question?** Partially and
+honestly: the full pipeline genuinely executes end to end against real
+AI2-THOR with real memory, real reflection, and real replanning --
+this was directly observed, not inferred from code reading alone. What
+it does *not* yet demonstrate is memory measurably improving the
+LLM-driven planning path (ReAct doesn't consume it), or robustness
+across scenes/tasks beyond the one default environment.
+
+**Strongest contribution**: the orchestration architecture itself --
+a clean separation of concerns (planner / memory / execution /
+reflection) wired together in a way that a single live mission could
+be traced end to end through every layer with a real, inspectable
+event log, memory read/write, and failure classification.
+
+**What remains experimental**: memory's effect on the LLM planning
+path, planner comparison beyond what `experiments/reports/` already
+documents, and any claim of generalization beyond `FloorPlan1`.
+
+**Release verdict**: **READY WITH DOCUMENTED LIMITATIONS.** The one
+critical blocker found during this audit (the primary mission flow
+failing 100% of the time) was fixed and re-verified live; the
+remaining gaps above are real but do not block using the system as
+what it is -- a working, traceable embodied-agent research platform,
+not a finished product with universal task coverage.
+
 ## System Architecture
 
 ### Perception (Phase 2, complete + Phase 3.x Spatial & Temporal Perception)
@@ -1347,6 +1553,54 @@ This API has no authentication, rate limiting, or request quota
 enforcement -- it is not intended to be deployed as a publicly
 reachable, unauthenticated service (section 30.9).
 
+### Browser E2E testing (Playwright)
+
+`frontend/tests/e2e/` is a real-Chromium browser test suite (Phase
+8.5), separate from `frontend/src/**/*.test.tsx`'s jsdom-based Vitest
+suite -- it loads the actual app in a real browser and drives it the
+way a user would (clicks, real `getUserMedia`/`MediaRecorder`, real
+`<audio>` playback), while mocking the backend HTTP surface via
+Playwright's `page.route()` so no FastAPI process and no real
+Gemini/OpenAI/ElevenLabs credentials are ever required. Real-provider
+validation (a real LLM/speech call) is a separate, manual, opt-in
+activity -- see "Real provider validation" below and
+`docs/troubleshooting.md` -- never something this automated suite or
+CI does.
+
+```bash
+cd frontend
+npm install
+npx playwright install --with-deps chromium   # one-time; downloads
+                                                # Chromium + every OS
+                                                # library it needs
+                                                # (libnspr4, libnss3,
+                                                # libasound2, libgbm1,
+                                                # the X11 libs, ...)
+
+npm run test:e2e            # headless, matches CI
+npm run test:e2e:headed     # watch the real browser while it runs
+npm run test:e2e:ui         # Playwright's interactive UI/trace viewer
+```
+
+`playwright.config.ts` starts only the Vite dev server (`npm run dev`)
+-- never the backend -- and grants microphone permission with
+Chromium's `--use-fake-device-for-media-stream`/
+`--use-fake-ui-for-media-stream` flags, so mic-interaction tests
+(`tests/e2e/microphone.spec.ts`: permission, recording, transcript,
+barge-in) run fully headless with a synthetic audio device, no
+physical microphone and no manual permission dialog required. See
+that file's own docstring, and `tests/e2e/milo-state.spec.ts` for a
+real-browser proof of the MILO state machine reacting to a real
+(mocked) task lifecycle.
+
+**Reproducibility**: `npx playwright install --with-deps chromium` is
+the single command that makes this reproducible on a fresh developer
+machine or a CI runner -- it installs Chromium itself plus every
+Ubuntu package the earlier "Chromium runtime libraries unavailable"
+limitation was blocked on, so that limitation is no longer an
+undocumented manual step. `.github/workflows/ci.yml`'s `e2e` job runs
+this exact command.
+
 The Planner API (Phase 4) needs no simulator, LLM, or extra
 configuration -- it always plans against a fresh symbolic `WorldState`:
 
@@ -1465,9 +1719,12 @@ for the full endpoint contract.
 `LanguageAgent.from_config()` reads its settings from the environment
 (`backend/language/config.py`); every variable has a default except the
 API key itself. The provider is selected with `LANGUAGE_LLM_PROVIDER`
--- `"openai"` (default) or `"gemini"` -- and every other setting
-defaults to a value appropriate for *that* provider, so switching
-providers is a one-variable change, never a code change.
+-- `"openai"` (default), `"gemini"`, or `"qwen"` (local/self-hosted) --
+and every other setting defaults to a value appropriate for *that*
+provider, so switching providers is a one-variable change, never a
+code change. `GET /api/v1/language` reports the currently configured
+provider/model and whether an API key is present, without ever
+exposing the key itself -- see "Provider & speech status" below.
 
 **Skip re-exporting these every session** by copying
 `backend/.env.example` to `backend/.env` and filling in your key --
@@ -1550,6 +1807,37 @@ every test either injects a fake `LLMClient` or monkeypatches the HTTP
 call, per this project's requirement that the unit test suite never
 make a real LLM API call.
 
+#### Local Qwen / local LLM
+
+Points `LanguageAgent` at any locally hosted, OpenAI-API-compatible
+server (vLLM, Ollama, ...) serving Qwen, Llama, Phi, or any other
+model that server exposes -- reuses the same
+`OpenAICompatibleLLMClient` the OpenAI provider uses (see
+`backend/language/provider_factory.py`); no separate client class or
+planner change is involved.
+
+```bash
+export LANGUAGE_LLM_PROVIDER="qwen"
+# Optional overrides (defaults shown):
+export LANGUAGE_LLM_MODEL="qwen2.5-7b-instruct"
+export LANGUAGE_LLM_BASE_URL="http://localhost:8000/v1"   # vLLM's default OpenAI-compatible endpoint
+export LANGUAGE_LLM_API_KEY_ENV_VAR="QWEN_API_KEY"
+# Many local servers don't check the bearer token at all -- if yours
+# doesn't, set this to any placeholder value (never a real secret); a
+# value must still be present, since credential resolution is
+# identical across every provider (see llm_client.py's Security note).
+export QWEN_API_KEY="not-needed"
+```
+
+Start a local vLLM server serving Qwen (example, adjust for your
+hardware/model choice) and the app above will reach it with no other
+change:
+
+```bash
+python -m vllm.entrypoints.openai.api_server \
+    --model Qwen/Qwen2.5-7B-Instruct --port 8000
+```
+
 #### Optional: real API smoke tests
 
 An explicitly opt-in suite (`backend/tests/test_language_llm_smoke.py`)
@@ -1561,6 +1849,51 @@ export RUN_LLM_SMOKE_TESTS=true
 export OPENAI_API_KEY="sk-..."      # to run the OpenAI smoke test
 export GEMINI_API_KEY="..."         # to run the Gemini smoke test
 cd backend && python -m pytest tests/test_language_llm_smoke.py -v
+```
+
+### Speech: Whisper (default) and ElevenLabs
+
+Two independent speech subsystems exist server-side:
+
+- **Whisper** (`backend/speech/`, `SPEECH_ENABLE_WHISPER=true`, `WHISPER_MODEL_SIZE`,
+  `WHISPER_DEVICE`) -- local, offline speech-to-text.
+- **ElevenLabs** (`backend/voice/`, `VOICE_ENABLE_ELEVENLABS=true`, `ELEVENLABS_API_KEY`,
+  `ELEVENLABS_VOICE_ID`) -- a paid third-party API providing both speech-to-text
+  (`POST /api/v1/voice/transcribe`) and MILO's spoken text-to-speech output
+  (`POST /api/v1/voice/speak`), the latter already wired into the frontend's
+  `VoiceContext`/MILO `speaking` state.
+
+The frontend's live microphone pipeline (`SpeechContext.tsx`) calls whichever
+STT backend `STT_PROVIDER` selects (`"whisper"`, the default, or `"elevenlabs"`)
+-- fetched once from `GET /api/v1/speech` at startup. Text-to-speech is always
+ElevenLabs; there is no Whisper equivalent for speech output.
+
+```bash
+# Whisper (default) -- no ElevenLabs credential required for STT.
+export SPEECH_ENABLE_WHISPER=true
+export STT_PROVIDER=whisper           # optional, this is already the default
+
+# ElevenLabs STT instead -- reuses the same account/key as TTS output.
+export VOICE_ENABLE_ELEVENLABS=true
+export ELEVENLABS_API_KEY="..."       # never commit this value
+export STT_PROVIDER=elevenlabs
+```
+
+### Provider & speech status
+
+Two read-only, secret-free status endpoints back Settings' "LLM Provider"
+and "Speech & Voice" cards -- neither ever 503s, and neither ever includes
+an API key value, only whether one is configured:
+
+```bash
+curl -s localhost:8000/api/v1/language | python -m json.tool
+# {"provider": "openai", "model": "gpt-4o-mini", "configured": true, "available": true}
+
+curl -s localhost:8000/api/v1/speech | python -m json.tool
+# {"provider": "whisper", "enabled": true, "available": true}
+
+curl -s localhost:8000/api/v1/voice | python -m json.tool
+# {"enabled": true, "available": true, "provider": "elevenlabs", "voice_id": "..."}
 ```
 
 ### Optional: a real Phase 3.6 benchmark run
@@ -1643,6 +1976,17 @@ environment (Python 3.9, `backend/requirements.txt`, the system
 libraries `opencv-python` needs at runtime). Build from the repository
 root so the image can see `backend/`:
 
+`backend/requirements.txt` pins `torch`/`torchvision` with no index
+constraint, so a bare `pip install -r requirements.txt` would pull
+PyPI's default wheels -- which bundle multi-GB CUDA runtime libraries
+this CPU-only, no-GPU image never uses. The Dockerfile installs the
+CPU-only build from PyTorch's own package index first
+(`--index-url https://download.pytorch.org/whl/cpu`), so the general
+`requirements.txt` install that follows is a no-op for those two
+packages. This only changes what the Docker image installs -- local/GPU
+development (`backend/requirements.txt`,
+`backend/scripts/download_torch.py`) is unaffected.
+
 ```bash
 docker build -f docker/Dockerfile -t vision-language-robotics-backend .
 
@@ -1670,19 +2014,55 @@ similarly degrades to `503 vision_unavailable` unless
 binary is available -- this Dockerfile does not bundle or attempt to
 run Unity, so the Vision API is expected to stay unavailable in this
 image unless a caller specifically integrates a simulator-capable base
-image (out of scope for this Dockerfile). The frontend (`frontend/`) is
-not built by this image -- it is excluded via
-[`.dockerignore`](.dockerignore) and has its own build
-(`frontend/README.md`), intended to be served behind the same reverse
-proxy as this backend in a real deployment rather than baked into the
-same image. Model weights (`models/`) are likewise excluded and remain
-download-on-first-run, same as a local checkout. No API key is baked
-into the image or required to build it -- `OPENAI_API_KEY`/
-`GEMINI_API_KEY` are supplied at `docker run` time via `-e`, exactly
-like any other environment variable, and are never written into an
-image layer.
+image (out of scope for this Dockerfile). Model weights (`models/`) are
+excluded and remain download-on-first-run, same as a local checkout. No
+API key is baked into the image or required to build it --
+`OPENAI_API_KEY`/`GEMINI_API_KEY` are supplied at `docker run` time via
+`-e`, exactly like any other environment variable, and are never
+written into an image layer. (Phase 8.5 fixed a real gap here: the
+root `.dockerignore`'s bare `.env` pattern did not actually exclude
+`backend/.env` from this image's build context, so a local
+`backend/.env` with real keys was being copied into the image. Fixed
+by adding explicit `backend/.env`/`**/.env` entries — see
+[`docs/phases/phase8_5_configuration_and_providers.md`](docs/phases/phase8_5_configuration_and_providers.md#6-security-audit-result).)
+
+#### Running the whole app (Phase 8.4)
+
+[`frontend/Dockerfile`](frontend/Dockerfile) builds the frontend the
+same way (`npm run build`) and serves the static output through nginx,
+which reverse-proxies `/api` and `/health` to the backend --
+[`docker-compose.yml`](docker-compose.yml) at the repo root wires both
+images together on one network so the frontend's API client (relative
+URLs only, see `frontend/src/api/client.ts`) never needs to know the
+backend's address:
+
+```bash
+cp backend/.env.example backend/.env   # fill in a real LLM API key
+docker compose up --build
+# frontend: http://localhost:8080
+# backend directly (optional): http://localhost:8000/health
+```
+
+Both images define a `HEALTHCHECK`; `backend/.env` is read only at
+container *run* time (`env_file:`, marked optional) and is never copied
+into either image build context -- see `.dockerignore` and
+`frontend/.dockerignore`. `.github/workflows/ci.yml`'s `docker` job
+builds both images and smoke-tests the backend container on every push/
+PR, with no registry push.
 
 ## Future Phases
+
+> **Note (Phase 8.7 audit):** this section is a historical roadmap
+> written before the Phase 7 `Orchestrator` rewrite and predates
+> several items below actually being implemented. It is kept for its
+> accurate technical detail on remaining gaps, but for current status
+> see [Phase 8.7 — Final Research Readiness Status](#phase-87--final-research-readiness-status-2026-08-11)
+> above. In particular: **dynamic replanning and a Reflection agent are
+> both implemented and were verified live** in that section's E2E
+> mission run (`backend/agents/reflection_agent.py`,
+> `backend/orchestration/orchestrator.py`) -- the bullet below
+> describing replanning as unbuilt, and the later bullet claiming "no
+> Reflection module exists," are both superseded.
 
 - **Dynamic replanning after an execution failure** (Experiment 5) --
   Phase 5 deliberately detects and reports structured failure

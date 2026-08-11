@@ -35,5 +35,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
+    // `tests/e2e/` is Playwright's suite (real Chromium, see
+    // `playwright.config.ts`), not Vitest's -- excluded so `npm test`
+    // never tries to collect/run `*.spec.ts` files there under jsdom.
+    exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**"],
   },
 });

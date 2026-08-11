@@ -445,3 +445,119 @@ freeze.** Phase 3.x is still active development; that endpoint's
 request/response shape (`backend/api/models/vision.py`) may still
 change without the same stability guarantee this document makes for
 `Scene`/`Detection`/`Relationship`/`Mask`/`VisionAgent.perceive()`.
+
+---
+
+## 8. HTTP API Reference (Phase 8.5 addendum)
+
+Everything above this section documents Python-level interfaces frozen
+at Phase 2 -- it predates, and is a different kind of document from,
+this section. This addendum instead lists the actual HTTP surface FastAPI
+serves today (`backend/api/app.py`'s `include_router` calls), added
+because no other doc covered it end to end and Phase 8.5 added two new
+endpoints (`GET /api/v1/language`, `GET /api/v1/speech`) that need a
+home. Sourced directly from each route's `@router.get`/`@router.post`
+declaration and `summary=` -- nothing here is invented, and this
+section carries no freeze guarantee (routes may still change as their
+owning phase evolves).
+
+**Security note applying to every endpoint below**: none of them ever
+return an API key, credential, authorization header, or secret
+environment value in a response body. Status endpoints report booleans
+(`configured`, `available`, `enabled`) derived from whether a
+credential is present, never the credential itself -- see each
+status endpoint's own docstring (`language.py`, `speech.py`,
+`voice.py`) for the exact security rationale.
+
+`GET /health` (no prefix) is the one route not mounted under `/api/v1`.
+Every other router is mounted at `/api/v1/<name>` per `app.py`.
+
+### Health
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health` | Liveness check. Never calls an LLM provider or the simulator -- cheap and provider-call-free by design. |
+
+### Language (`/api/v1/language`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/language` | **(Phase 8.5)** Real LLM provider status: `{provider, model, configured, available}`. Never 503s; never includes the API key. `configured`/`available` reflect whether the resolved credential env var is currently set -- no live provider call is made. |
+| POST | `/api/v1/language/parse` | Parses a natural language instruction into a validated `ParsedInstruction` via the Language Understanding runtime. Does not execute, plan, or touch the simulator. |
+
+### Speech (`/api/v1/speech`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/speech` | **(Phase 8.5)** Real STT provider status: `{provider, enabled, available}` for whichever backend `STT_PROVIDER` currently selects (`whisper` or `elevenlabs`). Never 503s. |
+| POST | `/api/v1/speech/transcribe` | Transcribes an uploaded audio file via the configured Whisper model. Does not parse, plan, or create a task. |
+
+### Voice (`/api/v1/voice`, ElevenLabs)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/voice` | Real ElevenLabs configuration status: `{enabled, available, provider, voice_id}`. Never 503s, never includes the API key. |
+| POST | `/api/v1/voice/transcribe` | Transcribes an uploaded audio file via ElevenLabs STT. |
+| POST | `/api/v1/voice/speak` | Synthesizes MILO's spoken response (from a `task_id` or raw `text`) as audio; returns audio bytes plus the exact spoken text in an `X-Milo-Response-Text` header. |
+
+### Tasks (`/api/v1/tasks`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/v1/tasks` | Parses a text instruction and runs it through the Orchestrator on a background thread; returns immediately with the initial `TaskState`. |
+| GET | `/api/v1/tasks` | Lists every task this process has run, newest first (process-local, in-memory). |
+| GET | `/api/v1/tasks/{task_id}` | Current `TaskState` for a task. |
+| GET | `/api/v1/tasks/{task_id}/state` | Alias of the above. |
+| GET | `/api/v1/tasks/{task_id}/plan` | The task's current `Plan`. |
+| GET | `/api/v1/tasks/{task_id}/memory` | Memories retrieved/created for the task. |
+| GET | `/api/v1/tasks/{task_id}/robot` | (Phase 8.6) Curated live simulator state for the shared `Simulator` — agent position/rotation/camera tilt, held object, visible objects. Reads the *current* simulator state, not a snapshot from when this task last acted. 503s under the same "no simulator running" contract as `POST /tasks`. |
+| GET | `/api/v1/tasks/{task_id}/events` | The task's structured event log. |
+| POST | `/api/v1/tasks/{task_id}/cancel` | Requests cancellation, honored at the next safe boundary. A no-op on an already-finished task. |
+
+### Execution (`/api/v1/execution`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/v1/execution/start` | Begins executing a validated `Plan` against the running simulator on a background thread. |
+| GET | `/api/v1/execution/{execution_id}` | Current state of an execution. |
+| POST | `/api/v1/execution/{execution_id}/cancel` | Requests cancellation of a running execution (next step boundary, not mid-call). |
+| GET | `/api/v1/execution/{execution_id}/steps` | Per-step results. |
+| GET | `/api/v1/execution/{execution_id}/events` | Structured execution event log. |
+
+### Vision (`/api/v1/vision`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/v1/vision/perceive` | Runs the full perception pipeline on the simulator's current frame. Not part of the Phase 2 freeze above -- see the note preceding this section. |
+
+### Planner (`/api/v1/planner`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/v1/planner/plan` | Generates a validated `Plan` for a task via a requested strategy. Never touches AI2-THOR. |
+| POST | `/api/v1/planner/validate` | Replays a caller-supplied `Plan` against a fresh symbolic `WorldState`. |
+| POST | `/api/v1/planner/evaluate` | Runs every requested planning strategy against the same task and reports measured (never fabricated) metrics. |
+
+### Memory (`/api/v1/memory`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/memory/search` | Real semantic/structured memory retrieval, ranked results. |
+| GET | `/api/v1/memory` | Unranked listing of stored memories, newest first, optionally filtered by type. |
+
+### Agents (`/api/v1/agents`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/agents` | Lists every registered agent and its current state. |
+| GET | `/api/v1/agents/{name}/status` | One agent's current state. |
+
+### Lab (`/api/v1/lab`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/lab/experiments` | Lists real past experiment runs, read directly from `results/<type>/benchmark_runs/*/summary.json` -- no database, no fabricated runs. |
+| POST | `/api/v1/lab/experiments/perception` | Runs the real perception benchmark in-process and persists the result. |
+| POST | `/api/v1/lab/experiments/planner` | Compares planner strategies live (not persisted) -- reuses `POST /api/v1/planner/evaluate`'s logic. |
+| POST | `/api/v1/lab/sandbox` | Parses and plans an instruction without touching the simulator (a dry run against a fresh `WorldState`). |
+| GET | `/api/v1/lab/stats` | Aggregate Lab statistics from already-real data (experiment runs, task history, memory count). |

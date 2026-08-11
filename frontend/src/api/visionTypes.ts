@@ -29,6 +29,8 @@ export interface SpatialObject {
   last_seen: number | null;
 }
 
+// Deliberate "loose autocomplete" idiom, see api/types.ts::ErrorCategory.
+// eslint-disable-next-line @typescript-eslint/ban-types
 export type DepthSource = "ground_truth" | "depth_anything" | (string & {});
 
 export type TrackStatus =
@@ -37,6 +39,7 @@ export type TrackStatus =
   | "temporarily_lost"
   | "reacquired"
   | "lost"
+  // eslint-disable-next-line @typescript-eslint/ban-types -- see DepthSource above.
   | (string & {});
 
 export type SceneChangeType =
@@ -45,6 +48,7 @@ export type SceneChangeType =
   | "moved"
   | "occluded"
   | "reappeared"
+  // eslint-disable-next-line @typescript-eslint/ban-types -- see DepthSource above.
   | (string & {});
 
 export interface SceneChange {
@@ -83,6 +87,7 @@ export type VisionErrorCategory =
   | "invalid_request"
   | "vision_unavailable"
   | "internal_error"
+  // eslint-disable-next-line @typescript-eslint/ban-types -- see DepthSource above.
   | (string & {});
 
 export interface VisionApiErrorBody {

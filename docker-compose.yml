@@ -1,0 +1,56 @@
+# docker-compose.yml
+#
+# Purpose
+# -------
+# Runs the whole MILO application -- backend (FastAPI) + frontend
+# (built, served by nginx) -- as two containers on one network, wired
+# the same way frontend/nginx.conf.template expects: the frontend
+# reverse-proxies `/api` and `/health` to the backend by its compose
+# service name (`backend`), so the frontend's API client never needs
+# an absolute URL (see frontend/src/api/client.ts, vite.config.ts).
+#
+# Usage
+# -----
+#   cp backend/.env.example backend/.env   # fill in a real LLM API key
+#   docker compose up --build
+#   # frontend: http://localhost:8080
+#   # backend directly (optional):  http://localhost:8000/health
+#
+# Secrets: backend/.env is never copied into either image (see
+# docker/.dockerignore's and frontend/.dockerignore's "Env / secrets"
+# sections) -- it's only read at container *run* time via `env_file`
+# below. If you haven't created it yet, compose still starts (the file
+# is optional here); the backend simply runs with no LLM provider
+# configured, exactly like running it locally without one (see
+# backend/api/routes/health.py's `llm_provider_configured` field).
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      # Same default as backend/api/app.py's own fallback -- explicit
+      # here so a frontend served from a non-default port still works
+      # without editing this file.
+      API_ALLOWED_ORIGINS: ${API_ALLOWED_ORIGINS:-http://localhost:8080}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: frontend
+    ports:
+      - "8080:80"
+    environment:
+      # Resolved by frontend/nginx.conf.template at container start --
+      # `backend` is this compose file's own service name, resolvable
+      # via Docker's embedded DNS on the network compose creates below.
+      BACKEND_ORIGIN: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
