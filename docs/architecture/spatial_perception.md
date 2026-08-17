@@ -278,8 +278,14 @@ see [`api_contracts.md`](api_contracts.md)'s Phase 3.x note.
 
 Nothing in this phase matches a `ParsedInstruction` (Language, Phase
 3.4-3.7) against a `SpatialScene`/tracked objects (Vision, Phase 3.x).
-That fusion, and any subsequent planning/execution, is **Phase 4**
-(PLANNED, not started) -- see the root README's roadmap.
+That fusion, and any subsequent planning/execution, was **Phase 4**
+(done -- see the root README's roadmap) for planning itself, and
+**Phase C** for grounding the planner's `WorldState` in this phase's
+`Scene` output: `backend/planner/grounding.py`'s
+`ground_world_state()`, wired into
+`orchestration.orchestrator.Orchestrator._observe()`. See that
+module's docstring for what is (existence/proximity/containment) and
+isn't (open/held state, full fusion) grounded yet.
 
 ## Configuration
 

@@ -121,7 +121,9 @@ def _seed_preconditions(agent: MemoryAgent, scenario: BenchmarkScenario) -> None
 
 
 def _memory_was_used_in_plan(
-    plan_targets: List[Optional[str]], memory_context_count: int
+    plan_targets: List[Optional[str]],
+    memory_context_count: int,
+    primary_object: Optional[str],
 ) -> bool:
     """
     A minimal, controlled "memory influence" signal (section 9): true
@@ -130,9 +132,20 @@ def _memory_was_used_in_plan(
     memory-suggested location step ahead of the object step itself
     (`planner.rule_based._apply_memory_hint`'s only observable effect).
     Does not merely check "memory was present" (section 9's explicit
-    warning against that weaker signal).
+    warning against that weaker signal, and a bug this function used to
+    have: earlier revisions accepted only `memory_context_count`/
+    `plan_targets` and returned `memory_context_count > 0 and
+    len(plan_targets) > 0` -- true whenever ANY memory was retrieved
+    for a non-empty plan, regardless of whether the plan's shape
+    changed at all, contradicting this very docstring. Caught via the
+    real-AI2-THOR ablation in `experiment_real.py`, where it was
+    silently over-reporting "memory influenced the plan" for episodes
+    whose plan was identical to the memory_off case.)
     """
-    return memory_context_count > 0 and len(plan_targets) > 0
+    if memory_context_count == 0 or not plan_targets or not primary_object:
+        return False
+    first_target = (plan_targets[0] or "").strip().lower()
+    return first_target != primary_object.strip().lower()
 
 
 def run_scenario(
@@ -210,7 +223,7 @@ def run_scenario(
                 plan_targets=plan_targets,
                 memory_context_count=memory_context_count,
                 memory_used_in_plan=_memory_was_used_in_plan(
-                    plan_targets, memory_context_count
+                    plan_targets, memory_context_count, episode.task.object
                 ),
                 failure_cause=failure_cause,
                 recovered_from=recovered_from,

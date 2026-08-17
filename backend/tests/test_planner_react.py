@@ -21,6 +21,10 @@ How to run
 import json
 
 from language.llm_client import LLMResponse
+from memory.agent import PlannerMemoryContext
+from memory.models import MemoryProvenance
+from memory.retrieval import MemoryResult
+from memory.semantics import build_semantic_memory
 from planner.react import ReActPlanner
 from planner.rule_based import RuleBasedPlanner
 from planner.state import WorldState
@@ -43,8 +47,10 @@ class ScriptedClient:
             json.dumps(r) if isinstance(r, dict) else r for r in responses
         ]
         self.calls = 0
+        self.requests = []
 
     def complete(self, request):
+        self.requests.append(request)
         content = self._responses[min(self.calls, len(self._responses) - 1)]
         self.calls += 1
         return LLMResponse(
@@ -117,3 +123,35 @@ def test_unrecognized_action_name_is_rejected():
     planner = ReActPlanner(llm_client=client, repair_attempts=3)
     result = planner.plan(TASK, WorldState.initial())
     assert result.success
+
+
+def test_memory_context_is_threaded_into_the_prompt():
+    # Regression test: ReActPlanner.plan() used to accept memory_context
+    # only for interface consistency and never actually use it -- the
+    # LLM prompt looked identical whether or not memory was supplied.
+    memory = build_semantic_memory(
+        "mug", "located_on", "counter", provenance=MemoryProvenance.OBSERVATION,
+        confidence=0.9,
+    )
+    result = MemoryResult(
+        memory=memory,
+        similarity=0.8,
+        final_score=0.85,
+        ranking_components={},
+        retrieval_metadata={},
+    )
+    memory_context = PlannerMemoryContext(query="mug", results=[result])
+
+    client = ScriptedClient(_VALID_SEQUENCE)
+    planner = ReActPlanner(llm_client=client)
+    result_ = planner.plan(TASK, WorldState.initial(), memory_context=memory_context)
+
+    assert result_.success
+    assert client.requests, "LLM should have been called"
+    assert memory.content in client.requests[0].system_prompt
+
+    # No memory supplied -> prompt still valid, but no hint content.
+    client_no_memory = ScriptedClient(_VALID_SEQUENCE)
+    planner_no_memory = ReActPlanner(llm_client=client_no_memory)
+    planner_no_memory.plan(TASK, WorldState.initial())
+    assert "[]" in client_no_memory.requests[0].system_prompt

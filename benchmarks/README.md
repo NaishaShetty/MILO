@@ -57,5 +57,27 @@ test (`backend/tests/test_vision_evaluation.py`). Run it standalone via
 [`docs/architecture/spatial_perception.md`](../docs/architecture/spatial_perception.md)'s
 "Benchmarking" section for the full design.
 
+Planning benchmark (Phase E): implemented elsewhere, same reason
+------------------------------------------------------------------------------
+The task-success benchmark this file originally described as "once
+the planner exists" is implemented, but lives in
+[`backend/planning_evaluation/`](../backend/planning_evaluation/), not
+`benchmarks/planning/` -- same rationale as the language/perception
+benchmarks above: it imports `simulator.simulator.Simulator`,
+`planner.rule_based`/`planner.behavior_tree`, `orchestration.
+task_runner.TaskRunner`, and `memory.agent.MemoryAgent` directly.
+`benchmarks/planning/` holds only a pointer `README.md`. The dataset
+itself (`milo_benchmark v1.0`, 25 tasks across 5 real AI2-THOR scenes)
+is structured for publishing as a standalone Hugging Face `datasets`
+repo -- see its own [dataset
+card](../backend/planning_evaluation/dataset/v1.0/README.md). Run the
+planner-comparison benchmark via
+`RUN_SIMULATOR_TESTS=true python -m planning_evaluation.run_benchmark`
+and the memory-ablation companion via
+`RUN_SIMULATOR_TESTS=true python -m planning_evaluation.run_memory_ablation`
+(both opt-in gated -- real AI2-THOR/Unity subprocesses); results land
+under `experiments/results/` and the write-up lives at
+[`experiments/reports/phase_e_milo_benchmark_report.md`](../experiments/reports/phase_e_milo_benchmark_report.md).
+
 Everything else in this directory remains not implemented yet -- this
 file establishes the directory's purpose ahead of that work.

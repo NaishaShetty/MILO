@@ -138,6 +138,19 @@ SAM2 = ModelConfig(
     local_dir=MODELS_ROOT / "sam2",
 )
 
+# Optional `memory.embeddings.SentenceTransformerEmbedder` backbone --
+# a small (~90MB), widely-used sentence-embedding model. Loaded through
+# plain `transformers.AutoModel`/`AutoTokenizer` (mean-pooling done in
+# `embeddings.py`), not the `sentence-transformers` package, so this
+# project incurs no new dependency for it -- see `embeddings.py`'s own
+# docstring for why. Opt-in via `MEMORY_EMBEDDING_PROVIDER=
+# sentence_transformer`; the default (`hashing`) never touches this.
+SENTENCE_EMBEDDER = ModelConfig(
+    name="sentence_embedder",
+    hf_name="sentence-transformers/all-MiniLM-L6-v2",
+    local_dir=MODELS_ROOT / "sentence_embedder",
+)
+
 DEPTH_ANYTHING = ModelConfig(
     name="depth_anything",
     hf_name="depth-anything/Depth-Anything-V2-Small-hf",

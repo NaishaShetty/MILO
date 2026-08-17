@@ -106,8 +106,12 @@ Goal: {goal}
 Object: {object}
 Target: {target}
 Current world state: {state}
+Retrieved memory (hints only -- may be stale or wrong; the current world state above always \
+takes precedence over these if they disagree): {memory_hints}
 Steps taken so far: {history}
 """
+
+_MAX_MEMORY_HINTS_IN_PROMPT = 5
 
 
 def _describe_state(state: WorldState) -> Dict[str, Any]:
@@ -125,6 +129,31 @@ def _describe_state(state: WorldState) -> Dict[str, Any]:
             for name, obj in state.objects.items()
         },
     }
+
+
+def _describe_memory_context(memory_context: Any) -> List[Dict[str, Any]]:
+    """
+    Renders a `memory.agent.PlannerMemoryContext` into the small,
+    human-readable list the system prompt embeds -- top-ranked results
+    only (`_MAX_MEMORY_HINTS_IN_PROMPT`), each reduced to its free-form
+    `content` and `confidence` (never raw store internals), matching
+    the same "hints, not ground truth" framing `rule_based.py`'s
+    `_apply_memory_hint` already applies to the rule-based planner. `[]`
+    for no memory (the LLM is instructed to treat that as "no hints
+    available", never as "nothing is stored anywhere").
+    """
+    if memory_context is None:
+        return []
+    return [
+        {
+            "content": result.memory.content,
+            "confidence": result.memory.confidence,
+            "type": result.memory.memory_type.value
+            if hasattr(result.memory.memory_type, "value")
+            else str(result.memory.memory_type),
+        }
+        for result in memory_context.results[:_MAX_MEMORY_HINTS_IN_PROMPT]
+    ]
 
 
 def _extract_json(text: str) -> Dict[str, Any]:
@@ -183,14 +212,19 @@ class ReActPlanner(Planner):
             )
 
         try:
-            # `memory_context` is accepted for interface consistency
-            # (Phase 6.3) but not yet threaded into the ReAct
-            # prompt/loop itself -- doing so safely (without risking
-            # the LLM treating a retrieved memory as ground truth
-            # rather than a fallible hint) is future work; the
-            # fallback path below still benefits from it via
-            # `RuleBasedPlanner`.
-            steps = self._run_react_loop(task, state)
+            # `memory_context` is injected into the system prompt as a
+            # clearly-labeled, ranked list of hints (`_build_request`/
+            # `_describe_memory_context`) -- explicitly subordinate to
+            # the current `WorldState`, which the LLM is told always
+            # wins on disagreement, so a stale/wrong memory can steer
+            # exploration order but can never override what the
+            # symbolic state (and, later, live perception) actually
+            # says is true. `_validate_proposal_shape` still checks
+            # every proposed action's real preconditions against
+            # `state` regardless of what the memory hints claimed, so a
+            # bad hint can misdirect the LLM's search but never bypass
+            # validation.
+            steps = self._run_react_loop(task, state, memory_context)
         except (
             LLMUnavailableError,
             MalformedLLMOutputError,
@@ -251,7 +285,9 @@ class ReActPlanner(Planner):
             latency_ms=(time.monotonic() - started_at) * 1000.0,
         )
 
-    def _run_react_loop(self, task: SingleTask, state: WorldState) -> List[PlanStep]:
+    def _run_react_loop(
+        self, task: SingleTask, state: WorldState, memory_context=None
+    ) -> List[PlanStep]:
         working_state = state.clone()
         steps: List[PlanStep] = []
         goal_check = GOAL_CHECKS.get((task.goal or "").strip().lower())
@@ -264,7 +300,9 @@ class ReActPlanner(Planner):
             if goal_check is not None and goal_check(task, working_state):
                 break
 
-            proposal = self._propose_with_repair(task, working_state, steps)
+            proposal = self._propose_with_repair(
+                task, working_state, steps, memory_context
+            )
             if not proposal.get("action"):
                 # "done" with no action: the model reports the goal is
                 # already achieved and there is nothing left to do.
@@ -295,11 +333,15 @@ class ReActPlanner(Planner):
         return steps
 
     def _propose_with_repair(
-        self, task: SingleTask, state: WorldState, steps: List[PlanStep]
+        self,
+        task: SingleTask,
+        state: WorldState,
+        steps: List[PlanStep],
+        memory_context=None,
     ) -> Dict[str, Any]:
         last_error: Optional[str] = None
         for attempt in range(self._repair_attempts + 1):
-            request = self._build_request(task, state, steps, last_error)
+            request = self._build_request(task, state, steps, last_error, memory_context)
             try:
                 response = self._llm_client.complete(request)  # type: ignore[union-attr]
             except LanguageRuntimeError as exc:
@@ -377,6 +419,7 @@ class ReActPlanner(Planner):
         state: WorldState,
         steps: List[PlanStep],
         last_error: Optional[str],
+        memory_context=None,
     ) -> LLMRequest:
         actions = ", ".join(sorted(_all_action_names()))
         history = [f"{s.action}({s.target or ''})" for s in steps]
@@ -386,6 +429,7 @@ class ReActPlanner(Planner):
             object=task.object,
             target=task.target,
             state=json.dumps(_describe_state(state)),
+            memory_hints=json.dumps(_describe_memory_context(memory_context)),
             history=json.dumps(history),
         )
         user_message = "Propose the next action."

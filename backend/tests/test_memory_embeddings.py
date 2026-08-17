@@ -107,6 +107,75 @@ class TestConfiguration:
         assert embedder.dimension == 64
 
 
+class TestSentenceTransformerEmbedder:
+    """
+    Real-model tests for the opt-in `sentence_transformer` provider
+    (`MEMORY_EMBEDDING_PROVIDER=sentence_transformer`) -- mirrors this
+    project's existing convention of loading real Vision models
+    directly in tests (see `vision/test_detector.py`), not mocking
+    them. Weights download once into `models/sentence_embedder/` (via
+    `config.model_manager.ModelManager`, same as every Vision model)
+    and are reused on every subsequent run/test, so this only pays a
+    network cost the first time it executes in a given environment.
+    """
+
+    def test_get_embedder_returns_sentence_transformer_for_that_provider(self):
+        from memory.embeddings import SentenceTransformerEmbedder
+
+        config = EmbeddingConfig(
+            provider="sentence_transformer", dimension=512, model_name="", device="cpu"
+        )
+        embedder = get_embedder(config)
+        assert isinstance(embedder, SentenceTransformerEmbedder)
+        assert isinstance(embedder, Embedder)
+        assert embedder.dimension == 384  # fixed by the underlying model
+
+    def test_embeddings_are_unit_norm(self):
+        config = EmbeddingConfig(
+            provider="sentence_transformer", dimension=512, model_name="", device="cpu"
+        )
+        embedder = get_embedder(config)
+        vector = embedder.embed("the mug is on the table")
+        norm = sum(c * c for c in vector) ** 0.5
+        assert norm == pytest.approx(1.0, abs=1e-4)
+
+    def test_semantically_similar_text_scores_higher_than_unrelated_text(self):
+        """
+        The whole point of swapping in a learned embedder: unlike
+        `HashingEmbedder` (lexical/substring overlap only), semantically
+        related but lexically distinct text ("mug"/"cup") should score
+        more similar than semantically unrelated text ("mug"/
+        "airplane") -- a distinction `HashingEmbedder` cannot make.
+        """
+        config = EmbeddingConfig(
+            provider="sentence_transformer", dimension=512, model_name="", device="cpu"
+        )
+        embedder = get_embedder(config)
+        mug, cup, airplane = embedder.embed_batch(
+            [
+                "the mug is on the table",
+                "the cup is on the counter",
+                "the airplane flew over the ocean",
+            ]
+        )
+
+        def cosine(a, b):
+            return sum(x * y for x, y in zip(a, b))
+
+        assert cosine(mug, cup) > cosine(mug, airplane)
+
+    def test_embed_batch_matches_individual_embed_calls(self):
+        config = EmbeddingConfig(
+            provider="sentence_transformer", dimension=512, model_name="", device="cpu"
+        )
+        embedder = get_embedder(config)
+        texts = ["red mug", "refrigerator"]
+        batch = embedder.embed_batch(texts)
+        individual = [embedder.embed(t) for t in texts]
+        for b, i in zip(batch, individual):
+            assert b == pytest.approx(i, abs=1e-5)
+
+
 class TestFailureHandling:
     def test_unsupported_provider_raises(self):
         config = EmbeddingConfig(

@@ -1,6 +1,25 @@
 """
 task_runner.py (backend/orchestration)
 
+Status: legacy single-attempt entry point
+------------------------------------------------
+`orchestration.orchestrator.Orchestrator` is the current, actively
+developed entry point for running a task -- it does everything
+`TaskRunner` does, plus reflection-driven, bounded replanning on
+failure (see `orchestrator.py`'s own "Relationship to
+`orchestration.task_runner.TaskRunner`" docstring section for the exact
+capability delta). New callers should use `Orchestrator`.
+
+`TaskRunner` is kept, not removed, because it is still a live
+dependency: `memory_evaluation/experiment.py` and
+`memory_evaluation/memory_size.py` drive their benchmarks directly
+through its single-attempt `run()` (the multi-attempt replanning loop
+`Orchestrator` adds is not part of what those benchmarks measure), and
+`tests/test_orchestration_task_runner.py` exercises it directly. Treat
+it as a frozen, single-attempt implementation detail of the memory
+evaluation harness, not a second general-purpose orchestration surface
+-- do not add new features here; add them to `Orchestrator` instead.
+
 Purpose
 -------
 `TaskRunner.run()` is the closed causal loop the phase spec's core
@@ -155,14 +174,31 @@ class TaskRunner:
         episode_id: Optional[str] = None,
         memory_enabled: bool = True,
         top_k: int = 5,
+        initial_state: Optional[WorldState] = None,
     ) -> TaskRunResult:
+        """
+        `initial_state`, when supplied, replaces the default
+        `WorldState.initial()` -- the narrow, opt-in seam for a caller
+        that already has real state to plan against (e.g.
+        `memory_evaluation/run_ablation_real.py` scanning a live
+        `Simulator.get_metadata()` for each task's target's current
+        `isOpen` before planning, so the rule-based planner's
+        state-aware `open`-before-`place` logic -- see `rule_based.
+        py`'s `_deposit()` -- actually has real data to act on). Never
+        used by `None` (the default): every other caller keeps today's
+        "always plan from a symbolically fresh state" behavior
+        unchanged, since full Vision-grounded `WorldState` construction
+        for the production API path is separately tracked future work
+        (see `docs/roadmap.md`), not something this parameter attempts
+        to solve generally.
+        """
         episode_id = episode_id or str(uuid.uuid4())
         latencies: Dict[str, float] = {}
         agent = self._memory_agent if memory_enabled else None
 
         memory_context = self._retrieve(task, episode_id, agent, top_k, latencies)
 
-        state = WorldState.initial()
+        state = initial_state if initial_state is not None else WorldState.initial()
         started = time.perf_counter()
         planning_result = self._planner.plan(task, state, memory_context)
         latencies["planning_ms"] = (time.perf_counter() - started) * 1000.0

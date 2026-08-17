@@ -11,29 +11,41 @@ env-driven `EmbeddingConfig` + `get_embedder()` factory -- mirroring
 provider string, a factory maps it to a concrete client" pattern
 exactly.
 
-Why the default (and only, as of Phase 6.2) provider is a hashing
-embedder, not a transformer/sentence-embedding model
+Why the default provider is still a hashing embedder, not a
+transformer/sentence-embedding model
 ------------------------------------------------------------------------
-This project already depends on `transformers`/`torch` (Vision), so a
-learned sentence-embedding model is not a hypothetical future
-dependency -- it is a legitimate next provider. It is deliberately not
-implemented yet: every retrieval test in this package must run
-deterministically, offline, and fast (no model download, no GPU, no
-network) exactly like every other test in this repository's suite (see
-`test_language_*.py`'s "LLM mocked" convention and
-`vision_evaluation`'s "synthetic, no GPU" convention) -- a network- or
-weights-dependent embedder would silently break that invariant for the
-entire memory test suite. `HashingEmbedder` is a real, self-consistent
-embedding: it uses the classic
+`HashingEmbedder` remains `EmbeddingConfig.from_env()`'s default: every
+retrieval test in this package must run deterministically, offline, and
+fast (no model download, no GPU, no network) exactly like every other
+test in this repository's suite (see `test_language_*.py`'s "LLM
+mocked" convention and `vision_evaluation`'s "synthetic, no GPU"
+convention) -- a network- or weights-dependent default would silently
+break that invariant for the entire memory test suite. It is a real,
+self-consistent embedding: it uses the classic
 [feature-hashing](https://en.wikipedia.org/wiki/Feature-hashing) trick
 (hash each token to a dimension index + sign, accumulate, L2-normalize)
 over word tokens and character trigrams, which does capture
 lexical/substring similarity (memories sharing words score higher) even
 though it captures no semantic/synonym similarity a learned model
-would. `Embedder` is the seam a future `SentenceTransformerEmbedder`
-plugs into (one more `elif` in `get_embedder()`, matching
-`provider_factory.create_llm_client()`'s own extension story) without
-any change to `retrieval.py` or anything built on top of it.
+would.
+
+`SentenceTransformerEmbedder` (opt-in via `MEMORY_EMBEDDING_PROVIDER=
+sentence_transformer`) is the learned alternative this project already
+had the dependencies for (`transformers`/`torch`, used by Vision) and
+the seam for (`Embedder` is provider-agnostic; `get_embedder()` is the
+only place that maps a provider string to a concrete class, matching
+`provider_factory.create_llm_client()`'s own extension story). It loads
+`sentence-transformers/all-MiniLM-L6-v2` through plain
+`transformers.AutoModel`/`AutoTokenizer` (mean-pooling + L2-normalize
+done here) rather than the separate `sentence-transformers` package, so
+adopting it costs no new dependency; weights are downloaded once into
+this project's `models/` directory via `config.model_manager.
+ModelManager`, matching every Vision model's own lifecycle (never the
+global Hugging Face cache). See `backend/memory_evaluation/
+run_ablation_real.py` for the first caller that actually opts into it
+(the FakeSimulator-backed `memory_evaluation.experiment`/`scenarios`
+benchmark keeps the default `HashingEmbedder`, since that benchmark's
+whole point is being deterministic and offline).
 
 Why hashing (`hashlib.blake2b`), not Python's builtin `hash()`
 --------------------------------------------------------------------
@@ -179,6 +191,81 @@ class HashingEmbedder(Embedder):
         return [component / norm for component in vector]
 
 
+class SentenceTransformerEmbedder(Embedder):
+    """
+    Learned, semantic `Embedder` backed by `sentence-transformers/
+    all-MiniLM-L6-v2` -- see this module's docstring for why it exists
+    alongside `HashingEmbedder` and why it is loaded through plain
+    `transformers` classes rather than the `sentence-transformers`
+    package. `torch`/`transformers` are imported lazily inside
+    `__init__` (not at module level) so that constructing a
+    `HashingEmbedder` -- the default, and the only thing most of this
+    package's tests ever touch -- never pays for loading `torch`.
+    """
+
+    #: `all-MiniLM-L6-v2`'s fixed hidden size; see
+    #: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2.
+    _DIMENSION = 384
+
+    def __init__(self, model_name: str = "", device: str = "cpu") -> None:
+        import torch
+        from transformers import AutoModel, AutoTokenizer
+
+        from config.model_config import SENTENCE_EMBEDDER
+        from config.model_manager import ModelManager
+
+        self._torch = torch
+        self._device = device
+        model_config = SENTENCE_EMBEDDER
+        if model_name and model_name != model_config.hf_name:
+            # A caller asked for a different Hub checkpoint -- reuse
+            # `SENTENCE_EMBEDDER`'s on-disk layout convention but point
+            # it at the requested repo instead of silently ignoring the
+            # override.
+            from dataclasses import replace
+
+            model_config = replace(model_config, hf_name=model_name)
+
+        manager = ModelManager(model_config)
+        self._tokenizer, self._model = manager.load(
+            AutoTokenizer, AutoModel, device=device
+        )
+        self._model.eval()
+
+    @property
+    def dimension(self) -> int:
+        return self._DIMENSION
+
+    def _mean_pool(self, token_embeddings, attention_mask):
+        torch = self._torch
+        mask = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+        summed = torch.sum(token_embeddings * mask, dim=1)
+        counts = torch.clamp(mask.sum(dim=1), min=1e-9)
+        return summed / counts
+
+    def embed(self, text: str) -> List[float]:
+        return self.embed_batch([text])[0]
+
+    def embed_batch(self, texts: Sequence[str]) -> List[List[float]]:
+        """
+        Overrides `Embedder.embed_batch()`'s default map-`embed()`
+        implementation with a real batched forward pass -- see the base
+        class's own docstring on why this is the point at which a
+        model-backed provider earns its keep.
+        """
+        torch = self._torch
+        if not texts:
+            return []
+        encoded = self._tokenizer(
+            list(texts), padding=True, truncation=True, return_tensors="pt"
+        ).to(self._device)
+        with torch.no_grad():
+            output = self._model(**encoded)
+        pooled = self._mean_pool(output.last_hidden_state, encoded["attention_mask"])
+        normalized = torch.nn.functional.normalize(pooled, p=2, dim=1)
+        return normalized.cpu().tolist()
+
+
 @dataclass(frozen=True)
 class EmbeddingConfig:
     """
@@ -221,7 +308,7 @@ class EmbeddingConfig:
         )
 
 
-_SUPPORTED_PROVIDERS = ("hashing",)
+_SUPPORTED_PROVIDERS = ("hashing", "sentence_transformer")
 
 
 def get_embedder(config: EmbeddingConfig) -> Embedder:
@@ -236,6 +323,10 @@ def get_embedder(config: EmbeddingConfig) -> Embedder:
     """
     if config.provider == "hashing":
         return HashingEmbedder(dimension=config.dimension)
+    if config.provider == "sentence_transformer":
+        return SentenceTransformerEmbedder(
+            model_name=config.model_name, device=config.device
+        )
     raise ValueError(
         f"Unsupported embedding provider {config.provider!r} (configured via "
         f"MEMORY_EMBEDDING_PROVIDER). Supported providers: "

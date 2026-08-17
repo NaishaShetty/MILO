@@ -6,8 +6,17 @@ Purpose
 Phase 6.3's integration glue: the one package in this repository
 allowed to depend on both `backend/planner/`+`backend/execution/` (the
 robot's "do the task" pipeline) AND `backend/memory/` (the "remember
-the experience" subsystem) -- `TaskRunner` (`task_runner.py`) is the
-closed causal loop the phase spec's core principle asks for:
+the experience" subsystem). Two entry points live here:
+`Orchestrator` (`orchestrator.py`, Phase 7) is the current,
+general-purpose one -- reflection-driven, bounded replanning on
+failure; `TaskRunner` (`task_runner.py`, Phase 6.3) is a legacy
+single-attempt loop kept only because `memory_evaluation/`'s
+benchmarks and its own test suite still drive it directly -- see
+`task_runner.py`'s own "Status: legacy single-attempt entry point"
+docstring section. New callers should use `Orchestrator`.
+
+`TaskRunner` is the closed causal loop the phase spec's core principle
+asks for:
 
 ```
 Task -> retrieve memory -> plan (memory-conditioned) -> execute

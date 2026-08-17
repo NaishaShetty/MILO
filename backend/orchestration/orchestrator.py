@@ -80,6 +80,7 @@ from execution.models import ExecutionRecord, ExecutionStatus, StepStatus
 from memory.agent import MemoryQueryContext
 from memory.models import Memory
 from memory.semantics import EpisodicDetails, FailureDetails
+from planner.grounding import ground_world_state
 from planner.state import WorldState
 from schemas.task import SingleTask
 
@@ -192,6 +193,11 @@ class Orchestrator:
         memory_context = self._retrieve_memory(task, episode_id, task_state)
 
         world_state = WorldState.initial()
+        # Ground world_state against live vision *before* planning, not
+        # only for post-hoc observability -- see `_observe()`'s
+        # docstring. Skipped entirely when no vision_agent is
+        # configured, matching this method's existing behavior.
+        self._observe(task, task_state, world_state)
         task_state.status = TaskStatus.PLANNING
         started = time.perf_counter()
         planning_result = self._planner.plan(task, world_state, memory_context)
@@ -222,7 +228,7 @@ class Orchestrator:
                 ) * 1000.0
                 return self._finish_cancelled(task_state)
 
-            self._observe(task, task_state)
+            self._observe(task, task_state, world_state)
 
             task_state.status = TaskStatus.EXECUTING
             self._publish(task_state, EventType.ACTION_STARTED)
@@ -354,18 +360,32 @@ class Orchestrator:
 
     # -- observation --------------------------------------------------------
 
-    def _observe(self, task: SingleTask, task_state: TaskState) -> None:
+    def _observe(
+        self,
+        task: SingleTask,
+        task_state: TaskState,
+        world_state: Optional[WorldState] = None,
+    ) -> None:
         """
         Section 7.16's `OBSERVE` step, skipped entirely when no
         `VisionAgentWrapper` was configured (the default -- see
         `__init__`) so every existing caller/test that never passed
         one keeps working byte-for-byte unchanged. Perception failures
         (e.g. no detector wired up server-side) are caught and logged,
-        never allowed to break the task -- vision is informational for
-        Mission Control's "Detected Objects" panel, never a
-        precondition the rest of this loop depends on (planning/
-        execution already resolve objects via simulator ground truth,
-        see `execution.resolver.ObjectResolver`).
+        never allowed to break the task -- a bad scene degrades
+        `world_state` back to whatever it already was (memory/a prior
+        scene), it never corrupts it.
+
+        When `world_state` is given, this also grounds it against the
+        scene via `planner.grounding.ground_world_state()` -- the
+        `SpatialScene -> WorldState` translation that lets `run()`
+        plan and execute against what the robot actually currently
+        sees, rather than an always-empty `WorldState.initial()` or
+        `execution.resolver.ObjectResolver`'s simulator-metadata scan
+        (still used for dispatch-time objectId resolution, a separate
+        concern -- see `grounding.py`'s module docstring). `run()`
+        calls this once before planning and again each loop iteration
+        before execution, so replans see updated perception too.
         """
         if self._vision is None:
             return
@@ -389,6 +409,8 @@ class Orchestrator:
             }
             for d in scene.detections
         ]
+        if world_state is not None:
+            ground_world_state(scene, world_state)
         self._sync_agent_states(task_state)
         self._publish(task_state, EventType.OBSERVATION_RECEIVED)
 

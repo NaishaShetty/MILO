@@ -82,6 +82,50 @@ def test_place_goal_has_no_open_close_for_non_container_target():
     assert "close" not in [s.action for s in result.plan.steps]
 
 
+def test_place_goal_inserts_open_close_for_a_known_closed_container():
+    # Regression test: "place" (unlike "store") never inserted an
+    # `open` step, so placing into a receptacle `state` already knows
+    # is closed used to fail the `place` precondition outright.
+    state = WorldState.initial()
+    state.object("drawer").is_open = False
+    task = SingleTask(goal="place", object="apple", target="drawer")
+    result = PLANNER.plan(task, state)
+    assert result.success
+    assert [s.action for s in result.plan.steps] == [
+        "locate",
+        "navigate",
+        "pickup",
+        "locate",
+        "navigate",
+        "open",
+        "place",
+        "close",
+    ]
+
+
+def test_place_goal_does_not_reopen_an_already_open_container():
+    state = WorldState.initial()
+    state.object("drawer").is_open = True
+    task = SingleTask(goal="place", object="apple", target="drawer")
+    result = PLANNER.plan(task, state)
+    assert result.success
+    assert "open" not in [s.action for s in result.plan.steps]
+    assert "close" not in [s.action for s in result.plan.steps]
+
+
+def test_store_goal_does_not_reopen_an_already_open_container():
+    # "store" used to unconditionally add `open`, which would itself
+    # fail its own `not_open` precondition against a container already
+    # known to be open.
+    state = WorldState.initial()
+    state.object("refrigerator").is_open = True
+    task = SingleTask(goal="store", object="apple", target="refrigerator")
+    result = PLANNER.plan(task, state)
+    assert result.success
+    assert "open" not in [s.action for s in result.plan.steps]
+    assert "close" not in [s.action for s in result.plan.steps]
+
+
 def test_generic_fallback_goal_still_produces_a_plan():
     result = _plan(goal="turn_on", object="lamp")
     assert result.success

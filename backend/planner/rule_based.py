@@ -266,15 +266,37 @@ def _acquire(
 
 
 def _deposit(
-    builder: _StepBuilder, obj: str, target: str, *, use_container: bool
+    builder: _StepBuilder,
+    obj: str,
+    target: str,
+    state: WorldState,
+    *,
+    use_container: bool,
 ) -> None:
-    """locate + navigate + (open) + place + (close) -- the shared suffix for placing an object."""
+    """
+    locate + navigate + (open) + place + (close) -- the shared suffix
+    for placing an object.
+
+    Whether `open`/`close` are inserted is state-aware, not just
+    `use_container`: `use_container` (the "store"/"put_away" goals)
+    still opens a target with unknown open/closed state (`is_open is
+    None`) the way it always has, but a target `state` already knows is
+    closed (`is_open is False`) -- e.g. a "place" goal targeting a
+    closed drawer -- also gets an `open` inserted, since `place`'s
+    `container_ready` precondition (see `actions._require_container_ready`)
+    would otherwise fail outright. Conversely, a target `state` already
+    knows is open (`is_open is True`) never gets a redundant `open` (which
+    would itself fail `open`'s own `not_open` precondition) or a
+    same-plan `close`.
+    """
     builder.add(LOCATE, target)
     builder.add(NAVIGATE, target)
-    if use_container:
+    is_open = state.object(target).is_open
+    needs_open = is_open is not True and (use_container or is_open is False)
+    if needs_open:
         builder.add(OPEN, target)
     builder.add(PLACE, obj, {"container": target})
-    if use_container:
+    if needs_open:
         builder.add(CLOSE, target)
 
 
@@ -289,7 +311,7 @@ def _goal_store(
     )
     builder = _StepBuilder()
     _acquire(builder, obj, state, memory_context)
-    _deposit(builder, obj, target, use_container=True)
+    _deposit(builder, obj, target, state, use_container=True)
     return builder.steps
 
 
@@ -304,7 +326,7 @@ def _goal_place(
     )
     builder = _StepBuilder()
     _acquire(builder, obj, state, memory_context)
-    _deposit(builder, obj, target, use_container=False)
+    _deposit(builder, obj, target, state, use_container=False)
     return builder.steps
 
 

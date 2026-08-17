@@ -142,7 +142,7 @@ for the full research-contribution breakdown and final evaluation.
 
 ## Current Results
 
-- **Tests**: backend `889 passed, 2 skipped, 0 failed`; frontend
+- **Tests**: backend `894 passed, 2 skipped, 0 failed`; frontend
   `186 passed, 0 failed` (29 files); production build clean. (Run
   backend tests with `VISION_ENABLE_SIMULATOR` unset/`false` -- a local
   `.env` with the simulator enabled for interactive use will cause 3
@@ -156,20 +156,53 @@ for the full research-contribution breakdown and final evaluation.
   planned, and executed against real AI2-THOR, but still ended in
   `failed` after one real replan: AI2-THOR correctly rejected placing
   into a closed receptacle, exposing a separate, pre-existing gap in
-  the rule-based planner's "place" template (not yet fixed — see
-  Limitations).
+  the rule-based planner's "place" template. Since fixed: `_deposit()`
+  now inserts an `open` step whenever the destination's current
+  `WorldState.is_open` is known `False` (and skips a redundant `open`/
+  `close` when it's already known `True`) — see
+  `backend/planner/rule_based.py`.
 - **Frontend↔backend connectivity**: every dynamic value on every page
   traces to a real backend route; no fabricated data found in any
   production path; polling correctly cancels on unmount.
-- **Memory benchmark finding**: on a controlled ablation, memory
-  reduced task success 90% → 80% and increased mean actions, because
-  the rule-based planner's memory hint adds a step rather than
-  replacing one, and because stale memory isn't overridden by live
-  perception end-to-end. This benchmark runs on a documented
-  `FakeSimulator`, not production AI2-THOR (see Limitations).
+- **Memory benchmark finding**: on a controlled `FakeSimulator`
+  ablation, memory reduced task success 90% → 80% and increased mean
+  actions, because the rule-based planner's memory hint adds a step
+  rather than replacing one, and because stale memory isn't overridden
+  by live perception end-to-end.
+- **Same ablation, re-run for real** (real AI2-THOR + a real learned
+  sentence-embedding model, not `FakeSimulator`/a lexical embedder):
+  the 90%→80% drop did **not** reproduce — 16/16 episode pairs showed
+  zero success/action delta between memory on and off. Traced to a
+  real, more interesting root cause: the memory-conditioned
+  location-hint mechanism the FakeSimulator finding depends on never
+  actually engages under real AI2-THOR, because forming a qualifying
+  memory requires AI2-THOR's `parentReceptacle` metadata, which is
+  `None` for every loose, pickupable object in this scene's default
+  layout (confirmed directly, not inferred). The mechanism itself
+  works — proven under `FakeSimulator` and mechanically triggered in
+  this real run's closed-receptacle scenarios — it's just structurally
+  inert for this specific object-placement case today. Full writeup:
+  [`experiments/reports/phase_b_real_ablation_findings.md`](experiments/reports/phase_b_real_ablation_findings.md).
 - **Planner/replanning**: reflection and dynamic replanning are real
   and were observed live (see the mission result above), not merely
   implemented-but-untested.
+- **`milo_benchmark v1.0`** — a versioned, 25-task, 5-scene, 3-tier
+  benchmark dataset (built for publishing to the Hugging Face Hub) with
+  a reproducible runner and real baseline numbers: `rule_based` 23/25
+  (92%), `behavior_tree` 22/25 (88%), scored against **live**
+  post-execution AI2-THOR state (not just "did nothing error" — a
+  strictly stronger check than any prior real-AI2-THOR result in this
+  project used). Also re-ran the memory ablation above across all 5
+  scenes (not just `FloorPlan1`): 20/20 episodes succeeded, memory
+  retrieval worked in every scene, and the retrieved memory never
+  changed a plan anywhere — confirming the `parentReceptacle` root
+  cause above is a general property of real AI2-THOR, not specific to
+  one scene. Also surfaced a new, real execution-layer issue (a
+  ~100s AI2-THOR `navigate` stall with a misleading error message).
+  Full writeup:
+  [`experiments/reports/phase_e_milo_benchmark_report.md`](experiments/reports/phase_e_milo_benchmark_report.md);
+  dataset card:
+  [`backend/planning_evaluation/dataset/v1.0/README.md`](backend/planning_evaluation/dataset/v1.0/README.md).
 
 Full detail, methodology, and provenance:
 [`docs/phases/phase8_7_final_audit.md`](docs/phases/phase8_7_final_audit.md).
@@ -178,20 +211,28 @@ Full detail, methodology, and provenance:
 
 - **AI2-THOR only** — no physical robot validation; all execution
   results are simulator results.
-- **Limited scene/task diversity** — the platform runs against
-  AI2-THOR's `FloorPlan1` by default; generalization is unvalidated.
-- **Vision is not fused into the planner's world model** — planning
-  happens against a symbolic `WorldState` or a live AI2-THOR metadata
-  scan by object name, not a real Vision `SpatialScene`.
-- **ReAct planner doesn't consume retrieved memory** — `memory_context`
-  is accepted but not threaded into the LLM prompt; only the
-  rule-based fallback path benefits from memory today.
-- **Rule-based planner can fail against closed receptacles** — its
-  "place" plan template doesn't insert an open-receptacle step first;
-  reproduced live during the Phase 8.7 audit.
-- **Memory-vs-no-memory benchmark runs on a fake harness** — a
-  documented `FakeSimulator` and a deterministic lexical embedder, not
-  real AI2-THOR or a learned model.
+- **Scene diversity validated but shallow** — a 5-scene sweep across
+  all 4 iTHOR room types (kitchen/living room/bedroom/bathroom, 3
+  tasks each) found object resolution, navigation, and pickup
+  generalize cleanly, and surfaced one real `store`-goal planner bug
+  (`_deposit()` assumes every store destination is openable) that no
+  `FloorPlan1`-only task set could have found. See
+  [`experiments/reports/phase_d_floorplan_generalization_findings.md`](experiments/reports/phase_d_floorplan_generalization_findings.md)
+  for the full table and what it does/doesn't establish — 5 of ~120
+  iTHOR scenes, 3 tasks each, is a first real number, not a
+  statistically powered study.
+- **Vision grounding covers existence/location only, not full state
+  fusion** — `Orchestrator` now grounds the planner's `WorldState`
+  from a live Vision `Scene` before planning (`backend/planner/
+  grounding.py`), but only existence (`is_located`), proximity
+  (`is_near_robot`), and containment (`location`, from scene-graph
+  `INSIDE` edges); `is_open`/`is_held` are still symbolic-only, since
+  vision doesn't yet observe grasp or appearance state.
+- **Memory's location-hint mechanism is inert under real AI2-THOR's
+  default object placement** — it depends on `parentReceptacle`
+  metadata that loose, pickupable objects don't have populated by
+  default in `FloorPlan1`; see the Phase B findings doc above for the
+  root cause and suggested fix.
 - **HTN planning was never implemented**, despite being one of the
   originally scoped planning strategies.
 - **External API dependence** — LLM providers and ElevenLabs are paid
@@ -314,9 +355,18 @@ docker/          Container definitions (backend + frontend)
 |---|---|
 | Core pipeline (perception → language → planning → execution → memory → reflection) | ✅ Done |
 | MILO frontend, voice, MILO Lab | ✅ Done |
-| Vision-grounded planner world model | 🔜 Future |
-| Memory threaded into the ReAct/LLM planner | 🔜 Future |
-| Rule-based planner closed-receptacle fix | 🔜 Future |
+| Memory threaded into the ReAct/LLM planner | ✅ Done |
+| Rule-based planner closed-receptacle fix | ✅ Done |
+| Memory ablation re-run on real AI2-THOR + real embedder | ✅ Done |
+| Vision-grounded planner world model (existence/location grounding) | ✅ Done |
+| Floor-plan generalization sweep (5 scenes, all 4 iTHOR room types) | ✅ Done |
+| `milo_benchmark v1.0` dataset + runner (planner comparison, memory ablation, live goal-check scoring) | ✅ Done — built locally, not yet pushed to Hugging Face |
+| Broaden memory's location signal beyond `parentReceptacle` | 🔜 Future |
+| Full vision state fusion (open/held state) | 🔜 Future |
+| Fix `_deposit()` opening non-openable `store` destinations | 🔜 Future |
+| Fix misleading `ACTION_TIMEOUT` message / unbounded action stall | 🔜 Future |
+| Real `ReActPlanner` baseline (needs an LLM API key) | 🔜 Future |
+| Publish `milo_benchmark` to the Hugging Face Hub | 🔜 Future |
 | HTN planner | 🔜 Future |
 | Production auth/rate limiting | 🔜 Future |
 

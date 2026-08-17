@@ -46,10 +46,16 @@ from simulator.ai2thor_env import AI2ThorEnv
 
 class Simulator:
 
-    def __init__(self, render_depth=False, platform=None):
+    def __init__(self, scene="FloorPlan1", render_depth=False, platform=None):
         """Builds the underlying AI2-THOR env.
 
         Args:
+            scene: Passed straight through to `AI2ThorEnv` -- any AI2-THOR
+                scene ID (e.g. `"FloorPlan201"` for a living room). Defaults
+                to `"FloorPlan1"`, matching every existing caller's prior
+                (implicit, hardcoded) behavior -- see `experiments/reports/`
+                for the floor-plan generalization sweep this parameter exists
+                for.
             render_depth: Passed straight through to `AI2ThorEnv`. Off by
                 default (matches prior behavior/perf); pass `True` when a
                 ground-truth `DepthEstimator` (Phase 3.x) needs `get_depth()`
@@ -61,7 +67,7 @@ class Simulator:
                 `ai2thor_env.py`'s "Headless GPU deployment" note.
         """
 
-        self.env = AI2ThorEnv(render_depth=render_depth, platform=platform)
+        self.env = AI2ThorEnv(scene=scene, render_depth=render_depth, platform=platform)
 
     def start(self):
         self.env.start()
