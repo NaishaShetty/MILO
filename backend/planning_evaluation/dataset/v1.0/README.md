@@ -166,6 +166,75 @@ need a vision pipeline wired into the scoring harness; this dataset's
 reference runner does not do that yet (see the origin repo's Phase C
 vision-grounding work, which is not yet connected to this benchmark).
 
+### Addendum — perception-grounded `tier1_locate` check added (partially addresses the limitation above)
+
+The limitation above is now **partially addressed, not resolved**: the
+reference runner (`backend/planning_evaluation/run_benchmark.py`) now
+also runs a second, stricter `tier1_locate` signal,
+`perceived_by_agent`, alongside the original existence-only check
+(now called `exists_in_scene` when reported side by side — see
+`live_state.py`'s `check_goal_live_grounded()`). `perceived_by_agent`
+is backed by a real vision perception call
+(`GroundingDINODetector`/`SAM2Segmenter`, via `agents.vision_agent.
+VisionAgentWrapper.perceive()`) against the live simulator's current
+camera frame after execution, fed through Phase C's
+`planner.grounding.ground_world_state()` to answer "did the agent's
+vision actually register a detection for this object."
+
+Both signals are kept separate on purpose — `goal_success` for
+`tier1_locate` tasks still reports `exists_in_scene` (unchanged, so
+every prior baseline number stays comparable); `perceived_by_agent` is
+additional, informational, and never silently merged into
+`goal_success`. This is a deliberate scope decision, not an oversight:
+collapsing them into one number would hide exactly the gap this check
+exists to measure.
+
+**Real numbers from the first run this was exercised against** (see
+`experiments/reports/phase_e_milo_benchmark_report.md`'s Addendum 5 for
+full methodology, root-cause investigation, and per-episode detail):
+
+```
+rule_based:         exists_in_scene 10/10   perceived_by_agent 6/10
+behavior_tree:      exists_in_scene 10/10   perceived_by_agent 6/10
+react (qwen2.5:7b):  exists_in_scene 10/10   perceived_by_agent 5/10
+```
+
+So the assumption above ("should always pass in practice") was wrong
+for `perceived_by_agent`, even though it remains true for
+`exists_in_scene`: real, repeated divergence on 4-5 of 10
+`tier1_locate` tasks per planner. Investigated, not just counted — the
+measured cause was a genuine sim-to-real domain gap in
+`GroundingDINODetector`, not a camera-framing bug or a label-vocabulary
+mismatch: on a reproduced frame where AI2-THOR's own ground truth says
+the target object is visible and within 0.7m, the detector's real
+confidence for it peaked at 0.275, below the project's production
+`box_threshold=0.35` cutoff. This dataset's `goal_success` metric is
+unchanged by this finding (`tier1_locate` still scores on
+`exists_in_scene`, by design — see the report addendum for why); this
+is reported as a new, separately-tracked perception-accuracy finding,
+not a dataset or predicate change.
+
+This remains a partial fix, not a full one: `perceived_by_agent`
+depends on the camera actually facing the object after the planner's
+`navigate` step completes, on the detector's confidence threshold
+relative to AI2-THOR's synthetic rendering style, and (in this
+project's current environment) on a CPU-only vision inference path
+(`torch.cuda.is_available()` is `False` on this machine despite a
+present RTX 4050 GPU) — see the report addendum for exactly which of
+these were observed to matter in practice, not assumed.
+
+Lowering `GroundingDINODetector`'s confidence threshold (0.35 → 0.15)
+recovers most of the missed detections in the reproduced case, but
+this was **not** adopted as a fix — it is reported only as a
+root-cause data point. Its effect on false-positive rate elsewhere in
+the pipeline was not measured, so the production threshold is
+unchanged pending real validation. In short: `goal_success` describes
+planner-level task success (unchanged by any of this); `perceived_by_agent`
+describes the vision system's own, currently limited, detection
+reliability on AI2-THOR's synthetic renders — a different, still-open
+question this dataset now measures separately instead of conflating
+with the first.
+
 ## Collection methodology
 
 1. For each of the 5 candidate scenes, a live AI2-THOR

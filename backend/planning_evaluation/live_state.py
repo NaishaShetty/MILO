@@ -42,16 +42,85 @@ Every task in `dataset/v1.0/` was authored from a live metadata scan
 (see `tasks.json`'s `generated_by` field), so this should always pass
 in practice -- it exists to catch a regression, not to measure
 locating accuracy.
+
+Addendum -- `check_goal_live_grounded()` (perception-grounded tier1)
+----------------------------------------------------------------------
+The simplification above is now partially addressed, not removed: this
+module keeps `check_goal_live()`'s `tier1_locate` predicate exactly as
+described above (existence-only, byte-identical behavior), because it
+is still a real, independent signal ("did the task even name a real
+object" -- a regression guard, not a perception measurement) and
+deleting it would silently merge two different questions into one
+number, which is exactly what this project's "two independent success
+signals" convention (see this module's earlier docstring, and
+`run_benchmark.py`'s "Two independent success signals per episode")
+exists to avoid.
+
+`check_goal_live_grounded()` adds a second, stricter signal alongside
+it for the `tier1_locate` goal group only: `perceived_by_agent`, backed
+by Phase C's `planner.grounding.ground_world_state()` -- run for real
+against a `Scene` from `agents.vision_agent.VisionAgentWrapper.
+perceive()` (reading the same live RGB frame the running `Simulator`
+already provides) -- checking `WorldState.object(task.object).
+is_located` after grounding. This is the first time `ground_world_state()`
+has been invoked post-hoc (previously only ever called pre-planning,
+from `orchestration.orchestrator.Orchestrator._observe()`); it is a
+pure, stateless function, so calling it here after execution is safe
+and does not affect planning.
+
+Both booleans are returned side by side
+(`GroundedTier1Result.exists_in_scene`/`.perceived_by_agent`) -- never
+merged into one. `run_benchmark.py` decides, and documents, what
+`goal_success` means for `tier1_locate` tasks going forward; this
+module does not make that call, it only supplies both raw signals. See
+`dataset/v1.0/README.md`'s "Known limitations" section for the real
+numbers from the first run this was exercised against, and whether
+`perceived_by_agent` ever actually diverged from `exists_in_scene` in
+practice.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from execution.resolver import ObjectResolver
 from schemas.task import SingleTask
 
 _resolver = ObjectResolver()
+
+#: The exact goal vocabulary `check_goal_live()` treats as
+#: "tier1_locate" -- shared with `check_goal_live_grounded()` so the
+#: two functions can never silently drift on which goals this applies
+#: to.
+TIER1_LOCATE_GOALS = ("find", "search_for", "locate", "inspect", "count")
+
+
+@dataclass
+class GroundedTier1Result:
+    """
+    Two independent `tier1_locate` success signals for one episode,
+    kept separate on purpose -- see this module's docstring addendum.
+    Both are `None` when the episode's goal is not in
+    `TIER1_LOCATE_GOALS` (nothing to check).
+    """
+
+    #: `check_goal_live()`'s existing existence-only check, unchanged.
+    exists_in_scene: Optional[bool]
+
+    #: `ground_world_state()`-backed perception check: did the agent's
+    #: vision actually register a detection for this object. `None`
+    #: when no vision perception attempt was made or possible for this
+    #: episode (e.g. vision stack unavailable) -- distinct from
+    #: `False` ("vision ran and did not detect it"), so a caller can
+    #: tell "unmeasured" from "measured, and failed" apart.
+    perceived_by_agent: Optional[bool]
+
+    #: Set when `perceived_by_agent` could not be measured for a real
+    #: reason (e.g. vision stack construction failed, perceive()
+    #: raised) -- kept for honest reporting rather than silently
+    #: leaving `perceived_by_agent=None` unexplained.
+    perception_error: Optional[str] = None
 
 
 def _by_object_id(metadata: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
@@ -102,8 +171,74 @@ def check_goal_live(task: SingleTask, metadata: Dict[str, Any]) -> Optional[bool
         ref = _resolve(task.object or task.target, metadata)
         return (ref.get("isOpen") is False) if ref is not None else False
 
-    if goal in ("find", "search_for", "locate", "inspect", "count"):
+    if goal in TIER1_LOCATE_GOALS:
         ref = _resolve(task.object or task.target, metadata)
         return ref is not None
 
     return None
+
+
+def check_goal_live_grounded(
+    task: SingleTask,
+    metadata: Dict[str, Any],
+    *,
+    vision_agent: Optional[Any] = None,
+) -> GroundedTier1Result:
+    """
+    `tier1_locate`-only dual check: `exists_in_scene` (identical to
+    `check_goal_live()` for this goal group) alongside
+    `perceived_by_agent` (real vision perception, via
+    `ground_world_state()`). See this module's docstring addendum.
+
+    Returns a `GroundedTier1Result` with both fields `None` when
+    `task.goal` is not in `TIER1_LOCATE_GOALS` -- this function is a
+    no-op for every other goal group; callers should keep using
+    `check_goal_live()` for those.
+
+    `vision_agent`, when given, must be an
+    `agents.vision_agent.VisionAgentWrapper` (typed `Any` here to keep
+    this module free of a hard dependency on the vision package --
+    `run_benchmark.py` is the only caller that constructs a real one).
+    Passing `None` (e.g. vision stack unavailable, or the goal is not
+    tier1_locate) skips the perception check and leaves
+    `perceived_by_agent=None`, `exists_in_scene` still computed.
+    """
+    goal = (task.goal or "").strip().lower()
+    if goal not in TIER1_LOCATE_GOALS:
+        return GroundedTier1Result(exists_in_scene=None, perceived_by_agent=None)
+
+    exists_in_scene = check_goal_live(task, metadata)
+
+    if vision_agent is None:
+        return GroundedTier1Result(
+            exists_in_scene=exists_in_scene, perceived_by_agent=None
+        )
+
+    object_name = task.object or task.target
+    if not object_name:
+        return GroundedTier1Result(
+            exists_in_scene=exists_in_scene,
+            perceived_by_agent=None,
+            perception_error="task has no object/target name to look for",
+        )
+
+    # Local imports: keeps `ground_world_state`/`Scene` (and their own
+    # transitive vision-package imports) out of every caller that
+    # never exercises this function -- `check_goal_live()` above stays
+    # importable with zero vision dependency, matching this module's
+    # existing "benchmark-only, minimal dependency footprint" design.
+    from planner.grounding import ground_world_state
+
+    try:
+        scene = vision_agent.perceive(f"{object_name}.")
+        world_state = ground_world_state(scene)
+        perceived = bool(world_state.object(object_name).is_located)
+        return GroundedTier1Result(
+            exists_in_scene=exists_in_scene, perceived_by_agent=perceived
+        )
+    except Exception as exc:  # noqa: BLE001 -- report, never crash the benchmark
+        return GroundedTier1Result(
+            exists_in_scene=exists_in_scene,
+            perceived_by_agent=None,
+            perception_error=f"{type(exc).__name__}: {exc}",
+        )

@@ -375,6 +375,9 @@ docker/          Container definitions (backend + frontend)
 | Real `ReActPlanner` baseline on `milo_benchmark` | ✅ Done — 20/25 (80%) via local `qwen2.5:7b`/Ollama, after Gemini's free tier proved unworkable |
 | Test-suite `VISION_ENABLE_SIMULATOR` env-leak fix (`conftest.py`) | ✅ Fixed — also cut the full suite from ~13min to ~6s |
 | Publish `milo_benchmark v1.0` to the Hugging Face Hub | ✅ Done — [huggingface.co/datasets/naishashetty/milo_benchmark](https://huggingface.co/datasets/naishashetty/milo_benchmark) |
+| Perception-grounded `tier1_locate` check (`perceived_by_agent`, alongside unchanged `exists_in_scene`) | ✅ Done (infra) — real vision, dual signal, `goal_success` unchanged |
+| ↳ Vision sim-to-real detection gap it surfaced (0.35 threshold misses real, ground-truth-visible objects) | ⚠️ Open — real, measured, not fixed (a lowered threshold was explicitly not adopted, unvalidated elsewhere) |
+| ↳ CPU-bound vision inference (PyTorch not CUDA-enabled despite present GPU) | 🔜 Future — current cost/latency numbers understate real achievable performance |
 | Full vision state fusion (open/held state) | 🔜 Future |
 | HTN planner | 🔜 Future |
 | Production auth/rate limiting | 🔜 Future |

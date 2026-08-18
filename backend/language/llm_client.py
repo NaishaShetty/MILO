@@ -255,6 +255,18 @@ class LLMResponse:
     #: Observability requirements for Phase 3.4.
     latency_ms: float
 
+    #: `{"prompt_tokens": int, "completion_tokens": int}` when the
+    #: provider's response envelope included a real OpenAI-style
+    #: `usage` object (Ollama's OpenAI-compatible endpoint does, as of
+    #: the `qwen2.5:7b` runs this field was added for); `None` when the
+    #: provider didn't return one. This is the provider's own reported
+    #: count, never estimated here -- a caller wanting a token estimate
+    #: for a provider that omits `usage` must compute its own
+    #: heuristic (see `planning_evaluation/run_benchmark.py`'s
+    #: cost/latency instrumentation for exactly that, clearly labeled
+    #: as an approximation, not this field).
+    usage: Optional[Dict[str, int]] = None
+
 
 @runtime_checkable
 class LLMClient(Protocol):
@@ -438,9 +450,21 @@ class OpenAICompatibleLLMClient:
                 f"envelope shape: {self._safe_error_detail(http_response.text, api_key)}"
             ) from exc
 
+        raw_usage = envelope.get("usage")
+        usage: Optional[Dict[str, int]] = None
+        if isinstance(raw_usage, dict) and "prompt_tokens" in raw_usage and "completion_tokens" in raw_usage:
+            try:
+                usage = {
+                    "prompt_tokens": int(raw_usage["prompt_tokens"]),
+                    "completion_tokens": int(raw_usage["completion_tokens"]),
+                }
+            except (TypeError, ValueError):
+                usage = None
+
         return LLMResponse(
             content=content,
             provider=self._config.provider,
             model=envelope.get("model", self._config.model),
             latency_ms=latency_ms,
+            usage=usage,
         )

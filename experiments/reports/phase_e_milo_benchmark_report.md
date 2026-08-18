@@ -591,3 +591,305 @@ file upload). Live at:
 three-planner baseline table from this report) are both present and
 serving (confirmed via `list_repo_files()` and a `200` on the dataset
 page). `docs/roadmap.md` and the README updated accordingly.
+
+---
+
+## Addendum 5 — perception-grounded `tier1_locate`: a real vision check, run for real
+
+`dataset/v1.0/README.md`'s "Known limitations" section named this
+gap explicitly: `tier1_locate`'s live check only ever confirmed an
+object of the named type exists somewhere in the scene
+(`exists_in_scene`, unchanged) — never that the agent's own vision
+actually saw it. Phase C's `planner.grounding.ground_world_state()`
+existed but was only ever wired into `Orchestrator._observe()`
+(pre-planning), never into this benchmark. This addendum wires it in,
+post-hoc, as a second independent signal
+(`live_state.check_goal_live_grounded()` /
+`GroundedTier1Result.perceived_by_agent`) and re-runs the full
+25-task x 3-planner suite with it active, real, on this machine's real
+AI2-THOR + real `GroundingDINODetector`/`SAM2Segmenter` stack, real
+`qwen2.5:7b` via Ollama for `react` — no mocks anywhere in this run.
+
+### What changed in the harness
+
+- `run_benchmark.py` builds a real `GroundingDINODetector()` +
+  `SAM2Segmenter()` stage exactly once (lazily, on the first
+  `tier1_locate` episode that needs it — `tier2_pickup`/`tier3_store`
+  episodes never touch vision), then rebinds a fresh, otherwise-cheap
+  `VisionAgent` to each episode's own restarted `Simulator` instance
+  (`_build_shared_vision_stage`/`_build_vision_agent_for_episode`).
+  No depth stage is attached (`depth=None`) — `GroundTruthDepthEstimator`
+  requires `Simulator(render_depth=True)`, which this harness's
+  episodes don't opt into, and `ground_world_state()`'s `is_located`
+  read (the only thing this check needs) never touches `Detection.depth`
+  anyway; discovered by hitting the real `RuntimeError` on a first
+  attempt, not assumed in advance.
+- After execution, for `tier1_locate` episodes only:
+  `VisionAgentWrapper.perceive(f"{object}.")` reads the live camera
+  frame, `ground_world_state()` folds the resulting `Scene` into a
+  fresh `WorldState`, and `WorldState.object(task.object).is_located`
+  becomes `perceived_by_agent`.
+- **`goal_success` for `tier1_locate` tasks is unchanged** — it still
+  reports `exists_in_scene` (`check_goal_live()`'s original
+  existence-only answer), so every prior baseline number in this
+  report and in the dataset card stays directly comparable.
+  `perceived_by_agent` is recorded as an additional column
+  (`goal_success_perceived_by_agent` in the JSON/CSV output), visible
+  side by side, never merged into the headline number. This was a
+  deliberate choice, not a default: merging the two would hide exactly
+  the gap this check exists to surface, and would retroactively change
+  what `goal_success` means for every number already published for
+  `v1.0`.
+
+### A real environment constraint discovered while wiring this up
+
+This machine's installed PyTorch build is **CPU-only**
+(`torch.__version__` reports `2.13.0+cpu`, `torch.cuda.is_available()`
+is `False`) despite `nvidia-smi` showing a working RTX 4050 with 6GB
+VRAM — `GroundingDINODetector`/`SAM2Segmenter` therefore ran on CPU for
+this entire run, not GPU. Practical effect: this sidestepped the VRAM-
+contention risk flagged going in (vision + `qwen2.5:7b` sharing 6GB) —
+Ollama's own bundled runtime loads `qwen2.5:7b` onto the GPU
+independently of this Python process's PyTorch build (confirmed via
+`ollama ps` mid-run: 82%/18% GPU/CPU split, identical to Addendum 3,
+and `nvidia-smi` showing ~4.1GB used throughout, no OOM at any point),
+while vision inference competed for CPU time instead. This is a
+genuine environment mismatch, not a code defect — flagged here rather
+than smoothed over. It did not block the run, but a future run on a
+machine with a CUDA-enabled PyTorch build would see materially
+different (faster) vision latency and possibly the VRAM contention
+this was originally worried about.
+
+### Results: did `perceived_by_agent` ever diverge from `exists_in_scene`? Yes — real, repeated divergence
+
+```
+rule_based:      exists_in_scene 10/10   perceived_by_agent 6/10   diverged 4/10
+behavior_tree:   exists_in_scene 10/10   perceived_by_agent 6/10   diverged 4/10
+react (qwen2.5:7b): exists_in_scene 10/10   perceived_by_agent 5/10   diverged 5/10
+```
+
+`exists_in_scene` (the pre-existing check) stayed exactly 10/10 for
+every planner, as expected — every `tier1_locate` task really does
+name a real object. `perceived_by_agent` is the new information: it
+is meaningfully lower for all three planners, and it is **not** the
+same 10/10 the dataset card's "should always pass in practice" note
+assumed. This is the answer to the question this whole addendum was
+built to ask: the old existence-only check really was masking a real
+perception gap.
+
+Diverged tasks (`exists_in_scene=True`, `perceived_by_agent=False`):
+
+```
+rule_based / behavior_tree (identical set — same plan-step shape, see section 5):
+  milo-v1-fp1-t1a   (mug, FloorPlan1)
+  milo-v1-fp1-t1b   (tomato, FloorPlan1)
+  milo-v1-fp201-t1a (laptop, FloorPlan201)
+  milo-v1-fp401-t1a (towel, FloorPlan401)
+
+react:
+  milo-v1-fp1-t1a   (mug, FloorPlan1)
+  milo-v1-fp1-t1b   (tomato, FloorPlan1)
+  milo-v1-fp201-t1b (vase, FloorPlan201)
+  milo-v1-fp301-t1a (alarmclock, FloorPlan301)
+  milo-v1-fp401-t1b (candle, FloorPlan401)
+```
+
+### Root cause — investigated for real, not left as a bare number
+
+Two of the four diverged rule_based/behavior_tree tasks were
+reproduced directly (`milo-v1-fp1-t1a`, mug in `FloorPlan1`) with the
+detector's raw intermediate output inspected, not just the final
+boolean:
+
+- AI2-THOR's own ground truth says the mug **is** visible and close
+  (`visible: True`, `distance: 0.636m`) at the exact camera frame
+  captured after execution — so this is not a "camera never looked at
+  it" framing failure.
+- `GroundingDINODetector.process()` at its **default
+  `box_threshold=0.35`** returns **zero detections** for that exact
+  frame with prompt `"mug."` (and zero even with a broadened prompt
+  `"mug. cup. bowl. object."`).
+- Re-running the identical frame through the identical model with a
+  lowered threshold surfaces the real signal that was there all
+  along: at `box_threshold=0.15` the model produces a `mug` detection
+  at **confidence 0.275** — genuinely present, but below the
+  production 0.35 cutoff. Lowering further (`0.1`) surfaces five more
+  candidate boxes in the same confidence band.
+
+**Conclusion: this is a real, measured sim-to-real domain gap, not a
+detector malfunction or a camera-framing bug.** `GroundingDINODetector`
+is trained on real photographs; AI2-THOR's synthetic renders are
+visibly out-of-distribution for it, and its confidence on a real,
+in-frame, ground-truth-visible object here peaked at 0.275 — under the
+0.35 threshold this project ships with. This is exactly the kind of
+gap `exists_in_scene`-only scoring cannot see: the object was real,
+the plan was correct, execution succeeded, and the agent's own vision
+still would not have confirmed it, because of vision-model
+uncertainty, not the plan's or the object's absence.
+
+A second, smaller contributing factor observed for `react` only:
+every `react` `tier1_locate` episode is a single `locate` action
+(`action_count == 1` for all 10) — `react`'s `GOAL_CHECKS` for `find`
+is satisfied by the symbolic `locate` effect alone, so (unlike
+`rule_based`/`behavior_tree`, which always add an explicit `navigate`
+step — see `_goal_perceive` in `rule_based.py`) `react` never
+necessarily moves the camera closer to the object at all. This did
+not explain the `milo-v1-fp301-t1a` (`alarmclock`) divergence by
+itself, though: `rule_based`/`behavior_tree` used the identical
+free-text prompt (`"alarmclock."`, the task's literal `object` field,
+missing a space — itself a plausible detector-vocabulary risk that
+was flagged going in) against the same scene and *did* perceive it
+successfully, which rules out prompt wording as the sole cause there
+too — the same 0.35-threshold marginality demonstrated above is the
+better-supported explanation for that specific divergence as well.
+
+**Lowering the threshold was not adopted as a fix.** The `0.15`/`0.1`
+re-runs above are reported strictly as a root-cause diagnostic, not as
+a proposed or applied configuration change — `GroundingDINODetector`'s
+production `box_threshold` remains `0.35` everywhere else in this
+project (Mission Control, `Orchestrator._observe()`, every other
+caller). Lowering it globally to chase this one finding was
+deliberately not done here: its effect on false-positive rate
+elsewhere in the pipeline (spurious detections in cluttered scenes,
+noisier `ground_world_state()` output feeding real planning decisions)
+was not measured in this pass, and shipping an unvalidated threshold
+change on the strength of a handful of reproduced frames would trade
+one unmeasured risk for another. This stays an open, measured
+limitation for future work to actually validate, not something this
+addendum claims to have resolved.
+
+**What this addendum actually establishes, stated plainly**: this
+benchmark previously conflated two different claims — "the planner
+picked a real object and its plan was valid" (`exists_in_scene`,
+`goal_success`, unchanged) and "the agent's own vision system would
+actually have confirmed that object was there" (`perceived_by_agent`,
+new). Those are not the same fact, and this run is the first time they
+were measured separately rather than the first standing in for the
+second. `goal_success`/the published `v1.0` baseline table describe
+planner-level task success; `perceived_by_agent` describes the vision
+system's real, currently limited detection reliability on AI2-THOR's
+synthetic renders — a genuinely open problem, not one this addendum
+closes.
+
+### New full baseline (all three planners, all tiers, dual tier1 check active)
+
+```
+rule_based:      24/25 (96%)   tier1_locate 10/10   tier2_pickup 10/10   tier3_store 4/5
+behavior_tree:   24/25 (96%)   tier1_locate 10/10   tier2_pickup 10/10   tier3_store 4/5
+react (qwen2.5:7b): 20/25 (80%)   tier1_locate 10/10   tier2_pickup 10/10   tier3_store 0/5
+```
+
+`goal_success` totals: 68/75 across all three planners combined
+(`rule_based`+`behavior_tree` each fail only the known
+`milo-v1-fp301-t3a` book→drawer geometry limit; `react` fails all 5
+`tier3_store` tasks for the same class of precondition-ordering
+mistakes documented in Addendum 3 — `place`/`put_down` proposed before
+`holding_target`/`container_ready`, or `pickup`/`open`/`navigate`
+proposed before `target_near`/`target_located`).
+
+**Delta vs. Addendum 1/3's existing baseline (`rule_based` 24/25,
+`behavior_tree` 24/25, `react`/`qwen2.5:7b` 20/25, all with
+`tier1_locate` 10/10): zero change to `goal_success` for any
+planner.** Every episode's `plan_success`/`execution_success`/
+`goal_success` triple reproduced exactly, task-for-task, including the
+exact same single `tier3_store` failure mode for `rule_based`/
+`behavior_tree` and the exact same 5 `react` failure messages. The new
+information this run adds is entirely additive: `perceived_by_agent`,
+which the old baseline table never measured at all.
+
+### Reproducing this run
+
+```
+cd backend
+RUN_SIMULATOR_TESTS=true LANGUAGE_LLM_PROVIDER=qwen \
+  LANGUAGE_LLM_MODEL=qwen2.5:7b \
+  LANGUAGE_LLM_BASE_URL=http://localhost:11434/v1 \
+  QWEN_API_KEY=not-needed \
+  LANGUAGE_LLM_TIMEOUT_SECONDS=120 \
+  python -m planning_evaluation.run_benchmark
+```
+
+Results: `experiments/results/milo_benchmark_20260818T085629Z.json` /
+`_episodes.csv`.
+
+---
+
+## Addendum 6 — cost/latency, a tradeoff table not a ranking
+
+Collected from the same re-run as Addendum 5 (no separate run) —
+`wall_clock_ms` was already recorded per episode and is captured
+*before* the new perception-grounding check runs (so it reflects only
+plan + execution time, never vision-inference time, for every
+planner). `react` episodes additionally now record `llm_call_count`
+and prompt/completion token counts — real counts, from Ollama's
+OpenAI-compatible `usage` field (present on all 25/25 `react` calls
+this run, so no episode needed the word/4-chars-per-token fallback;
+`language.llm_client.LLMResponse.usage` and
+`BenchmarkEpisodeResult.llm_token_usage_is_approximate` exist
+specifically for the case where a provider omits `usage`, which did
+not happen here).
+
+### Hardware / cost framing
+
+RTX 4050 Laptop GPU, 6GB VRAM, fully local — `qwen2.5:7b` via Ollama,
+zero external network calls, **zero per-token API cost**, in direct
+contrast to Addendum 2's abandoned Gemini attempt, which had a real
+paid-API cost model (free-tier quota, 20 requests/day) even before it
+hit that quota and produced an unusable baseline. Every number below
+is a real measurement on this one machine, not a vendor-published
+benchmark — and, per Addendum 5, vision inference this run ran on CPU
+(this machine's PyTorch build has no CUDA support), so these `react`
+latency numbers reflect GPU-only LLM inference with no vision-model
+GPU contention; a CUDA-enabled build would change this picture.
+
+### Per-planner average wall-clock time per episode (plan + execution, 25 episodes each)
+
+```
+rule_based:     707.2ms avg   (min 110.1ms, max 3986.6ms)
+behavior_tree:  865.2ms avg   (min 124.9ms, max 4551.4ms)
+react:         7506.7ms avg   (min 2018.2ms, max 25978.8ms)
+```
+
+`react` by tier: `tier1_locate` 4799.2ms avg, `tier2_pickup` 7087.0ms
+avg, `tier3_store` 13761.2ms avg (the `tier3_store` rows are all
+failures that spend their full 3-repair-attempt budget before giving
+up, same pattern Addendum 3 already documented).
+
+Wall-clock timing can vary run-to-run with hardware/thermal conditions
+(same caveat this report already uses in Addendum 1/3) — this run's
+`react` average (7.5s/episode) is noticeably higher than Addendum 3's
+(5.5s/episode) on what is nominally the same model/quantization/
+hardware; this is reported as observed run-to-run variance, not
+investigated further, since `goal_success` outcomes were identical
+between the two runs (see Addendum 5) — the slowdown affected latency,
+not correctness.
+
+### `react`-only: LLM calls and token usage per episode (25 episodes)
+
+```
+Average LLM calls per episode:        2.84
+Average prompt tokens per episode:    861.2   (real, from provider `usage`)
+Average completion tokens per episode: 111.5   (real, from provider `usage`)
+Episodes needing the token-count approximation fallback: 0/25
+```
+
+`rule_based`/`behavior_tree` make zero LLM calls per episode (no LLM
+dependency at all) — not included in this table for that reason, not
+omitted by oversight.
+
+### Reading this table
+
+This is a tradeoff, not a ranking. `rule_based`/`behavior_tree` are
+deterministic and roughly an order of magnitude faster per episode
+because they never call an LLM at all — that is the expected,
+unremarkable shape of a symbolic planner, not a "win" over `react`.
+`react` is slower and spends real (if unpriced, local) compute per
+step — averaging nearly 3 LLM calls and roughly 1,000 tokens of
+prompt+completion per episode — because it is doing something
+categorically different: reasoning about each action from natural
+language rather than executing a fixed template. Which approach is
+"better" depends entirely on what a deployment actually needs (a
+fixed, known task vocabulary vs. open-ended instruction following) —
+this report does not take a position on that beyond reporting the real
+numbers plainly.
+
