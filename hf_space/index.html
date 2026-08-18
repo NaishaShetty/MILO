@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MILO Benchmark Companion</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>MILO Benchmark Companion</h1>
+    <p class="lede">
+      A read-only, pre-recorded companion to
+      <a href="https://huggingface.co/datasets/naishashetty/milo_benchmark" target="_blank" rel="noopener">
+        <code>naishashetty/milo_benchmark</code>
+      </a>
+      on the Hugging Face Hub. Everything on this page is loaded from a real benchmark results JSON
+      produced by a real run against real AI2-THOR scenes &mdash;
+      <strong>there is no live simulator running behind this page.</strong>
+      AI2-THOR needs a GPU-backed Unity process this Space's free static/CPU tier cannot run, which is
+      exactly why this is a static replay rather than an interactive demo. See the About tab for full detail.
+    </p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab-btn active" data-tab="leaderboard" role="tab" aria-selected="true">Leaderboard</button>
+    <button class="tab-btn" data-tab="replay" role="tab" aria-selected="false">Episode replay</button>
+    <button class="tab-btn" data-tab="about" role="tab" aria-selected="false">About</button>
+  </nav>
+
+  <main>
+    <section id="tab-leaderboard" class="tab-panel active">
+      <div id="leaderboard-table-wrap" class="table-scroll">
+        <p class="loading">Loading&hellip;</p>
+      </div>
+      <p id="source-caption" class="caption"></p>
+      <p class="caption">
+        Methodology: <code>goal_success</code> checks live post-execution AI2-THOR object state
+        (<code>check_goal_live()</code>), not just &ldquo;did every step dispatch without error&rdquo;
+        (<code>execution_success</code>). Full predicate table in
+        <code>backend/planning_evaluation/dataset/v1.0/README.md</code> and
+        <code>backend/planning_evaluation/live_state.py</code> in the origin repository.
+        <code>tier1_locate</code>&rsquo;s live scoring predicate only checks that an object of the named
+        type exists in the scene &mdash; a known, documented simplification, not a perception check
+        (a separate, additive <code>perceived_by_agent</code> signal exists alongside it; see the origin
+        repo&rsquo;s benchmark report Addendum 5 for that finding).
+      </p>
+    </section>
+
+    <section id="tab-replay" class="tab-panel">
+      <p class="caption">
+        A handful of real, logged episodes &mdash; at least one success per planner, plus the known
+        still-failing <code>FloorPlan301</code> book&rarr;drawer geometry-limit case. Pick one below.
+      </p>
+      <label for="episode-select" class="select-label">Episode</label>
+      <select id="episode-select"></select>
+      <div id="episode-detail"></div>
+    </section>
+
+    <section id="tab-about" class="tab-panel">
+      <p>
+        This Space is a companion to the
+        <a href="https://huggingface.co/datasets/naishashetty/milo_benchmark" target="_blank" rel="noopener"><code>naishashetty/milo_benchmark</code></a>
+        dataset and the
+        <a href="https://github.com/NaishaShetty/MILO" target="_blank" rel="noopener">MILO vision-language-robotics project</a>
+        (origin repository). It shows real, already-computed benchmark results for three planners
+        (<code>rule_based</code>, <code>behavior_tree</code>, <code>react</code> on a local
+        <code>qwen2.5:7b</code> model via Ollama) against a fixed 25-task, 5-scene, 3-tier AI2-THOR benchmark.
+      </p>
+      <p>
+        <strong>Why not a live demo?</strong> AI2-THOR requires a GPU-backed Unity process. This Space's
+        static free tier has neither a GPU nor Unity, so live execution is not possible here &mdash; this
+        Space intentionally does not pretend otherwise. What you see is a static replay of one specific,
+        timestamped, reproducible run&rsquo;s output (see the leaderboard&rsquo;s source caption for exactly
+        which file).
+      </p>
+      <p>
+        <strong>Why a static Space, not an interactive Gradio app?</strong> Gradio/Docker Spaces require an
+        HF Pro subscription for CPU hosting; static Spaces are free. Since this page never needed a live
+        Python backend anyway (every number and trace here is precomputed from a results JSON, see
+        <code>generate_data.py</code> in this Space&rsquo;s repository), a static page loses nothing over a
+        Gradio one for this use case.
+      </p>
+      <p>
+        Full methodology, honesty notes about known predicate limitations, and this project&rsquo;s
+        benchmark report are linked from the
+        <a href="https://github.com/NaishaShetty/MILO" target="_blank" rel="noopener">origin repository</a>&rsquo;s
+        README and this Space&rsquo;s own README file.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      Dataset: <a href="https://huggingface.co/datasets/naishashetty/milo_benchmark" target="_blank" rel="noopener">huggingface.co/datasets/naishashetty/milo_benchmark</a>
+      &middot; Code: <a href="https://github.com/NaishaShetty/MILO" target="_blank" rel="noopener">github.com/NaishaShetty/MILO</a>
+    </p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

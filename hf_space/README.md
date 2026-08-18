@@ -3,9 +3,7 @@ title: MILO Benchmark Companion
 emoji: 🤖
 colorFrom: blue
 colorTo: purple
-sdk: gradio
-sdk_version: 6.24.0
-app_file: app.py
+sdk: static
 pinned: false
 license: mit
 ---
@@ -25,10 +23,10 @@ benchmark.
 ## This is not a live demo, and that's deliberate
 
 AI2-THOR requires a GPU-backed Unity subprocess to actually simulate a
-scene. **HF Spaces' free CPU tier has no GPU and cannot run Unity**, so
-this Space cannot execute a real episode interactively, full stop. Rather
-than fake it (e.g. replaying a canned animation and implying it's live),
-this Space is explicit about being a **static replay** of one specific,
+scene. **HF Spaces' free tier has no GPU and cannot run Unity**, so this
+Space cannot execute a real episode interactively, full stop. Rather than
+fake it (e.g. replaying a canned animation and implying it's live), this
+Space is explicit about being a **static replay** of one specific,
 timestamped, already-completed, reproducible benchmark run. If you want
 to run the benchmark for real, clone the origin repository and run
 `backend/planning_evaluation/run_benchmark.py` yourself against a real
@@ -72,17 +70,37 @@ repo) is to say plainly what's measured vs. illustrative. Applied here:
   an illustrative example of the UI, not a capture of that literal
   episode's run.
 
-## Why Gradio, not static HTML or Streamlit
+## Why static HTML, not Gradio
 
-A `Dataframe` for the leaderboard plus a dropdown-driven detail view for
-episode replay is a small, well-trodden Gradio `Blocks` pattern, and
-Gradio Spaces on the free CPU tier are the simplest, most common path for
-exactly this shape of "table + browsable detail" demo — no separate
-frontend build step, and Python end-to-end matches the rest of this
-project. Static HTML+JS was also seriously considered (and would have
-worked, avoiding a Python runtime dependency entirely) but was passed
-over only because Gradio's `Dataframe`/`Gallery`/`Dropdown` widgets get
-the same result with less hand-rolled layout code.
+This Space started as a Gradio `Blocks` app (a `Dataframe` for the
+leaderboard plus a dropdown-driven detail view) — a small, well-trodden
+pattern for exactly this "table + browsable detail" shape. It was
+rebuilt as static HTML/CSS/JS after discovering that **Gradio and Docker
+Spaces require an HF Pro subscription for CPU hosting on this account**;
+static Spaces are free. Nothing about the page's actual content or logic
+needed the change: everything here was already precomputed from a
+results JSON with no live Python execution per request, so a static page
+loses nothing over the Gradio version for this use case — it swaps a
+server-rendered `Dataframe`/`Dropdown` for the equivalent plain
+HTML table and `<select>`, both populated from the same data at
+page-load via `fetch("data.json")`.
+
+## How the static site is built
+
+Nothing here is hand-authored data — `data.json` (what `script.js`
+fetches) is generated ahead of time by `generate_data.py`, which reuses
+`data.py`/`episodes.py`'s exact loading, leaderboard-row, and
+plan-trace-reconstruction logic unchanged (only the output target
+changed, from an in-process Gradio render to a JSON file). Regenerate it
+with:
+
+```bash
+python3 generate_data.py
+```
+
+whenever a newer `results/milo_benchmark_*.json` lands (see "Data
+source" below) — then commit and redeploy. `index.html`/`style.css`/
+`script.js` never need to change for a data refresh alone.
 
 ## Data source and how it stays current
 
@@ -102,15 +120,15 @@ runs from the origin repo's `experiments/results/`:
   completed run. **This is the file the leaderboard above actually
   loads**, since it's the newer of the two.
 
-If the origin repository produces a newer full run (for example, a
-re-run adding a perception-grounded `tier1_locate` check or LLM
-call/token instrumentation for `react` — both were in progress and not
-yet in either file above at the time this Space was built), copy that
-JSON into `results/` and redeploy; no code change is required. The
-leaderboard code path is written defensively for this: if a source JSON
-lacks a given column (e.g. `react`'s LLM-call or token counts), that
-column renders as `—` instead of crashing or silently showing a
-fabricated `0`.
+If the origin repository produces a newer full run (for example, the
+perception-grounded `tier1_locate` check and LLM call/token
+instrumentation for `react` landed in the origin repo's
+`experiments/results/milo_benchmark_20260818T085629Z.json` after this
+Space was first built), copy that JSON into `results/`, re-run
+`generate_data.py`, and redeploy. The leaderboard code path is written
+defensively for this: if a source JSON lacks a given column (e.g.
+`react`'s LLM-call or token counts), that column renders as `—` instead
+of crashing or silently showing a fabricated `0`.
 
 ## Methodology (matches the published dataset card)
 
@@ -121,7 +139,8 @@ planned action dispatch without an error" (`execution_success` — a
 weaker, separate signal, also shown). Full predicate table and known
 limitations (including the honest caveat that `tier1_locate`'s live
 check only verifies an object of the named type exists in the scene, not
-that it was actually perceived) are in
+that it was actually perceived — and the separate, additive
+`perceived_by_agent` signal that now measures that too) are in
 `backend/planning_evaluation/dataset/v1.0/README.md` in the origin
 repository — read that file for the canonical methodology text; this
 Space's copy is a summary, not a re-derivation.
@@ -136,24 +155,29 @@ Space's copy is a summary, not a re-derivation.
 
 ## Running locally
 
+No server, no dependencies beyond Python (only needed to regenerate
+`data.json`, not to view the page):
+
 ```bash
-pip install -r requirements.txt
-python app.py
+python3 -m http.server 8080
 ```
 
-Opens a local Gradio server (default `http://127.0.0.1:7860`). No GPU,
-no AI2-THOR, no network access required — everything renders from the
-JSON files in `results/` and the images in `screenshots/`.
+then open `http://127.0.0.1:8080`. No GPU, no AI2-THOR, no network
+access required — everything renders from `data.json` and the images in
+`screenshots/`.
 
 ## Files
 
 ```
 hf_space/
-├── app.py            # Gradio Blocks app: leaderboard + episode replay + about tab
-├── data.py            # results JSON loader + leaderboard row builder (defensive re: optional columns)
-├── episodes.py         # curated episode picks + reconstructed-plan-trace builder (clearly labeled)
-├── requirements.txt
-├── README.md           # this file (HF Space card)
+├── index.html          # page markup: leaderboard / episode replay / about tabs
+├── style.css            # styling (light + dark, no build step)
+├── script.js             # fetches data.json, renders the leaderboard table and episode detail view
+├── data.json              # generated by generate_data.py -- the only thing script.js fetches
+├── generate_data.py        # build step: re-derives data.json from results/*.json (not served/run by the Space itself)
+├── data.py                  # results JSON loader + leaderboard row builder (defensive re: optional columns) -- used by generate_data.py
+├── episodes.py                # curated episode picks + reconstructed-plan-trace builder (clearly labeled) -- used by generate_data.py
+├── README.md                   # this file (HF Space card)
 ├── results/
 │   ├── milo_benchmark_20260817T154347Z.json   # react/Gemini run (quota-limited, kept for record)
 │   └── milo_benchmark_20260818T070841Z.json   # react/qwen2.5:7b run (the one currently loaded)
@@ -165,8 +189,7 @@ hf_space/
 
 ## Status of this Space
 
-Built and verified locally (`python app.py`, confirmed the Gradio server
-starts and serves the leaderboard and episode data with no errors). **Not
-pushed to the Hugging Face Hub** — this directory is a local, reviewable
-build; publishing (via `huggingface_hub` or `huggingface-cli`) is a
-separate, deliberate step not taken here.
+Built and verified locally (served via `python3 -m http.server`,
+confirmed the page loads, the leaderboard renders real data, and episode
+replay works with no console errors) and live on the Hugging Face Hub —
+see the top of the origin repository's README for the live URL.
