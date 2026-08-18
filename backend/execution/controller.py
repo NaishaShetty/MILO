@@ -416,16 +416,24 @@ class ExecutionController:
             start = time.time()
             try:
                 raw_result = self._dispatch_with_timeout(action)
-            except FutureTimeoutError as exc:
+            except (FutureTimeoutError, TimeoutError) as exc:
                 # `self._step_timeout_s is None` means `_dispatch_with_timeout`
                 # took the direct-call branch (no `ThreadPoolExecutor`, no
-                # timeout of ours in play at all) -- so a `FutureTimeoutError`
+                # timeout of ours in play at all) -- so a timeout caught
                 # here cannot be ours. It is AI2-THOR's own internal
                 # `ai2thor.fifo_server.FifoServer` pipe-read timeout (default
-                # 100s, independent of and invisible to `step_timeout_s`)
-                # surfacing as a plain `TimeoutError`, which has been the same
-                # class as `concurrent.futures.TimeoutError` since Python
-                # 3.11 -- so it lands in this `except` clause too. Blaming
+                # 100s, independent of and invisible to `step_timeout_s`),
+                # raised as a plain builtin `TimeoutError`. On Python 3.11+
+                # that IS `concurrent.futures.TimeoutError` (the two classes
+                # were unified), so `except FutureTimeoutError` alone used to
+                # catch it there -- but this project's supported/CI
+                # interpreter is Python 3.9 (see requirements.txt's cp39
+                # wheel pin), where they are still two distinct exception
+                # classes, and a plain `TimeoutError` fell through to the
+                # generic-exception branch below instead, misreporting a
+                # real engine-level timeout as `SIMULATOR_ERROR`. Catching
+                # both explicitly is correct and equivalent on every
+                # supported Python version, not just 3.11+. Blaming
                 # `self._step_timeout_s` here previously produced the
                 # nonsensical "exceeded its Nones timeout" message; report
                 # which timeout actually fired instead, keeping AI2-THOR's
