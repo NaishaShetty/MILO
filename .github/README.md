@@ -192,7 +192,11 @@ for the full research-contribution breakdown and final evaluation.
   iTHOR room types), 3-tier dataset with a reproducible runner, scored
   against **live** post-execution AI2-THOR state (not just "did nothing
   error"). Published on the Hugging Face Hub:
-  [huggingface.co/datasets/naishashetty/milo_benchmark](https://huggingface.co/datasets/naishashetty/milo_benchmark).
+  [huggingface.co/datasets/naishashetty/milo_benchmark](https://huggingface.co/datasets/naishashetty/milo_benchmark)
+  — companion leaderboard + episode replay Space (static, pre-recorded;
+  AI2-THOR needs a GPU/Unity this Space's free tier doesn't have, so it
+  isn't a live demo):
+  [huggingface.co/spaces/naishashetty/milo_benchmark_companion](https://huggingface.co/spaces/naishashetty/milo_benchmark_companion).
   Real planner-comparison baseline:
 
   | Planner | Goal success | tier1 (locate) | tier2 (pickup) | tier3 (store) |
@@ -375,6 +379,7 @@ docker/          Container definitions (backend + frontend)
 | Real `ReActPlanner` baseline on `milo_benchmark` | ✅ Done — 20/25 (80%) via local `qwen2.5:7b`/Ollama, after Gemini's free tier proved unworkable |
 | Test-suite `VISION_ENABLE_SIMULATOR` env-leak fix (`conftest.py`) | ✅ Fixed — also cut the full suite from ~13min to ~6s |
 | Publish `milo_benchmark v1.0` to the Hugging Face Hub | ✅ Done — [huggingface.co/datasets/naishashetty/milo_benchmark](https://huggingface.co/datasets/naishashetty/milo_benchmark) |
+| Companion Space: leaderboard + episode replay | ✅ Done — static (pre-recorded, no live AI2-THOR): [huggingface.co/spaces/naishashetty/milo_benchmark_companion](https://huggingface.co/spaces/naishashetty/milo_benchmark_companion) |
 | Perception-grounded `tier1_locate` check (`perceived_by_agent`, alongside unchanged `exists_in_scene`) | ✅ Done (infra) — real vision, dual signal, `goal_success` unchanged |
 | ↳ Vision sim-to-real detection gap it surfaced (0.35 threshold misses real, ground-truth-visible objects) | ⚠️ Open — real, measured, not fixed (a lowered threshold was explicitly not adopted, unvalidated elsewhere) |
 | ↳ CPU-bound vision inference (PyTorch not CUDA-enabled despite present GPU) | 🔜 Future — current cost/latency numbers understate real achievable performance |

@@ -20,7 +20,11 @@ size_categories:
 A small, versioned dataset of `(scene, instruction, ground-truth task
 spec)` triples for evaluating embodied task planning in AI2-THOR,
 built for the [MILO vision-language-robotics
-project](https://github.com/NaishaShetty/MILO). Every task pairs a natural-language
+project](https://github.com/NaishaShetty/MILO). A companion Space —
+leaderboard + episode replay, static/pre-recorded since AI2-THOR needs
+a GPU/Unity this Space's free tier doesn't have — is live at
+[huggingface.co/spaces/naishashetty/milo_benchmark_companion](https://huggingface.co/spaces/naishashetty/milo_benchmark_companion).
+Every task pairs a natural-language
 instruction with a structured goal/object/target spec and a
 machine-checkable success predicate, across 5 real AI2-THOR scenes
 spanning all 4 iTHOR room types.
