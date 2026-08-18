@@ -4,8 +4,8 @@ This document explains the depth, 3D localization, tracking, and
 temporal-scene subsystems added on top of the Phase 2 perception
 pipeline (see [`perception_pipeline.md`](perception_pipeline.md) and
 [`api_contracts.md`](api_contracts.md) for that foundation, which this
-phase extends without modifying). It answers the questions the root
-[README.md](../../README.md) lists for Phase 3.x:
+phase extends without modifying). It answers the questions the
+[README](../../.github/README.md) lists for Phase 3.x:
 
 1. What objects are present? -- Phase 2 (unchanged).
 2. Where are they in the image? -- Phase 2 (unchanged).

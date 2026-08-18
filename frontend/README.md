@@ -9,7 +9,7 @@ real orchestrator, and shows real agent/memory/event data. Nothing here
 plans, executes, or reasons on its own -- every action goes through the
 backend's Task API.
 
-See the root [README.md](../README.md) and
+See the [README](../.github/README.md) and
 [`backend/docs/language_interface_spec.md`](../backend/docs/language_interface_spec.md)
 for the full backend architecture; this file only covers the frontend.
 
