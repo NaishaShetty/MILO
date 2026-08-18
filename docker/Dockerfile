@@ -60,8 +60,28 @@ COPY backend/requirements.txt ./requirements.txt
 # what this Docker image installs, not backend/requirements.txt or
 # backend/scripts/download_torch.py (which developers use to fetch a
 # CUDA build for actual GPU work).
+#
+# `--extra-index-url`, not `--index-url`: `--index-url` *replaces*
+# PyPI outright for this command, not just adds PyTorch's index as a
+# preferred source. torch's own dependency resolution here still pulls
+# in ordinary PyPI packages (e.g. typing-extensions) alongside
+# torch/torchvision themselves; when pip has to fall back to building
+# one of those from an sdist (observed in CI: a `typing-extensions`
+# wheel was discarded over a package-name normalization mismatch,
+# forcing a build from source), that build's own PEP 517 backend
+# (`flit_core`) has to come from somewhere -- and with a bare
+# `--index-url` restricting the whole command to
+# download.pytorch.org/whl/cpu, which mirrors PyTorch's own packages
+# only, there is nowhere for it to come from, and the install fails
+# with "Could not find a version that satisfies the requirement
+# flit_core<4,>=3.11". `--extra-index-url` keeps PyPI available as a
+# fallback for every package this command touches besides torch/
+# torchvision themselves, while pip still prefers the CPU-only builds
+# from PyTorch's index for those two -- the documented approach from
+# PyTorch's own install instructions for exactly this "CPU build,
+# still need everything else from PyPI" case.
 RUN pip install "torch>=2.5.1" "torchvision>=0.20.1" \
-        --index-url https://download.pytorch.org/whl/cpu \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
     && pip install -r requirements.txt
 
 # Now copy the backend source itself. .dockerignore (repo root) keeps
