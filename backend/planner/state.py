@@ -56,6 +56,19 @@ class ObjectState:
     distinction is never actually load-bearing for validation today,
     but keeping it means a future "this object is not openable" check
     is a one-line addition, not a state-model migration.
+
+    `is_openable` is that addition (Phase D/E follow-up): `None` when
+    it's unknown whether the object can be opened at all (the default
+    -- e.g. no live metadata was seeded for it), `True`/`False` when a
+    caller knows for certain (e.g. `orchestration.task_runner`'s
+    `_seed_initial_state_from_live_metadata` sets it from AI2-THOR's
+    own `openable` flag). Distinct from `is_open`: `is_openable=False`
+    means "opening this object is not a valid action at all" (e.g. a
+    shelf), whereas `is_open=None` just means "we don't know its
+    current open/closed state" (e.g. a fridge we haven't looked at
+    yet). `rule_based.py`'s `_deposit()` reads this to avoid inserting
+    an `open` step for a `store`/`place` destination it knows isn't a
+    container in the first place -- see that function's own docstring.
     """
 
     location: Optional[str] = None
@@ -63,6 +76,7 @@ class ObjectState:
     is_near_robot: bool = False
     is_held: bool = False
     is_open: Optional[bool] = None
+    is_openable: Optional[bool] = None
 
 
 @dataclass

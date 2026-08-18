@@ -257,3 +257,77 @@ reading the object's own `parentReceptacle`) and re-run this same
 ablation unchanged — `real_scenarios.py`'s Category A/B are already
 built to demonstrate the hint mechanism the moment a qualifying memory
 exists to retrieve.
+
+---
+
+## Addendum (resolved) — the `parentReceptacle` gap, root-caused and fixed
+
+**This section documents a fix made after the finding above; sections
+1–8's original text is left unchanged as the honest record of what was
+found, when, and why.**
+
+Investigated whether a real, ground-truth alternative to
+`parentReceptacle` (singular) exists in AI2-THOR's own metadata, per
+this report's own section 8 suggestion. It does: `parentReceptacles`
+(plural, a list field) is a **separate** AI2-THOR metadata field this
+project's code had never read. Checked directly against a live scene
+(no assumption, no vision, no guessing):
+
+```
+FloorPlan1   Mug        -> parentReceptacle: None | parentReceptacles: ['CounterTop|...']
+FloorPlan5   Bowl       -> parentReceptacle: None | parentReceptacles: ['CounterTop|...']
+FloorPlan201 Laptop     -> parentReceptacle: None | parentReceptacles: ['Chair|...', 'Chair|...', 'DiningTable|...']
+FloorPlan301 AlarmClock -> parentReceptacle: None | parentReceptacles: ['Dresser|...']
+FloorPlan401 Towel      -> parentReceptacle: None | parentReceptacles: ['TowelHolder|...']
+```
+
+`parentReceptacle` (singular) is `None` for every object in every
+scene tested — confirming this report's original finding exactly.
+`parentReceptacles` (plural) is populated every single time, for every
+object this project's memory-hint mechanism needs it for. This appears
+to be an AI2-THOR 5.0.0 API evolution this project's code (written
+against an earlier mental model of the metadata schema) simply never
+picked up — not a deeper physics/scene-registration limitation as
+originally suspected in section 4.
+
+**Fix**: `orchestration.task_runner.TaskRunner._form_observation()`
+now reads `parentReceptacles[0]` when present (falling back to the
+singular field only for synthetic `FakeSimulator` scenarios, which
+never populate the plural field — so no existing `FakeSimulator`-based
+test needed to change). When an object lists more than one candidate
+receptacle (observed for `FloorPlan201`'s laptop touching two chairs
+and a dining table simultaneously), the first entry is used
+deterministically — a real, if arbitrary, choice from AI2-THOR's own
+data, never a fabricated one.
+
+**Re-ran this exact ablation design across all 5 of Phase D's scenes**
+(not just `FloorPlan1`) with the fix applied — one "find X twice" pair
+per scene, `memory_off` vs `memory_on`:
+
+```
+20/20 episodes succeeded (unchanged from before the fix)
+memory_used_in_plan on memory_on's recall episode: 5/5 scenes (was 0/5)
+plan_step_count on memory_on's recall episode: 4 (was 2) -- the extra
+  locate/navigate pair on the remembered location, exactly as
+  `_apply_memory_hint()`'s docstring describes
+```
+
+Concrete example (`FloorPlan1`, "find the mug" twice, `memory_on`):
+episode 2's plan is now `['locate', 'navigate', 'locate', 'navigate']`
+with targets `['countertop', 'countertop', 'mug', 'mug']` — the robot's
+plan visits the remembered location (`countertop`) before falling back
+to locating the mug directly, matching this project's own
+"current-perception-overrides-stale-memory, but memory still gets a
+first try" design intent for the first time under real AI2-THOR.
+
+Raw output:
+[`experiments/results/milo_benchmark_memory_ablation_20260817T151851Z.json`](../results/milo_benchmark_memory_ablation_20260817T151851Z.json)
+/ [`..._episodes.csv`](../results/milo_benchmark_memory_ablation_20260817T151851Z_episodes.csv).
+
+This does not change the headline finding above (memory still shows
+zero success/action-count delta in this ablation design, because both
+conditions' episodes still succeed either way — this scenario measures
+*whether the hint engages*, not whether it changes success on an
+already-easy `find` task) — it resolves the mechanism-level root cause
+section 4 identified, on the concrete, feasible path section 8
+suggested. `docs/roadmap.md` updated accordingly.

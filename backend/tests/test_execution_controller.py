@@ -201,6 +201,52 @@ def test_step_timeout_is_reported_as_action_timeout():
     assert record.error.code == ExecutionErrorCode.ACTION_TIMEOUT
 
 
+def test_engine_level_timeout_with_no_step_timeout_configured_is_reported_accurately():
+    # Regression test (Phase E follow-up): `ai2thor.fifo_server.
+    # FifoServer` has its own internal ~100s pipe-read timeout,
+    # completely independent of `step_timeout_s`. Since Python 3.11,
+    # `concurrent.futures.TimeoutError is TimeoutError`, so that
+    # AI2-THOR-internal `TimeoutError` lands in the same `except
+    # FutureTimeoutError:` clause `_dispatch_with_retries` uses for its
+    # own `step_timeout_s`-configured path -- previously misattributed
+    # to `self._step_timeout_s` (`None`), producing the nonsensical
+    # "exceeded its Nones timeout" message. With no `step_timeout_s`
+    # configured (the default -- see `TaskRunner`/`ExecutionAgentWrapper`,
+    # neither pass one), a `TimeoutError` raised directly by the
+    # simulator/dispatcher must be this engine-level timeout, not ours.
+    step = PlanStep(
+        step_id=1, action="navigate", target="apple", description="Navigate to apple"
+    )
+    plan = Plan(
+        plan_id="p1",
+        task_id="t1",
+        planner_type="test",
+        goal_summary={},
+        steps=[step],
+        status=PlanStatus.VALID,
+    )
+    state = WorldState.initial()
+    state.object("apple").is_located = True
+
+    def _raise_engine_timeout():
+        raise TimeoutError("Reading from AI2-THOR backend timed out (using 100.0s) timeout.")
+
+    simulator = FakeSimulator(
+        apple_and_fridge_scene(), hooks={"navigate": _raise_engine_timeout}
+    )
+    controller = ExecutionController(simulator)  # no step_timeout_s configured
+
+    record = controller.execute_plan(plan, state)
+
+    assert record.status == ExecutionStatus.FAILED
+    assert record.error is not None
+    assert record.error.code == ExecutionErrorCode.ACTION_TIMEOUT
+    assert "Nones" not in record.error.message
+    assert "AI2-THOR" in record.error.message
+    assert "no step_timeout_s" in record.error.message
+    assert "100.0s" in record.error.message  # the real AI2-THOR-reported number
+
+
 def test_execute_plan_without_simulator_raises():
     plan = _store_plan()
     controller = ExecutionController(None)

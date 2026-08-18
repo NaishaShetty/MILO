@@ -82,6 +82,50 @@ def test_place_goal_has_no_open_close_for_non_container_target():
     assert "close" not in [s.action for s in result.plan.steps]
 
 
+def test_store_goal_has_no_open_close_for_a_known_non_openable_target():
+    # Regression test (Phase D/E): "store" always used to insert an
+    # `open`/`close` pair for any target whose `is_open` wasn't known
+    # `True` -- including a real, non-container receptacle like a
+    # shelf, which real AI2-THOR rejects with "... is not an Openable
+    # object" (see docs/roadmap.md and
+    # experiments/reports/phase_d_floorplan_generalization_findings.md
+    # section 4). `is_openable=False` (as a live metadata scan would
+    # seed) must suppress open/close even for "store" (use_container).
+    state = WorldState.initial()
+    state.object("shelf").is_openable = False
+    task = SingleTask(goal="store", object="spraybottle", target="shelf")
+    result = PLANNER.plan(task, state)
+    assert result.success
+    assert [s.action for s in result.plan.steps] == [
+        "locate",
+        "navigate",
+        "pickup",
+        "locate",
+        "navigate",
+        "place",
+    ]
+
+
+def test_store_goal_still_opens_a_target_with_unknown_openable_state():
+    # is_openable=None (the common case -- no live metadata seeded) is
+    # NOT the same as is_openable=False: this must preserve the exact
+    # prior "store always opens an unknown-state container" behavior.
+    state = WorldState.initial()
+    task = SingleTask(goal="store", object="mug", target="cabinet")
+    result = PLANNER.plan(task, state)
+    assert result.success
+    assert [s.action for s in result.plan.steps] == [
+        "locate",
+        "navigate",
+        "pickup",
+        "locate",
+        "navigate",
+        "open",
+        "place",
+        "close",
+    ]
+
+
 def test_place_goal_inserts_open_close_for_a_known_closed_container():
     # Regression test: "place" (unlike "store") never inserted an
     # `open` step, so placing into a receptacle `state` already knows

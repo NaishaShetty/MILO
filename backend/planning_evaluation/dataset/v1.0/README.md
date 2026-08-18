@@ -95,6 +95,38 @@ Reference implementation: `backend/planning_evaluation/live_state.py`'s
 `check_goal_live()` in the [MILO
 repository](../../../..) (this dataset's origin repo).
 
+## Baselines (v1.0, real runs, all three planners)
+
+| Planner | Goal success | tier1_locate | tier2_pickup | tier3_store | Notes |
+|---|---|---|---|---|---|
+| `rule_based` | 24/25 (96%) | 10/10 | 10/10 | 4/5 | Deterministic, no LLM. One failure is a real AI2-THOR placement/geometry limit, not a planner defect. |
+| `behavior_tree` | 24/25 (96%) | 10/10 | 10/10 | 4/5 | Same task/plan-step outcomes as `rule_based` (shares its goal-handler templates); same single failure. |
+| `react` (`qwen2.5:7b`, Q4_K_M, via Ollama, local) | 20/25 (80%) | 10/10 | 10/10 | 0/5 | `goal_success`/`execution_success`/`plan_success` agree on every episode — no predicate artifact. All 5 failures are genuine multi-step reasoning failures (the model proposes an action before its precondition chain is satisfied, e.g. `pickup` before navigating close enough), not infrastructure. Run on an RTX 4050 Laptop GPU (6GB VRAM, 82%/18% GPU/CPU split), zero rate-limit retries needed (fully local, no quota). |
+
+`react` was also attempted against Gemini's free tier
+(`gemini-flash-latest`) first; that attempt is **not** a valid
+baseline and is excluded from the table above — the free tier's daily
+quota (20 requests/day) was exhausted after 2 of 25 episodes, and a
+raw success-rate computed from that run would have been actively
+misleading (most of its apparent "successes" were `tier1_locate`
+episodes where the LLM call had already failed outright — the
+predicate can't distinguish "the agent found it" from "the object was
+already sitting in the scene regardless of what the agent did"). See
+the origin repository's `experiments/reports/
+phase_e_milo_benchmark_report.md` (Addendum 2 for the Gemini attempt
+and why it doesn't count, Addendum 3 for the `qwen2.5:7b` run this
+table reports) for full methodology, exact commands, and reproduction
+steps.
+
+**Reproducing the `react` row**: any OpenAI-API-compatible local
+server works (Ollama, vLLM, ...) — set `LANGUAGE_LLM_PROVIDER=qwen`,
+`LANGUAGE_LLM_MODEL=qwen2.5:7b` (or your chosen model/quantization),
+`LANGUAGE_LLM_BASE_URL` to your server's `/v1` endpoint, and
+`QWEN_API_KEY` to any placeholder value if your server doesn't enforce
+auth, then run
+`RUN_SIMULATOR_TESTS=true python -m planning_evaluation.run_benchmark`
+from the origin repository's `backend/` directory.
+
 ## Difficulty tiers and why they were chosen this way
 
 Tier boundaries were chosen to exercise structurally different code

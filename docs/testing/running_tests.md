@@ -84,6 +84,16 @@ RUN_SIMULATOR_TESTS=true python -m pytest simulator/test_execution_e2e.py -v
 Model weights are downloaded automatically on first run into
 `models/<model_name>/` (see [`docs/phases/phase2_vision.md`](../phases/phase2_vision.md#modelmanager)).
 
+`backend/tests/conftest.py` forces `VISION_ENABLE_SIMULATOR=false` for
+every test under `backend/tests/`, regardless of what a local `.env`
+sets it to for interactive dev use (`load_dotenv()` only fills gaps in
+`os.environ`, so a `.env` with `VISION_ENABLE_SIMULATOR=true` would
+otherwise leak into every `TestClient`, both breaking the 3 tests that
+specifically assert on the "no simulator configured" `503` case and
+silently making the whole suite dramatically slower by loading real
+Grounding DINO/SAM2 weights on every `TestClient` construction). No
+manual "remember to unset it" step is needed anymore.
+
 ### Running the API + Frontend (Phase 3.7)
 
 ```bash

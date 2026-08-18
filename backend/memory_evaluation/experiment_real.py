@@ -105,6 +105,17 @@ def _seed_initial_state_from_live_metadata(
     closed container, and real AI2-THOR rejected it with `"CounterTop
     ... is not an Openable object"` -- a failure this harness caused by
     over-reading live metadata, not a planner bug.
+
+    Also seeds `is_openable` directly from AI2-THOR's `openable` flag,
+    unconditionally (unlike `is_open`, this one has no false-positive
+    trap -- `openable` itself is exactly the fact `is_openable` models,
+    no derived reasoning needed). This is what lets `_deposit()`'s
+    non-openable-target carve-out (Phase D/E follow-up -- see
+    `docs/roadmap.md`) actually engage for any caller that seeds
+    `initial_state` from this helper: a `store` target AI2-THOR reports
+    as not `openable` (e.g. a shelf) now gets `is_openable=False`
+    seeded, so `_deposit()` places directly instead of inserting a
+    doomed `open` step.
     """
     state = WorldState.initial()
     referenced_names = {
@@ -118,7 +129,10 @@ def _seed_initial_state_from_live_metadata(
 
     for name in referenced_names:
         live = by_type.get(name.strip().lower())
-        if live is not None and live.get("openable") and live.get("isOpen") is not None:
+        if live is None:
+            continue
+        state.object(name).is_openable = bool(live.get("openable"))
+        if live.get("openable") and live.get("isOpen") is not None:
             state.object(name).is_open = bool(live["isOpen"])
     return state
 

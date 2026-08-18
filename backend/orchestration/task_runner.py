@@ -383,12 +383,34 @@ class TaskRunner:
         to a `SEMANTIC` memory (section 12/13). Triggers only when
         ALL of the following hold: the task named a primary object; the
         task just completed successfully; that object resolves to a
-        live simulator object; and that object's AI2-THOR
-        `parentReceptacle` metadata (real ground truth this project's
-        `Simulator`/`FakeSimulator` already expose -- never inferred or
-        guessed) names another live object. Everything else about the
-        final scene (every other object, every non-primary detection)
-        is deliberately never touched -- this is not a scene dump.
+        live simulator object; and that object's AI2-THOR receptacle
+        metadata (real ground truth this project's `Simulator`/
+        `FakeSimulator` already expose -- never inferred or guessed)
+        names another live object. Everything else about the final
+        scene (every other object, every non-primary detection) is
+        deliberately never touched -- this is not a scene dump.
+
+        Prefers `parentReceptacles` (plural, a list) over the singular
+        `parentReceptacle` this originally read exclusively -- a real,
+        confirmed AI2-THOR 5.0.0 behavior found investigating why this
+        pathway never engaged against real AI2-THOR (Phase B, Phase E):
+        `parentReceptacle` (singular) is `None` for every object tested
+        across all 5 of Phase D's scenes, even loose objects resting
+        directly on a real, populated receptacle, but `parentReceptacles`
+        (plural) reliably names that same receptacle every time (e.g.
+        FloorPlan1's mug: `parentReceptacle=None`,
+        `parentReceptacles=['CounterTop|...']`). When an object lists
+        more than one candidate (observed for `FloorPlan201`'s laptop,
+        which touches two chairs and a dining table simultaneously),
+        the first entry is used -- a deterministic choice from AI2-THOR's
+        own real list, not a guess, matching `execution.resolver.
+        ObjectResolver`'s own "pick one deterministically from ground
+        truth, never fabricate" precedent. Synthetic `FakeSimulator`
+        scenarios (`memory_evaluation/scenarios.py`,
+        `tests/_execution_test_helpers.py`) only ever populate the
+        singular field, so it remains the fallback -- this widens what
+        real AI2-THOR can trigger without changing any existing
+        `FakeSimulator`-based test's behavior.
         """
         if not task.object:
             return None
@@ -405,7 +427,11 @@ class TaskRunner:
         obj = next((o for o in objects if o.get("objectId") == object_id), None)
         if obj is None:
             return None
-        receptacle_id = obj.get("parentReceptacle")
+        parent_receptacles = obj.get("parentReceptacles")
+        if isinstance(parent_receptacles, list) and parent_receptacles:
+            receptacle_id = parent_receptacles[0]
+        else:
+            receptacle_id = obj.get("parentReceptacle")
         if not receptacle_id or not isinstance(receptacle_id, str):
             return None
         receptacle = next(

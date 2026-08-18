@@ -190,3 +190,47 @@ bug this sweep found, not a hypothetical one. `README.md`'s "Limited
 scene/task diversity" bullet and `docs/roadmap.md`'s "Broader
 scene/task diversity" row can be narrowed (not removed — see section 6)
 to point at this report.
+
+---
+
+## Addendum (resolved) — `_deposit()` non-openable-target bug fixed
+
+**This section documents a fix made after the finding above; section 4's
+original text is left unchanged as the honest record of what was found
+and when.**
+
+`planner.state.ObjectState` gained an `is_openable: Optional[bool]`
+field (`None` unless a caller knows for certain). `rule_based.py`'s
+`_deposit()` now skips inserting `open`/`close` when a `store`/`place`
+target is known (`is_openable is False`) not to be a container at all
+— `is_openable=None` (the default, no live metadata seeded) preserves
+the exact prior behavior, so this is strictly a carve-out, not a
+changed default. `memory_evaluation.experiment_real.
+_seed_initial_state_from_live_metadata` (used by every real-AI2-THOR
+harness in this project, including `run_floorplan_sweep.py` and
+`planning_evaluation.run_benchmark`) now seeds `is_openable` directly
+from AI2-THOR's own `openable` flag for every task-referenced name.
+
+Re-ran `milo-v1-fp401-t3a` ("Put the spray bottle away on the shelf.",
+`FloorPlan401`) against real AI2-THOR with the fix applied:
+
+```
+shelf is_openable seeded: False
+plan steps: ['locate', 'navigate', 'pickup', 'locate', 'navigate', 'place']
+execution succeeded: True
+goal_success: True
+```
+
+Also re-ran `milo-v1-fp301-t3a` ("Put the book away in the drawer.",
+`FloorPlan301`) to confirm the fix is targeted and doesn't mask the
+*other*, unrelated failure this report documents (the real
+placement/geometry limit, section 5): it still fails identically
+(`"No valid positions to place object found"`), as expected — that
+failure was never about `_deposit()`'s open/close logic and this fix
+does not touch it.
+
+Regression tests added: `test_store_goal_has_no_open_close_for_a_known_non_openable_target`,
+`test_store_goal_still_opens_a_target_with_unknown_openable_state`
+(`backend/tests/test_planner_rule_based.py`). `docs/roadmap.md` updated
+accordingly (moved from "Future work" to the Phase completion history
+as "E follow-up").

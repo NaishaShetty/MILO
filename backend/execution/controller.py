@@ -416,7 +416,33 @@ class ExecutionController:
             start = time.time()
             try:
                 raw_result = self._dispatch_with_timeout(action)
-            except FutureTimeoutError:
+            except FutureTimeoutError as exc:
+                # `self._step_timeout_s is None` means `_dispatch_with_timeout`
+                # took the direct-call branch (no `ThreadPoolExecutor`, no
+                # timeout of ours in play at all) -- so a `FutureTimeoutError`
+                # here cannot be ours. It is AI2-THOR's own internal
+                # `ai2thor.fifo_server.FifoServer` pipe-read timeout (default
+                # 100s, independent of and invisible to `step_timeout_s`)
+                # surfacing as a plain `TimeoutError`, which has been the same
+                # class as `concurrent.futures.TimeoutError` since Python
+                # 3.11 -- so it lands in this `except` clause too. Blaming
+                # `self._step_timeout_s` here previously produced the
+                # nonsensical "exceeded its Nones timeout" message; report
+                # which timeout actually fired instead, keeping AI2-THOR's
+                # own message (it already states the real number) rather
+                # than inventing one of our own.
+                if self._step_timeout_s is None:
+                    error_message = (
+                        f"Action {action.action_type.value!r} got no response "
+                        f"from AI2-THOR before AI2-THOR's own internal "
+                        f"protocol timeout fired (no step_timeout_s is "
+                        f"configured on this ExecutionController): {exc}"
+                    )
+                else:
+                    error_message = (
+                        f"Action {action.action_type.value!r} exceeded its "
+                        f"{self._step_timeout_s}s timeout."
+                    )
                 result = ActionResult(
                     success=False,
                     action=action.action_type.value,
@@ -424,8 +450,7 @@ class ExecutionController:
                     step_id=action.step_id,
                     object_id=action.parameters.get("object_id"),
                     target_id=action.parameters.get("container_id"),
-                    error=f"Action {action.action_type.value!r} exceeded its "
-                    f"{self._step_timeout_s}s timeout.",
+                    error=error_message,
                     error_code=ExecutionErrorCode.ACTION_TIMEOUT,
                     duration_ms=(time.time() - start) * 1000,
                     retry_count=attempt,

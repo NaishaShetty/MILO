@@ -288,11 +288,29 @@ def _deposit(
     knows is open (`is_open is True`) never gets a redundant `open` (which
     would itself fail `open`'s own `not_open` precondition) or a
     same-plan `close`.
+
+    A target `state` knows for certain is NOT openable at all
+    (`is_openable is False` -- e.g. a shelf, confirmed via live AI2-THOR
+    metadata) never gets an `open`/`close` inserted, regardless of
+    `use_container`/`is_open` -- a real AI2-THOR bug this project
+    shipped and caught via its own floor-plan generalization sweep (see
+    `docs/roadmap.md`): `store`ing onto a non-container receptacle
+    should just place the object directly, the same as `place` already
+    does for a target with no open/closed state at all. `is_openable`
+    unknown (`None`, the common case when no live metadata was seeded)
+    preserves the exact prior behavior -- this is strictly an added
+    "we know for sure it can't be opened" carve-out, never a new
+    default.
     """
     builder.add(LOCATE, target)
     builder.add(NAVIGATE, target)
-    is_open = state.object(target).is_open
-    needs_open = is_open is not True and (use_container or is_open is False)
+    target_state = state.object(target)
+    is_open = target_state.is_open
+    needs_open = (
+        target_state.is_openable is not False
+        and is_open is not True
+        and (use_container or is_open is False)
+    )
     if needs_open:
         builder.add(OPEN, target)
     builder.add(PLACE, obj, {"container": target})

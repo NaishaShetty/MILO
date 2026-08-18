@@ -3,16 +3,40 @@ run_benchmark.py (backend/planning_evaluation)
 
 Purpose
 -------
-Phase E's planner-comparison axis: scores `RuleBasedPlanner` and
-`BehaviorTreePlanner` against every task in `dataset/v1.0/tasks.json`
-on real AI2-THOR (`ReActPlanner` is deliberately excluded -- see
-`dataset/v1.0/README.md`'s "Known limitations": this sandbox has no
-LLM API key configured, and this project's own policy is to report an
-honest "not runnable here" rather than a degraded or fabricated
-number). Each episode restarts the simulator (fresh Unity process per
-episode -- the "fresh scene per episode" substitute
-`real_scenarios.py`/`run_floorplan_sweep.py` already use, since
-`Simulator` has no object-teleportation capability).
+Phase E's planner-comparison axis: scores `RuleBasedPlanner`,
+`BehaviorTreePlanner`, and `ReActPlanner` against every task in
+`dataset/v1.0/tasks.json` on real AI2-THOR. Each episode restarts the
+simulator (fresh Unity process per episode -- the "fresh scene per
+episode" substitute `real_scenarios.py`/`run_floorplan_sweep.py`
+already use, since `Simulator` has no object-teleportation
+capability).
+
+`ReActPlanner` baseline (Phase E follow-up)
+--------------------------------------------------
+Runs against Google's Gemini API (`LANGUAGE_LLM_PROVIDER=gemini` must
+be set, `GEMINI_API_KEY` must be a real key -- see `language.config.
+LLMRuntimeConfig.from_env()`) via `language.provider_factory.
+create_llm_client()`, exactly the production wiring path, never a
+benchmark-specific client. `REACT_MODEL_VERSION` records the exact
+model string used (see `LLMRuntimeConfig.model`, default
+`"gemini-flash-latest"`) for reproducibility -- Google's own
+free-tier availability/eligibility for that model is controlled
+entirely by Google, not this project.
+
+Free-tier reality, handled honestly, not hidden: Gemini's API returned
+intermittent `503 UNAVAILABLE` ("This model is currently experiencing
+high demand") during real runs -- roughly 2 of 3 calls in an initial
+3-call smoke test, with no relation to task content. `run_react_episode()`
+retries an episode up to `REACT_MAX_TRANSIENT_RETRIES` additional times
+ONLY when the planning failure looks like this specific transient
+provider condition (`_is_transient_llm_error()` -- matches on `503`/
+`UNAVAILABLE`/`429`/`RESOURCE_EXHAUSTED`/`rate limit`/`quota`, not on
+any other planning failure), and every episode's `BenchmarkEpisodeResult.
+llm_retry_attempts` records exactly how many extra attempts it took --
+0 for every non-`react` planner and for any `react` episode that
+succeeded first try. The final reported numbers are real outcomes
+after this bounded, fully-logged retry policy, never a number silently
+padded by unlimited retrying until something succeeds.
 
 Two independent success signals per episode, both recorded (see
 `live_state.py`'s docstring for why they can disagree):
@@ -36,10 +60,15 @@ per-tier summaries) and a matching `_episodes.csv`, same convention as
 How to run
 -----------
 Opt-in gated (launches a real Unity subprocess per episode -- 25 tasks
-x 2 planners = 50 episodes):
+x 3 planners = 75 episodes, plus any transient-error retries):
 
     cd backend
-    RUN_SIMULATOR_TESTS=true python -m planning_evaluation.run_benchmark
+    RUN_SIMULATOR_TESTS=true LANGUAGE_LLM_PROVIDER=gemini python -m planning_evaluation.run_benchmark
+
+(`GEMINI_API_KEY` must already be set -- e.g. via `.env`. Without a
+real key/provider configured, `react` episodes will fail immediately
+with a real `ConfigurationError`/provider error, reported honestly
+like any other real failure -- this script never fakes a client.)
 """
 
 from __future__ import annotations
@@ -50,15 +79,18 @@ import os
 import sys
 import time
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
+from language.config import LLMRuntimeConfig
+from language.provider_factory import create_llm_client
 from memory_evaluation.experiment_real import _seed_initial_state_from_live_metadata
 from orchestration.task_runner import TaskRunner
 from planner.behavior_tree import BehaviorTreePlanner
 from planner.planner import Planner
+from planner.react import ReActPlanner
 from planner.rule_based import RuleBasedPlanner
 from planning_evaluation.live_state import check_goal_live
 from planning_evaluation.loader import BenchmarkTask, load_tasks
@@ -66,11 +98,55 @@ from simulator.simulator import Simulator
 
 RESULTS_DIR = Path(__file__).resolve().parents[2] / "experiments" / "results"
 
-#: `ReActPlanner` intentionally omitted -- see module docstring.
-PLANNERS: Dict[str, "type[Planner]"] = {
+#: Bounded, fully-logged retry budget for `react` episodes that fail
+#: with a transient LLM-provider condition (see module docstring) --
+#: never applied to `rule_based`/`behavior_tree`, which have no LLM
+#: dependency to be transient about.
+REACT_MAX_TRANSIENT_RETRIES = 2
+
+#: Substrings identifying a transient LLM-provider condition (model
+#: overloaded, rate limit, quota) worth one bounded retry, as opposed
+#: to a real planning/parsing failure worth reporting as-is. Matched
+#: case-insensitively against `PlanningResult.errors`.
+_TRANSIENT_LLM_ERROR_MARKERS = (
+    "503",
+    "unavailable",
+    "429",
+    "resource_exhausted",
+    "rate limit",
+    "quota",
+)
+
+
+def _is_transient_llm_error(errors: List[str]) -> bool:
+    joined = " ".join(errors).lower()
+    return any(marker in joined for marker in _TRANSIENT_LLM_ERROR_MARKERS)
+
+
+def _make_react_planner() -> ReActPlanner:
+    client = create_llm_client(LLMRuntimeConfig.from_env())
+    return ReActPlanner(llm_client=client)
+
+
+#: Zero-arg factories so `rule_based`/`behavior_tree` (no constructor
+#: args needed) and `react` (needs a real `LLMClient`, built from the
+#: environment at call time -- see `_make_react_planner`) fit the same
+#: uniform shape.
+PLANNERS: Dict[str, Callable[[], Planner]] = {
     "rule_based": RuleBasedPlanner,
     "behavior_tree": BehaviorTreePlanner,
+    "react": _make_react_planner,
 }
+
+#: Recorded in the report's `reproducibility` block -- resolved once
+#: at import time so every episode's run reflects the exact same
+#: configured provider/model, whatever `LANGUAGE_LLM_PROVIDER` is set
+#: to when this script runs (`gemini` for the Phase E follow-up run;
+#: informational only, never used to gate `react`'s presence in
+#: `PLANNERS`).
+_LLM_CONFIG = LLMRuntimeConfig.from_env()
+REACT_LLM_PROVIDER = _LLM_CONFIG.provider
+REACT_MODEL_VERSION = _LLM_CONFIG.model
 
 
 @dataclass
@@ -91,6 +167,7 @@ class BenchmarkEpisodeResult:
     plan_step_count: int
     failure_cause: Optional[str]
     wall_clock_ms: float
+    llm_retry_attempts: int = 0
 
 
 def run_episode(planner_name: str, planner: Planner, bt: BenchmarkTask) -> BenchmarkEpisodeResult:
@@ -170,6 +247,28 @@ def run_episode(planner_name: str, planner: Planner, bt: BenchmarkTask) -> Bench
         simulator.stop()
 
 
+def run_react_episode(planner: Planner, bt: BenchmarkTask) -> BenchmarkEpisodeResult:
+    """
+    `run_episode` wrapped with a bounded, fully-logged retry for
+    `react` only -- see module docstring's "ReActPlanner baseline"
+    section for why this exists and exactly what it does and does not
+    retry. Every returned result's `llm_retry_attempts` records how
+    many *extra* attempts (beyond the first) were used, so the raw
+    numbers are auditable, not just the final pass/fail.
+    """
+    attempts = 0
+    while True:
+        result = run_episode("react", planner, bt)
+        transient = not result.plan_success and _is_transient_llm_error(
+            [result.failure_cause] if result.failure_cause else []
+        )
+        if not transient or attempts >= REACT_MAX_TRANSIENT_RETRIES:
+            result.llm_retry_attempts = attempts
+            return result
+        attempts += 1
+        time.sleep(3.0)  # brief pause before retrying an overloaded provider
+
+
 def _summarize(results: List[BenchmarkEpisodeResult]) -> Dict[str, Any]:
     def rate(rows: List[BenchmarkEpisodeResult]) -> Dict[str, Any]:
         n = len(rows)
@@ -204,16 +303,20 @@ def main() -> None:
 
     tasks = load_tasks()
     all_results: List[BenchmarkEpisodeResult] = []
-    for planner_name, planner_cls in PLANNERS.items():
-        planner = planner_cls()
+    for planner_name, planner_factory in PLANNERS.items():
+        planner = planner_factory()
         for bt in tasks:
-            result = run_episode(planner_name, planner, bt)
+            if planner_name == "react":
+                result = run_react_episode(planner, bt)
+            else:
+                result = run_episode(planner_name, planner, bt)
             all_results.append(result)
             status = "GOAL_OK" if result.goal_success else "GOAL_FAIL"
+            retries = f" retries={result.llm_retry_attempts}" if result.llm_retry_attempts else ""
             print(
                 f"[{planner_name:>13}] [{bt.scene:>12}] {bt.task_id:<22} "
                 f"{status:<9} exec={'OK' if result.execution_success else 'FAIL'} "
-                f"({result.wall_clock_ms:.0f}ms)"
+                f"({result.wall_clock_ms:.0f}ms){retries}"
                 + (f"  cause={result.failure_cause}" if result.failure_cause else "")
             )
 
@@ -223,16 +326,29 @@ def main() -> None:
     csv_path = RESULTS_DIR / f"milo_benchmark_{timestamp}_episodes.csv"
 
     episodes = [asdict(r) for r in all_results]
+    react_results = [r for r in all_results if r.planner == "react"]
     report = {
         "reproducibility": {
             "generated_at_utc": timestamp,
             "dataset": "milo_benchmark v1.0",
             "simulator": "Simulator (real AI2-THOR/Unity, restarted between episodes)",
             "planners": list(PLANNERS.keys()),
-            "planners_excluded": {
-                "react": "No LLM API key configured in this environment "
-                "(OPENAI_API_KEY/GEMINI_API_KEY/etc unset); reported honestly "
-                "rather than run in a degraded fallback mode."
+            "react_llm_provider": REACT_LLM_PROVIDER,
+            "react_llm_model": REACT_MODEL_VERSION,
+            "react_transient_retry_policy": {
+                "max_extra_attempts": REACT_MAX_TRANSIENT_RETRIES,
+                "retry_trigger_markers": list(_TRANSIENT_LLM_ERROR_MARKERS),
+                "episodes_that_needed_a_retry": sum(
+                    1 for r in react_results if r.llm_retry_attempts > 0
+                ),
+                "total_extra_attempts_used": sum(
+                    r.llm_retry_attempts for r in react_results
+                ),
+                "episodes_still_failing_after_all_retries": sum(
+                    1
+                    for r in react_results
+                    if not r.plan_success and r.llm_retry_attempts >= REACT_MAX_TRANSIENT_RETRIES
+                ),
             },
             "memory_enabled": False,
         },
