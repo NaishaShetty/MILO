@@ -20,7 +20,7 @@ size_categories:
 A small, versioned dataset of `(scene, instruction, ground-truth task
 spec)` triples for evaluating embodied task planning in AI2-THOR,
 built for the [MILO vision-language-robotics
-project](https://github.com/). Every task pairs a natural-language
+project](https://github.com/NaishaShetty/MILO). Every task pairs a natural-language
 instruction with a structured goal/object/target spec and a
 machine-checkable success predicate, across 5 real AI2-THOR scenes
 spanning all 4 iTHOR room types.
@@ -93,7 +93,7 @@ runner):
 
 Reference implementation: `backend/planning_evaluation/live_state.py`'s
 `check_goal_live()` in the [MILO
-repository](../../../..) (this dataset's origin repo).
+repository](https://github.com/NaishaShetty/MILO) (this dataset's origin repo).
 
 ## Baselines (v1.0, real runs, all three planners)
 
@@ -216,5 +216,6 @@ specifications/instructions referencing public AI2-THOR scene IDs.
 ## Citation
 
 This is a research-adjacent project artifact, not a peer-reviewed
-publication. If referencing it, cite the origin repository and this
-dataset version (`milo_benchmark v1.0`).
+publication. If referencing it, cite the origin repository
+([github.com/NaishaShetty/MILO](https://github.com/NaishaShetty/MILO))
+and this dataset version (`milo_benchmark v1.0`).
