@@ -179,7 +179,9 @@ def test_grounded_check_both_signals_agree_when_object_detected():
         detections=[Detection(label="mug", confidence=0.9, bbox=[0, 0, 1, 1])]
     )
 
-    result = check_goal_live_grounded(task, metadata, vision_agent=_FakeVisionAgent(scene))
+    result = check_goal_live_grounded(
+        task, metadata, vision_agent=_FakeVisionAgent(scene)
+    )
 
     assert result.exists_in_scene is True
     assert result.perceived_by_agent is True

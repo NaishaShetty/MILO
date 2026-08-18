@@ -313,7 +313,9 @@ def test_get_task_robot_state_404s_for_unknown_task(client: TestClient) -> None:
     # Simulator must be wired for the dependency itself to resolve before
     # the route body's 404 check ever runs -- same ordering as every
     # other simulator-backed route in this module.
-    _wire(FakeSimulator(objects=_mug_table_scene()), SingleTask(goal="find", object="mug"))
+    _wire(
+        FakeSimulator(objects=_mug_table_scene()), SingleTask(goal="find", object="mug")
+    )
     response = client.get("/api/v1/tasks/does-not-exist/robot")
     assert response.status_code == 404
 

@@ -99,11 +99,18 @@ SCENES: List[SceneSpec] = [
         scene="FloorPlan1",
         room_type="kitchen",
         tasks=[
-            SceneTask("find_mug", SingleTask(goal="find", object="mug", task_id="fp1-find")),
-            SceneTask("pick_up_apple", SingleTask(goal="pick_up", object="apple", task_id="fp1-pickup")),
+            SceneTask(
+                "find_mug", SingleTask(goal="find", object="mug", task_id="fp1-find")
+            ),
+            SceneTask(
+                "pick_up_apple",
+                SingleTask(goal="pick_up", object="apple", task_id="fp1-pickup"),
+            ),
             SceneTask(
                 "store_bread_in_fridge",
-                SingleTask(goal="store", object="bread", target="fridge", task_id="fp1-store"),
+                SingleTask(
+                    goal="store", object="bread", target="fridge", task_id="fp1-store"
+                ),
             ),
         ],
     ),
@@ -111,11 +118,18 @@ SCENES: List[SceneSpec] = [
         scene="FloorPlan5",
         room_type="kitchen",
         tasks=[
-            SceneTask("find_bowl", SingleTask(goal="find", object="bowl", task_id="fp5-find")),
-            SceneTask("pick_up_potato", SingleTask(goal="pick_up", object="potato", task_id="fp5-pickup")),
+            SceneTask(
+                "find_bowl", SingleTask(goal="find", object="bowl", task_id="fp5-find")
+            ),
+            SceneTask(
+                "pick_up_potato",
+                SingleTask(goal="pick_up", object="potato", task_id="fp5-pickup"),
+            ),
             SceneTask(
                 "store_mug_in_cabinet",
-                SingleTask(goal="store", object="mug", target="cabinet", task_id="fp5-store"),
+                SingleTask(
+                    goal="store", object="mug", target="cabinet", task_id="fp5-store"
+                ),
             ),
         ],
     ),
@@ -123,11 +137,22 @@ SCENES: List[SceneSpec] = [
         scene="FloorPlan201",
         room_type="living_room",
         tasks=[
-            SceneTask("find_laptop", SingleTask(goal="find", object="laptop", task_id="fp201-find")),
-            SceneTask("pick_up_newspaper", SingleTask(goal="pick_up", object="newspaper", task_id="fp201-pickup")),
+            SceneTask(
+                "find_laptop",
+                SingleTask(goal="find", object="laptop", task_id="fp201-find"),
+            ),
+            SceneTask(
+                "pick_up_newspaper",
+                SingleTask(goal="pick_up", object="newspaper", task_id="fp201-pickup"),
+            ),
             SceneTask(
                 "store_remotecontrol_in_drawer",
-                SingleTask(goal="store", object="remotecontrol", target="drawer", task_id="fp201-store"),
+                SingleTask(
+                    goal="store",
+                    object="remotecontrol",
+                    target="drawer",
+                    task_id="fp201-store",
+                ),
             ),
         ],
     ),
@@ -135,11 +160,19 @@ SCENES: List[SceneSpec] = [
         scene="FloorPlan301",
         room_type="bedroom",
         tasks=[
-            SceneTask("find_alarmclock", SingleTask(goal="find", object="alarmclock", task_id="fp301-find")),
-            SceneTask("pick_up_pillow", SingleTask(goal="pick_up", object="pillow", task_id="fp301-pickup")),
+            SceneTask(
+                "find_alarmclock",
+                SingleTask(goal="find", object="alarmclock", task_id="fp301-find"),
+            ),
+            SceneTask(
+                "pick_up_pillow",
+                SingleTask(goal="pick_up", object="pillow", task_id="fp301-pickup"),
+            ),
             SceneTask(
                 "store_book_in_drawer",
-                SingleTask(goal="store", object="book", target="drawer", task_id="fp301-store"),
+                SingleTask(
+                    goal="store", object="book", target="drawer", task_id="fp301-store"
+                ),
             ),
         ],
     ),
@@ -147,11 +180,22 @@ SCENES: List[SceneSpec] = [
         scene="FloorPlan401",
         room_type="bathroom",
         tasks=[
-            SceneTask("find_soapbar", SingleTask(goal="find", object="soapbar", task_id="fp401-find")),
-            SceneTask("pick_up_towel", SingleTask(goal="pick_up", object="towel", task_id="fp401-pickup")),
+            SceneTask(
+                "find_soapbar",
+                SingleTask(goal="find", object="soapbar", task_id="fp401-find"),
+            ),
+            SceneTask(
+                "pick_up_towel",
+                SingleTask(goal="pick_up", object="towel", task_id="fp401-pickup"),
+            ),
             SceneTask(
                 "store_spraybottle_on_shelf",
-                SingleTask(goal="store", object="spraybottle", target="shelf", task_id="fp401-store"),
+                SingleTask(
+                    goal="store",
+                    object="spraybottle",
+                    target="shelf",
+                    task_id="fp401-store",
+                ),
             ),
         ],
     ),
@@ -280,6 +324,10 @@ def main() -> None:
             "succeeded": sum(1 for r in scene_results if r.success),
         }
 
+    total_episodes = len(all_results)
+    succeeded = sum(1 for r in all_results if r.success)
+    failed = sum(1 for r in all_results if not r.success)
+
     report = {
         "reproducibility": {
             "generated_at_utc": timestamp,
@@ -291,9 +339,9 @@ def main() -> None:
         "scenes_summary": scenes_summary,
         "episodes": episodes,
         "totals": {
-            "total_episodes": len(all_results),
-            "succeeded": sum(1 for r in all_results if r.success),
-            "failed": sum(1 for r in all_results if not r.success),
+            "total_episodes": total_episodes,
+            "succeeded": succeeded,
+            "failed": failed,
         },
     }
 
@@ -306,9 +354,7 @@ def main() -> None:
     print()
     print(f"Wrote {json_path}")
     print(f"Wrote {csv_path}")
-    print(
-        f"Totals: {report['totals']['succeeded']}/{report['totals']['total_episodes']} succeeded"
-    )
+    print(f"Totals: {succeeded}/{total_episodes} succeeded")
 
 
 if __name__ == "__main__":

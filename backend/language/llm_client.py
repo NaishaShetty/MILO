@@ -452,7 +452,11 @@ class OpenAICompatibleLLMClient:
 
         raw_usage = envelope.get("usage")
         usage: Optional[Dict[str, int]] = None
-        if isinstance(raw_usage, dict) and "prompt_tokens" in raw_usage and "completion_tokens" in raw_usage:
+        if (
+            isinstance(raw_usage, dict)
+            and "prompt_tokens" in raw_usage
+            and "completion_tokens" in raw_usage
+        ):
             try:
                 usage = {
                     "prompt_tokens": int(raw_usage["prompt_tokens"]),

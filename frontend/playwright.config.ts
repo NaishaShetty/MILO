@@ -63,9 +63,27 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: `npm run dev -- --port ${PORT} --strictPort`,
+    // `--host 127.0.0.1` is load-bearing, not cosmetic: without it,
+    // Vite binds to whatever `localhost` resolves to on the runner,
+    // which on some GitHub-hosted ubuntu-latest runners resolves to
+    // the IPv6 loopback (`::1`) first depending on the box's DNS
+    // resolution order -- while `url` below (and Playwright's
+    // readiness poll) always hits `127.0.0.1` explicitly. That
+    // mismatch reproduces as this exact symptom: the dev server is
+    // actually up in well under a second, but the IPv4 poll never
+    // connects, so Playwright waits the full `timeout` and reports a
+    // misleading "Timed out waiting ... from config.webServer" that
+    // looks like a slow boot but isn't. Forcing the bind address to
+    // match the poll address removes the ambiguity outright.
+    command: `npm run dev -- --port ${PORT} --strictPort --host 127.0.0.1`,
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
+    // Surfaces the dev server's own stdout/stderr in the CI log
+    // instead of Playwright's default silent capture, so a future
+    // webServer failure (this one or a new one) is diagnosable from
+    // the job log directly rather than needing a fresh local repro.
+    stdout: "pipe",
+    stderr: "pipe",
   },
 });

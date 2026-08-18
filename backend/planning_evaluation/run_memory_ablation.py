@@ -54,22 +54,26 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Dict, List
 
-from memory_evaluation.experiment import Condition, EpisodeResult, _memory_was_used_in_plan
+from memory_evaluation.experiment import (
+    Condition,
+    EpisodeResult,
+    _memory_was_used_in_plan,
+)
 from memory_evaluation.experiment_real import (
     _build_real_memory_agent,
     _seed_initial_state_from_live_metadata,
 )
 from orchestration.task_runner import TaskRunner
 from planner.rule_based import RuleBasedPlanner
-from planning_evaluation.loader import load_tasks
+from planning_evaluation.loader import BenchmarkTask, load_tasks
 from simulator.simulator import Simulator
 
 RESULTS_DIR = Path(__file__).resolve().parents[2] / "experiments" / "results"
 
 
-def _first_locate_task_per_scene() -> Dict[str, "BenchmarkTask"]:  # noqa: F821
+def _first_locate_task_per_scene() -> Dict[str, BenchmarkTask]:
     tasks = load_tasks()
-    by_scene: Dict[str, object] = {}
+    by_scene: Dict[str, BenchmarkTask] = {}
     for t in tasks:
         if t.difficulty_tier == "tier1_locate" and t.scene not in by_scene:
             by_scene[t.scene] = t

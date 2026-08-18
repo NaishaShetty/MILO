@@ -108,7 +108,7 @@ import os
 import sys
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -177,7 +177,9 @@ def _build_shared_vision_stage() -> None:
         _VISION_BUILD_ERROR = f"{type(exc).__name__}: {exc}"
 
 
-def _build_vision_agent_for_episode(simulator: Simulator) -> Optional[VisionAgentWrapper]:
+def _build_vision_agent_for_episode(
+    simulator: Simulator,
+) -> Optional[VisionAgentWrapper]:
     """
     Rebinds the shared, already-loaded detector/segmenter (see
     `_build_shared_vision_stage`) to `simulator` -- a fresh `Simulator`
@@ -217,6 +219,7 @@ def _build_vision_agent_for_episode(simulator: Simulator) -> Optional[VisionAgen
         scene_graph=HeuristicSceneGraph(),
     )
     return VisionAgentWrapper(agent)
+
 
 #: Bounded, fully-logged retry budget for `react` episodes that fail
 #: with a transient LLM-provider condition (see module docstring) --
@@ -380,7 +383,9 @@ class BenchmarkEpisodeResult:
     llm_token_usage_is_approximate: Optional[bool] = None
 
 
-def run_episode(planner_name: str, planner: Planner, bt: BenchmarkTask) -> BenchmarkEpisodeResult:
+def run_episode(
+    planner_name: str, planner: Planner, bt: BenchmarkTask
+) -> BenchmarkEpisodeResult:
     task = bt.to_single_task()
     simulator = Simulator(scene=bt.scene)
     simulator.start()
@@ -444,7 +449,9 @@ def run_episode(planner_name: str, planner: Planner, bt: BenchmarkTask) -> Bench
                     failure_cause = step.error.message
                     break
         if failure_cause is None and not run_result.planning_result.success:
-            failure_cause = "; ".join(run_result.planning_result.errors) or "planning failed"
+            failure_cause = (
+                "; ".join(run_result.planning_result.errors) or "planning failed"
+            )
 
         return BenchmarkEpisodeResult(
             planner=planner_name,
@@ -467,7 +474,9 @@ def run_episode(planner_name: str, planner: Planner, bt: BenchmarkTask) -> Bench
             goal_success_perceived_by_agent=goal_success_perceived_by_agent,
             perception_error=perception_error,
             llm_call_count=counting_client.call_count if counting_client else 0,
-            llm_prompt_tokens=counting_client.prompt_tokens if counting_client else None,
+            llm_prompt_tokens=(
+                counting_client.prompt_tokens if counting_client else None
+            ),
             llm_completion_tokens=(
                 counting_client.completion_tokens if counting_client else None
             ),
@@ -496,7 +505,9 @@ def run_episode(planner_name: str, planner: Planner, bt: BenchmarkTask) -> Bench
             failure_cause=f"harness_exception: {exc!r}",
             wall_clock_ms=0.0,
             llm_call_count=counting_client.call_count if counting_client else 0,
-            llm_prompt_tokens=counting_client.prompt_tokens if counting_client else None,
+            llm_prompt_tokens=(
+                counting_client.prompt_tokens if counting_client else None
+            ),
             llm_completion_tokens=(
                 counting_client.completion_tokens if counting_client else None
             ),
@@ -546,9 +557,7 @@ def _summarize(results: List[BenchmarkEpisodeResult]) -> Dict[str, Any]:
     by_planner: Dict[str, Any] = {}
     for planner_name in PLANNERS:
         rows = [r for r in results if r.planner == planner_name]
-        tier1_rows = [
-            r for r in rows if r.goal_success_exists_in_scene is not None
-        ]
+        tier1_rows = [r for r in rows if r.goal_success_exists_in_scene is not None]
         tier1_measured = [
             r for r in tier1_rows if r.goal_success_perceived_by_agent is not None
         ]
@@ -603,11 +612,16 @@ def main() -> None:
                 result = run_episode(planner_name, planner, bt)
             all_results.append(result)
             status = "GOAL_OK" if result.goal_success else "GOAL_FAIL"
-            retries = f" retries={result.llm_retry_attempts}" if result.llm_retry_attempts else ""
+            retries = (
+                f" retries={result.llm_retry_attempts}"
+                if result.llm_retry_attempts
+                else ""
+            )
             grounded = ""
             if result.goal_success_exists_in_scene is not None:
                 perceived = (
-                    "?" if result.goal_success_perceived_by_agent is None
+                    "?"
+                    if result.goal_success_perceived_by_agent is None
                     else str(result.goal_success_perceived_by_agent)
                 )
                 grounded = (
@@ -648,7 +662,8 @@ def main() -> None:
                 "episodes_still_failing_after_all_retries": sum(
                     1
                     for r in react_results
-                    if not r.plan_success and r.llm_retry_attempts >= REACT_MAX_TRANSIENT_RETRIES
+                    if not r.plan_success
+                    and r.llm_retry_attempts >= REACT_MAX_TRANSIENT_RETRIES
                 ),
             },
             "memory_enabled": False,

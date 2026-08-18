@@ -57,7 +57,11 @@ from typing import Any, Dict, List
 from memory.agent import MemoryAgent
 from memory.config import MemoryConfig
 from memory.embeddings import EmbeddingConfig
-from memory_evaluation.experiment import Condition, EpisodeResult, _memory_was_used_in_plan
+from memory_evaluation.experiment import (
+    Condition,
+    EpisodeResult,
+    _memory_was_used_in_plan,
+)
 from memory_evaluation.real_scenarios import RealScenario
 from orchestration.task_runner import TaskRunner
 from planner.rule_based import RuleBasedPlanner

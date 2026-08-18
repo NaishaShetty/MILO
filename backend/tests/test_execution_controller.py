@@ -229,7 +229,9 @@ def test_engine_level_timeout_with_no_step_timeout_configured_is_reported_accura
     state.object("apple").is_located = True
 
     def _raise_engine_timeout():
-        raise TimeoutError("Reading from AI2-THOR backend timed out (using 100.0s) timeout.")
+        raise TimeoutError(
+            "Reading from AI2-THOR backend timed out (using 100.0s) timeout."
+        )
 
     simulator = FakeSimulator(
         apple_and_fridge_scene(), hooks={"navigate": _raise_engine_timeout}

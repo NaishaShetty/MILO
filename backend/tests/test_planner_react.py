@@ -130,7 +130,10 @@ def test_memory_context_is_threaded_into_the_prompt():
     # only for interface consistency and never actually use it -- the
     # LLM prompt looked identical whether or not memory was supplied.
     memory = build_semantic_memory(
-        "mug", "located_on", "counter", provenance=MemoryProvenance.OBSERVATION,
+        "mug",
+        "located_on",
+        "counter",
+        provenance=MemoryProvenance.OBSERVATION,
         confidence=0.9,
     )
     result = MemoryResult(

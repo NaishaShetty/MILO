@@ -148,9 +148,11 @@ def _describe_memory_context(memory_context: Any) -> List[Dict[str, Any]]:
         {
             "content": result.memory.content,
             "confidence": result.memory.confidence,
-            "type": result.memory.memory_type.value
-            if hasattr(result.memory.memory_type, "value")
-            else str(result.memory.memory_type),
+            "type": (
+                result.memory.memory_type.value
+                if hasattr(result.memory.memory_type, "value")
+                else str(result.memory.memory_type)
+            ),
         }
         for result in memory_context.results[:_MAX_MEMORY_HINTS_IN_PROMPT]
     ]
@@ -341,7 +343,9 @@ class ReActPlanner(Planner):
     ) -> Dict[str, Any]:
         last_error: Optional[str] = None
         for attempt in range(self._repair_attempts + 1):
-            request = self._build_request(task, state, steps, last_error, memory_context)
+            request = self._build_request(
+                task, state, steps, last_error, memory_context
+            )
             try:
                 response = self._llm_client.complete(request)  # type: ignore[union-attr]
             except LanguageRuntimeError as exc:

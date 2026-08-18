@@ -65,7 +65,7 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Sequence
+from typing import Any, List, Sequence, cast
 
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
 
@@ -227,8 +227,15 @@ class SentenceTransformerEmbedder(Embedder):
             model_config = replace(model_config, hf_name=model_name)
 
         manager = ModelManager(model_config)
-        self._tokenizer, self._model = manager.load(
-            AutoTokenizer, AutoModel, device=device
+        # `ModelManager.load()` is generically typed `Tuple[object, object]`
+        # (see its own docstring -- one method shared by every model
+        # type this project loads). The concrete types here are known
+        # from the `AutoTokenizer`/`AutoModel` classes just passed in;
+        # `cast` reflects that knowledge to mypy without weakening
+        # `ModelManager.load()`'s own generic signature for its other
+        # callers.
+        self._tokenizer, self._model = cast(
+            Any, manager.load(AutoTokenizer, AutoModel, device=device)
         )
         self._model.eval()
 
