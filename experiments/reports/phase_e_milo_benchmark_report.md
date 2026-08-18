@@ -188,6 +188,11 @@ specific to the one scene Phase B originally tested.
 
 ## 8. Publishing
 
+**Update**: since published — see Addendum 4 at the end of this
+report for the live URL. Text below is left as written at the time
+(no `HF_TOKEN`/namespace had been provided yet) for an accurate
+record of what was and wasn't available at each stage.
+
 Not yet pushed to the Hugging Face Hub — this environment has no
 `HF_TOKEN` and no destination namespace was specified. Everything
 needed to publish is built and versioned locally:
@@ -571,3 +576,18 @@ fail, but for the unrelated real-geometry reason documented in Phase D
 — `react` never got far enough into that plan (`pickup` rejected before
 navigation) to reach the placement step where the geometry limit would
 even apply.
+
+---
+
+## Addendum 4 — published to the Hugging Face Hub
+
+Section 8's "Not yet pushed" is now stale — an `HF_TOKEN` and
+destination namespace (`naishashetty`) were provided, and the exact
+commands section 8 queued were run as-is (`HfApi.create_repo()` +
+`HfApi.upload_folder()`, no `datasets` library needed for a plain
+file upload). Live at:
+**[huggingface.co/datasets/naishashetty/milo_benchmark](https://huggingface.co/datasets/naishashetty/milo_benchmark)**
+— `tasks.json` and the dataset card (`README.md`, with the real
+three-planner baseline table from this report) are both present and
+serving (confirmed via `list_repo_files()` and a `200` on the dataset
+page). `docs/roadmap.md` and the README updated accordingly.

@@ -136,6 +136,7 @@ planning, execution in implementation detail) see
 |Engineering|Three interchangeable planner strategies behind one interface, with shared plan validation against a symbolic world model|
 |Engineering|A real-time frontend driven entirely by backend polling, with no fabricated/mocked state in production paths|
 |Product|MILO Lab — a research interface exposing perception benchmarks, planner evaluation, and a parse/plan sandbox as real, runnable operations|
+|Research|[`milo_benchmark v1.0`](https://huggingface.co/datasets/naishashetty/milo_benchmark) — a published Hugging Face dataset (25 tasks, 5 real AI2-THOR scenes, 3 difficulty tiers) with a reproducible runner and a real three-planner baseline scored against live post-execution simulator state|
 
 See [`docs/phases/phase8\\\_7\\\_final\\\_audit.md`](docs/phases/phase8_7_final_audit.md)
 for the full research-contribution breakdown and final evaluation.
@@ -212,8 +213,9 @@ error"). Real planner-comparison baseline:
   real-AI2-THOR recall episodes, was 0/5), and both the failed-Gemini
   and successful-local-Qwen ReAct attempts in full detail:
   [`experiments/reports/phase_e_milo_benchmark_report.md`](experiments/reports/phase_e_milo_benchmark_report.md).
-  Dataset card:
-  [`backend/planning_evaluation/dataset/v1.0/README.md`](backend/planning_evaluation/dataset/v1.0/README.md).
+  Published dataset:
+  [huggingface.co/datasets/naishashetty/milo_benchmark](https://huggingface.co/datasets/naishashetty/milo_benchmark)
+  (source/card: [`backend/planning_evaluation/dataset/v1.0/README.md`](backend/planning_evaluation/dataset/v1.0/README.md)).
 
 Full detail, methodology, and provenance:
 [`docs/phases/phase8\\\_7\\\_final\\\_audit.md`](docs/phases/phase8_7_final_audit.md).
