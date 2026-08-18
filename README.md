@@ -437,5 +437,5 @@ values; the mocked set only fixes *which* real UI state renders.
 
 ## License
 
-No license file is currently included in this repository.
+MIT — see [`LICENSE`](LICENSE).
 
