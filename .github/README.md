@@ -256,10 +256,19 @@ for the full research-contribution breakdown and final evaluation.
   [benchmark report](../experiments/reports/phase_e_milo_benchmark_report.md).
 
 - **Cost/latency** (v1.0, 25 episodes each): `rule_based` ~707ms,
-  `behavior_tree` ~865ms, `react`/`qwen2.5:7b` ~7.5s avg/episode.
-  Measured on a CPU-bound vision stack (PyTorch without CUDA — see
-  [Roadmap](#roadmap)), so these numbers likely understate what a
-  GPU-accelerated setup would achieve; not remeasured here.
+  `behavior_tree` ~865ms, `react`/`qwen2.5:7b` ~7.5s avg/episode. This
+  table is plan+execution time only (captured before any
+  perception-grounding check runs), so it was never affected by the
+  vision stack's CPU/GPU status and isn't being remeasured.
+- **Vision inference, CPU vs. GPU** — the actual CPU-bound component
+  (PyTorch previously resolved to a CPU-only build despite the RTX
+  4050 being present; now fixed, see [Roadmap](#roadmap)). Same
+  machine, same image, same code path, 5 iterations (first excluded as
+  warmup): `GroundingDINODetector` 6189ms → 511ms (~12.1x), `SAM2Segmenter`
+  39120ms → 4734ms (~8.3x). Running vision inference and a loaded
+  `qwen2.5:7b` Ollama model concurrently peaks at ~5.9GB of this card's
+  6.1GB VRAM (~96%) — fits, with little headroom, and doesn't yet
+  include AI2-THOR/Unity's own footprint running at the same time.
 
 Full detail, methodology, and provenance:
 [`docs/phases/phase8_7_final_audit.md`](../docs/phases/phase8_7_final_audit.md).
@@ -380,10 +389,9 @@ docker/          Container definitions (backend + frontend)
 |---|---|
 | Vision sim-to-real detection gap (0.35 threshold misses real, ground-truth-visible objects) | ⚠️ Open |
 | `tier4_multi_step` `WorldState`-reseeding gap (held-object state doesn't carry between sub-goals) | ⚠️ Open |
-| CPU-bound vision inference (PyTorch not CUDA-enabled despite present GPU) | 🔜 Future |
 | Full vision state fusion (open/held state) | 🔜 Future |
 | HTN planner | 🔜 Future |
-| Production auth/rate limiting | 🔜 Future |
+| Production auth/rate limiting | ❌ Not planned — no publicly reachable API to protect |
 
 Completed items and full rationale for every open item:
 [`docs/roadmap.md`](../docs/roadmap.md).
