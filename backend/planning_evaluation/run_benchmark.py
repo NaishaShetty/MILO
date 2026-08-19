@@ -119,6 +119,7 @@ from language.provider_factory import create_llm_client
 from memory_evaluation.experiment_real import _seed_initial_state_from_live_metadata
 from orchestration.task_runner import TaskRunner
 from planner.behavior_tree import BehaviorTreePlanner
+from planner.htn import HTNPlanner
 from planner.planner import Planner
 from planner.react import ReActPlanner
 from planner.rule_based import RuleBasedPlanner
@@ -318,14 +319,20 @@ def _make_react_planner() -> ReActPlanner:
     return ReActPlanner(llm_client=client)
 
 
-#: Zero-arg factories so `rule_based`/`behavior_tree` (no constructor
-#: args needed) and `react` (needs a real `LLMClient`, built from the
-#: environment at call time -- see `_make_react_planner`) fit the same
-#: uniform shape.
+#: Zero-arg factories so `rule_based`/`behavior_tree`/`htn` (no
+#: constructor args needed) and `react` (needs a real `LLMClient`,
+#: built from the environment at call time -- see
+#: `_make_react_planner`) fit the same uniform shape.
+#:
+#: `htn` (`planner/htn.py`, slice 1) covers exactly the
+#: tier1_locate/tier2_pickup/tier3_store goal shapes this dataset's
+#: v1.0 tasks use -- see that module's docstring for what it does not
+#: yet cover.
 PLANNERS: Dict[str, Callable[[], Planner]] = {
     "rule_based": RuleBasedPlanner,
     "behavior_tree": BehaviorTreePlanner,
     "react": _make_react_planner,
+    "htn": HTNPlanner,
 }
 
 #: Recorded in the report's `reproducibility` block -- resolved once

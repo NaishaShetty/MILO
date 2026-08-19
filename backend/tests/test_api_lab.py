@@ -91,6 +91,7 @@ def test_run_planner_experiment_reuses_real_planner_evaluate_logic() -> None:
         "rule_based",
         "react",
         "behavior_tree",
+        "htn",
     }
 
 

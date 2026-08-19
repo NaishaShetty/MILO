@@ -28,6 +28,7 @@ from typing import Callable, Dict, Optional
 
 from language.llm_client import LLMClient
 from planner.behavior_tree import BehaviorTreePlanner
+from planner.htn import HTNPlanner
 from planner.planner import Planner
 from planner.react import ReActPlanner
 from planner.rule_based import RuleBasedPlanner
@@ -40,6 +41,7 @@ class PlannerType(str, Enum):
     RULE_BASED = "rule_based"
     REACT = "react"
     BEHAVIOR_TREE = "behavior_tree"
+    HTN = "htn"
 
 
 def _build_rule_based(validator: PlanValidator, **_kwargs) -> Planner:
@@ -48,6 +50,10 @@ def _build_rule_based(validator: PlanValidator, **_kwargs) -> Planner:
 
 def _build_behavior_tree(validator: PlanValidator, **_kwargs) -> Planner:
     return BehaviorTreePlanner(validator=validator)
+
+
+def _build_htn(validator: PlanValidator, **_kwargs) -> Planner:
+    return HTNPlanner(validator=validator)
 
 
 def _build_react(
@@ -67,6 +73,7 @@ _REGISTRY: Dict[PlannerType, Callable[..., Planner]] = {
     PlannerType.RULE_BASED: _build_rule_based,
     PlannerType.REACT: _build_react,
     PlannerType.BEHAVIOR_TREE: _build_behavior_tree,
+    PlannerType.HTN: _build_htn,
 }
 
 

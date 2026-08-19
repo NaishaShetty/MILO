@@ -18,6 +18,7 @@ import pytest
 
 from planner.behavior_tree import BehaviorTreePlanner
 from planner.factory import PlannerType, available_planner_types, create_planner
+from planner.htn import HTNPlanner
 from planner.react import ReActPlanner
 from planner.rule_based import RuleBasedPlanner
 from planner.state import WorldState
@@ -26,8 +27,13 @@ from schemas.task import SingleTask
 TASK = SingleTask(goal="pick_up", object="mug")
 
 
-def test_available_planner_types_lists_all_three():
-    assert set(available_planner_types()) == {"rule_based", "react", "behavior_tree"}
+def test_available_planner_types_lists_all_four():
+    assert set(available_planner_types()) == {
+        "rule_based",
+        "react",
+        "behavior_tree",
+        "htn",
+    }
 
 
 @pytest.mark.parametrize(
@@ -36,6 +42,7 @@ def test_available_planner_types_lists_all_three():
         (PlannerType.RULE_BASED, RuleBasedPlanner),
         (PlannerType.BEHAVIOR_TREE, BehaviorTreePlanner),
         (PlannerType.REACT, ReActPlanner),
+        (PlannerType.HTN, HTNPlanner),
     ],
 )
 def test_factory_builds_the_requested_strategy(planner_type, expected_class):

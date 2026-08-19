@@ -39,7 +39,12 @@ def test_planner_comparison_returns_one_metric_per_planner():
     task = SingleTask(goal="pick_up", object="mug")
     planners = {t.value: create_planner(t) for t in PlannerType}
     results = EVALUATOR.compare(planners, task, WorldState.initial())
-    assert {m.planner_type for m in results} == {"rule_based", "react", "behavior_tree"}
+    assert {m.planner_type for m in results} == {
+        "rule_based",
+        "react",
+        "behavior_tree",
+        "htn",
+    }
     assert all(m.success for m in results)
 
 

@@ -292,8 +292,12 @@ Full detail, methodology, and provenance:
   containment; open/closed and held/not-held state are still
   symbolic-only, since vision doesn't yet observe grasp or appearance
   state.
-- **HTN planning was never implemented**, despite being one of the
-  originally scoped planning strategies.
+- **HTN planning covers tier1-3 only (slice 1)** — a real fourth
+  planner strategy exists (`HTNPlanner`) and matches `rule_based`/
+  `behavior_tree` exactly on the full v1.0 benchmark (24/25, 96.0%),
+  but `tier4_multi_step`, `fetch`/`deliver`/`navigate_to`, and
+  memory-conditioned methods are explicit next-slice work, not yet
+  built.
 - **External API dependence** — cloud LLM providers and ElevenLabs are
   paid third-party services; a fully local setup (Ollama/vLLM + local
   Whisper) avoids this but isn't the default.
@@ -392,7 +396,7 @@ docker/          Container definitions (backend + frontend)
 | Item | Status |
 |---|---|
 | `tier4_multi_step` `WorldState`-reseeding gap (held-object state doesn't carry between sub-goals) | ⚠️ Open — fixed for one of two known-failing episodes; the other exposed a real, object-size-dependent limit in the held-object depth heuristic |
-| HTN planner | 🔜 Future |
+| HTN planner: `tier4_multi_step`/`fetch`/`deliver`/`navigate_to`/memory-hint coverage (slice 1 -- tier1-3 -- is done) | 🔜 Future |
 | Production auth/rate limiting | ❌ Not planned — no publicly reachable API to protect |
 
 Completed items and full rationale for every open item:

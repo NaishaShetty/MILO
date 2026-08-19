@@ -127,6 +127,7 @@ def test_evaluate_endpoint_compares_all_planners_by_default():
         "rule_based",
         "react",
         "behavior_tree",
+        "htn",
     }
     assert all(r["success"] for r in body["results"])
 
