@@ -198,6 +198,51 @@ per-failure root-cause detail (including the `tier4_multi_step`
 WorldState-reseeding gap above, tracked open in `docs/roadmap.md`, not
 fixed in this pass), cost/latency, and exact reproduction commands.
 
+## Second local model for `react`: `qwen2.5:3b` comparison
+
+A second small local model was run through the identical `react`
+harness/instrumentation against this same 54-task set, to see how
+model size trades off against accuracy/latency:
+
+| Model | Goal success | tier1_locate | tier2_pickup | tier3_store | tier4_multi_step | Avg latency/episode | Hardware |
+|---|---|---|---|---|---|---|---|
+| `qwen2.5:7b` (Q4_K_M) | 36/54 (66.7%) | 18/18 | 18/18 | 0/9 | 0/9 | 7156ms | RTX 4050 Laptop GPU, 6GB VRAM, 82%/18% GPU/CPU split |
+| `qwen2.5:3b` (Q4_K_M) | 36/54 (66.7%) | 18/18 | 18/18 | 0/9 | 0/9 | 3107ms | Same GPU, full GPU residency |
+
+`qwen2.5:3b` matches `qwen2.5:7b`'s goal-success rate **exactly,
+task-for-task** (verified via a full 54-row side-by-side comparison,
+0 differences) at roughly 2.3x lower average latency and modestly
+fewer tokens per episode -- a real cost/latency win with no accuracy
+cost observed on this task set.
+
+Investigated why the aggregate scores are identical (rather than
+taking the match at face value) by re-running 6 of these failing
+episodes (3 per model) with a diagnostic wrapper that captures the
+actual raw LLM completions -- reproducing the same outcomes as the
+full run. Real finding, verified directly on those 6 episodes (not
+re-checked against all 27 originally-classified failures from the
+full run): **both models' `tier3_store`/`tier4_multi_step` failures
+share a root cause -- neither model's proposals ever include a
+`locate` call for the destination/container object, only sometimes
+for the primary object being moved.** `qwen2.5:3b`'s proposals stall
+immediately at that gap in all 3 episodes checked. `qwen2.5:7b`, in
+the 1 of 3 checked episodes that got further, correctly completes
+`locate`/`navigate`/`pickup` on the primary object, then fails at
+placement by supplying the destination's name to `put_down`/`place`'s
+`target` field -- which the action schema defines as the *held
+object's* identity, not the destination -- a wrong-value mistake, not
+a missing one.
+
+This is treated as a real LLM reasoning/prompting limitation, not a
+bug in this dataset's reference planner code -- no precondition
+validation was weakened to work around it. See the origin repository's
+`experiments/reports/phase_e_milo_benchmark_report.md`'s Addendum 8
+for the full real transcripts and methodology, and `docs/roadmap.md`
+for the tracked, open finding (including a possible, not-yet-tried
+future direction: refining the `react` system prompt to explicitly
+require locating both the object and the destination before any
+`navigate`/`place` step).
+
 ## Versioning
 
 `v1.1` is now itself frozen going forward, following the same policy
