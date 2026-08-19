@@ -116,6 +116,31 @@ NEAR_ROBOT_DEPTH_METERS = 1.5
 #: (`Detection.depth`, the same field `is_near_robot` already uses),
 #: but still a heuristic proxy for "held," not a grasp-truth signal --
 #: see `_ground_held_object()`'s docstring for what could fool it.
+#:
+#: **Real, measured calibration** (`planning_evaluation/
+#: validate_held_object_depth.py`): held small objects (apple,
+#: keychain, boots, potato -- confirmed `isPickedUp=True`) measured
+#: 0.347m-0.459m across 5 real AI2-THOR episodes/scenes. A held BOOK
+#: measured 0.853m in a separate, clean, confirmed-`isPickedUp`
+#: measurement -- object-size-dependent, well outside the small-object
+#: range. Not-held-but-nearby objects (agent navigated directly next
+#: to them, not holding) measured 0.411m-2.158m across 8 samples, with
+#: a real overlap into the held range (one at 0.411m). No single
+#: cutoff cleanly separates both classes across all object sizes --
+#: 0.5m was kept (not raised) because raising it to also catch large
+#: held objects (e.g. to ~0.9m) would trade a large amount of
+#: precision (measured: 0.556 at 0.9m in this same validation, vs.
+#: 0.833 at 0.5m), and because this heuristic's own design already
+#: prioritizes recall over precision for the specific failure mode it
+#: targets (see `_ground_held_object()`'s "never clears" note) -- 0.5m
+#: is the evidence-backed compromise, not an untested guess, but it is
+#: NOT a solved problem: depth alone does not reliably discriminate
+#: held-vs-not-held once object size varies. Confirmed live: re-testing
+#: `milo-v1.1-fp201-t4a` found the actually-held book at 0.713m
+#: (outside this cutoff, so correctly not flagged) while a different,
+#: NOT-held nearby object (a box at 0.345m) WAS flagged instead -- a
+#: real, concrete instance of exactly this limitation, not a
+#: hypothetical. See `docs/roadmap.md`.
 HELD_OBJECT_MAX_DEPTH_M = 0.5
 
 
@@ -199,11 +224,17 @@ def _ground_held_object(scene: Scene, state: WorldState, max_depth_m: float) -> 
     attached to the robot's gripper -- see module docstring's scope
     note): a detection this close could also be the camera very near a
     countertop/wall, or an object the agent is standing directly next
-    to but not holding. It has not been measured against real
-    held/not-held ground truth yet (see `docs/roadmap.md`) -- treat a
-    `True` result as a real, useful signal for the specific gap it was
-    built to investigate (`tier4_multi_step`'s `WorldState`-reseeding
-    entry), not a certified grasp detector.
+    to but not holding. Now measured against real held/not-held ground
+    truth (see `HELD_OBJECT_MAX_DEPTH_M`'s docstring and
+    `docs/roadmap.md`) -- two confirmed real limitations, not
+    hypothetical: (1) a large held object (a book: 0.853m) can fall
+    outside `max_depth_m` and go undetected as held; (2) when that
+    happens, a closer NOT-held object can be picked instead, since this
+    function has no notion of "which name we expected" -- it always
+    returns the globally closest in-range detection, whatever its
+    label. Confirmed live on `milo-v1.1-fp201-t4a`: the actually-held
+    book (0.713m, outside the cutoff) was correctly left unflagged, but
+    a different, not-held box (0.345m) was picked instead.
     """
     candidates = [
         (d.depth, d)

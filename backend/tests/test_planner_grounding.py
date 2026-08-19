@@ -205,3 +205,38 @@ def test_closest_of_multiple_held_candidates_is_chosen():
     state = ground_world_state(scene)
 
     assert state.robot_holding == "bowl"
+
+
+def test_large_held_object_beyond_default_cutoff_is_not_flagged_as_held():
+    """Real, measured limitation, not hypothetical -- a held book
+    measured 0.853m in a clean, confirmed-`isPickedUp` live AI2-THOR
+    episode (`planning_evaluation/validate_held_object_depth.py`),
+    well outside the 0.5m default. Depth alone does not reliably
+    discriminate held-vs-not-held once object size varies -- see
+    `HELD_OBJECT_MAX_DEPTH_M`'s docstring."""
+    scene = Scene(detections=[_detection("book", depth=0.853)])
+
+    state = ground_world_state(scene)
+
+    assert state.robot_holding is None
+
+
+def test_closer_not_held_object_is_wrongly_preferred_over_farther_held_one():
+    """Real, measured limitation, not hypothetical -- confirmed live
+    on `milo-v1.1-fp201-t4a`: the actually-held book (0.713m, outside
+    the cutoff) was correctly left unflagged, but a different, NOT-held
+    box (0.345m, within the cutoff) was picked instead, since this
+    heuristic has no notion of "which name was expected" -- it always
+    returns the globally closest in-range detection. Documenting this
+    as expected-but-imperfect behavior, not silently patching over it
+    -- see `_ground_held_object()`'s docstring."""
+    scene = Scene(
+        detections=[
+            _detection("book", depth=0.713),  # actually held, but too far
+            _detection("box", depth=0.345),  # not held, but close enough
+        ]
+    )
+
+    state = ground_world_state(scene)
+
+    assert state.robot_holding == "box"

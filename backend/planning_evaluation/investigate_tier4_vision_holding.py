@@ -29,6 +29,13 @@ asking whether the detection-confidence fix unblocks tier4 as
 hypothesized, so it needs to test at the threshold that fix would
 actually ship with.
 
+Query strategy: one detection call PER object name, not one joint
+multi-phrase prompt -- see `diagnose_fp302_zero_detection.py`'s real
+finding (same held object: 0.1848 confidence under a 4-phrase joint
+prompt vs. 0.4844 under a single-phrase query, on the identical
+frame) for why. This is a real, separate root cause from the general
+detection-confidence gap `validate_detection_threshold.py` fixed.
+
 How to run
 -----------
     cd backend
@@ -93,13 +100,29 @@ def _run_episode(bt, *, use_vision: bool):
 
             if use_vision:
                 assert vision_agent is not None
-                prompt = ". ".join(all_names) + "."
-                scene = vision_agent.perceive(prompt)
+                # One query PER name, not one joint multi-phrase
+                # prompt -- see this run's second attempt (a single
+                # joint prompt) for why: a real diagnostic
+                # (diagnose_fp302_zero_detection.py) found the same
+                # held object scoring 0.1848 confidence under a
+                # 4-phrase joint prompt vs. 0.4844 under a single-
+                # phrase "alarmclock." query on the identical frame --
+                # multi-phrase joint prompts can produce merged,
+                # low-confidence labels for a near-field, frame-
+                # dominating held object, not because the object is
+                # genuinely hard to see.
+                merged_detections = []
+                for name in all_names:
+                    scene = vision_agent.perceive(f"{name}.")
+                    merged_detections.extend(scene.detections)
+                from scene.scene import Scene as _Scene
+
+                merged_scene = _Scene(detections=merged_detections)
                 print(
-                    f"    [debug] prompt={prompt!r} "
-                    f"detections={[(d.label, round(d.depth, 3) if d.depth is not None else None) for d in scene.detections]}"
+                    f"    [debug] per-name queries={all_names} "
+                    f"detections={[(d.label, round(d.depth, 3) if d.depth is not None else None) for d in merged_scene.detections]}"
                 )
-                ground_world_state(scene, initial_state)
+                ground_world_state(merged_scene, initial_state)
 
             runner = TaskRunner(RuleBasedPlanner(), simulator)
             run_result = runner.run(

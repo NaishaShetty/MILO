@@ -299,30 +299,58 @@ positive evidence, never clears `robot_holding` to `None` on an
 inconclusive frame -- see that module's docstring for the full
 reconciliation policy.
 
-**Real, honest limitation found investigating this**: the held-object
+**Real, honest limitation found investigating this -- three
+investigation passes, final precise status below.** The held-object
 heuristic was built partly to test whether it could close
 `docs/roadmap.md`'s `tier4_multi_step` `WorldState`-reseeding gap (a
 failed `place` leaves an object physically held, but re-seeding
-between sub-goals has no signal for "hand still full"). Re-running
-both known-failing episodes with vision grounding layered on top did
-**not** fix the gap -- not because the heuristic's logic is wrong
-(it's unit-tested and does the right thing on a synthetic close
-detection), but because in both live re-runs the detector produced
-**zero detections** for the post-failure frame the held object should
-have appeared in. This was downstream of the (at the time separately
-tracked) sim-to-real detection-confidence gap, production
-`box_threshold=0.35` missing real, visible objects -- since validated
-and fixed (`box_threshold` lowered to 0.25 after a real precision/
-recall measurement; see `docs/roadmap.md`). Re-testing both tier4
-episodes again at 0.25 still didn't close the gap, but for a more
-precise, per-episode reason this time: one episode still produced zero
-detections on the critical frame even at 0.25 (a genuine per-frame
-miss, not an aggregate-statistics contradiction); the other now
-detects the held object for real, but at a depth (0.713m) outside the
-held-object heuristic's own `HELD_OBJECT_MAX_DEPTH_M=0.5m` cutoff --
-a second, distinct miscalibration, not yet fixed. Full appearance
--model-grade state fusion (reliable open/closed and held/not-held for
-every object) remains future work -- see `docs/roadmap.md`.
+between sub-goals has no signal for "hand still full").
+
+*Pass 1* (production `box_threshold=0.35`, one joint multi-phrase
+detection prompt): both known-failing episodes produced zero
+detections on the post-failure frame -- no candidate for the heuristic
+to act on at all.
+
+*Pass 2* (after validating and adopting `box_threshold=0.25`, same
+joint prompt): `milo-v1.1-fp302-t4a` still produced zero detections;
+`milo-v1.1-fp201-t4a` now detected the held book, but at 0.713m,
+outside the heuristic's `HELD_OBJECT_MAX_DEPTH_M=0.5m` cutoff.
+
+*Pass 3* (root-caused both remaining issues): a targeted diagnostic
+(`diagnose_fp302_zero_detection.py`) found `fp302`'s zero-detection
+result was a *multi-phrase prompt-interference* artifact, not a
+genuinely invisible object -- the same held alarm clock scored 0.1848
+confidence under the 4-phrase joint prompt vs. 0.4844 under a
+single-phrase query, on the *identical* frame. Re-seeding with one
+detection call per object name instead of one joint prompt fixed it:
+the alarm clock was detected at 0.398m (within the cutoff),
+`robot_holding` was seeded correctly, and the planner then correctly
+*declined* to plan sub-goal 2 instead of crashing AI2-THOR --
+**`fp302-t4a`'s reseeding-gap symptom is fixed**; the episode's overall
+`goal_success` is still `False`, but only because sub-goal 1 fails on
+a real, separate AI2-THOR placement-geometry limit. `fp201-t4a`
+remains open: a dedicated calibration run
+(`validate_held_object_depth.py`, 5 held-object samples and 8
+not-held-but-close samples across real AI2-THOR episodes) found held
+-object depth is genuinely object-size-dependent -- small objects
+(apple, keychain, boots, potato) measured 0.347m-0.459m, but a clean,
+confirmed-held book measured 0.853m, and raising the cutoff to catch
+it would trade away far more precision than it's worth (measured:
+precision drops to 0.556 at a 0.9m cutoff, vs. 0.833 at 0.5m). With
+per-name queries, `fp201`'s held book was correctly left unflagged at
+0.713m -- but a different, NOT-held box at 0.345m was closer and got
+wrongly seeded as held instead, a real, live instance of the
+heuristic's "closest wins regardless of label" limitation. **Depth
+alone is a real, useful, but not fully reliable held-vs-not-held
+signal once object size varies -- not a solved problem.** The most
+promising remaining fix, not implemented in this pass: seed
+`robot_holding` from AI2-THOR's own live `isPickedUp`/
+`inventoryObjects` metadata directly, sidestepping both the detection
+-prompt and depth-calibration dependencies. Regression tests for the
+confirmed real limitations: `tests/test_planner_grounding.py`. Full
+appearance-model-grade state fusion (reliable open/closed and
+held/not-held for every object) remains future work -- see
+`docs/roadmap.md`.
 
 ## Configuration
 

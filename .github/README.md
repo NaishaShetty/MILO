@@ -231,11 +231,15 @@ for the full research-contribution breakdown and final evaluation.
   | `behavior_tree` | 50/54 (92.6%) | 18/18 | 18/18 | 7/9 | 7/9 |
   | `react` (`qwen2.5:7b`) | 36/54 (66.7%) | 18/18 | 18/18 | 0/9 | 0/9 |
 
-  This scale-up surfaced a real, open `WorldState`-reseeding gap: when
-  a `tier4_multi_step` sub-goal fails mid-`place`, the object is left
+  This scale-up surfaced a real `WorldState`-reseeding gap: when a
+  `tier4_multi_step` sub-goal fails mid-`place`, the object is left
   physically held, but the next sub-goal's planner has no signal that
-  the hand is already occupied — tracked, not fixed (see
-  [Roadmap](#roadmap)). Dataset card:
+  the hand is already occupied. Investigated in depth since this table
+  was first published — fixed for one of the two known-failing
+  episodes, still open for the other (a real, object-size-dependent
+  limit in vision-grounded held-object detection); this table's
+  numbers are the original v1.1 publish run, not re-benchmarked (see
+  [Roadmap](#roadmap) for the full investigation). Dataset card:
   [`backend/planning_evaluation/dataset/v1.1/README.md`](../backend/planning_evaluation/dataset/v1.1/README.md),
   full writeup: Addendum 7 of the
   [benchmark report](../experiments/reports/phase_e_milo_benchmark_report.md).
@@ -387,7 +391,7 @@ docker/          Container definitions (backend + frontend)
 
 | Item | Status |
 |---|---|
-| `tier4_multi_step` `WorldState`-reseeding gap (held-object state doesn't carry between sub-goals; detection-confidence fix helped partially, exposed a separate held-object depth-heuristic miscalibration) | ⚠️ Open |
+| `tier4_multi_step` `WorldState`-reseeding gap (held-object state doesn't carry between sub-goals) | ⚠️ Open — fixed for one of two known-failing episodes; the other exposed a real, object-size-dependent limit in the held-object depth heuristic |
 | HTN planner | 🔜 Future |
 | Production auth/rate limiting | ❌ Not planned — no publicly reachable API to protect |
 
