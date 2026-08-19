@@ -3,9 +3,9 @@
 # Purpose
 # -------
 # Production compose file for the GPU-hosted backend ONLY. The
-# frontend is not built or served here -- it's a static Vite bundle
-# deployed separately on Vercel (see frontend/vercel.json,
-# frontend/README.md's "Deployment (Vercel)" section). This file is
+# frontend is not built or served here -- it's a separately deployed
+# static Vite bundle (see frontend/README.md's "Deployment" section
+# and deployment/README.md). This file is
 # the counterpart to the existing docker-compose.yml's "backend"
 # service, but:
 #   - builds docker/Dockerfile.gpu (CUDA/AI2-THOR-capable), not
@@ -36,7 +36,8 @@
 #                                           # which variables production
 #                                           # needs (LLM key,
 #                                           # API_ALLOWED_ORIGINS set to
-#                                           # the real Vercel domain,
+#                                           # the real deployed frontend
+#                                           # origin,
 #                                           # VISION_ENABLE_SIMULATOR=true,
 #                                           # VISION_SIMULATOR_PLATFORM=cloud_rendering)
 #   docker compose -f docker-compose.prod.yml up -d --build
@@ -66,9 +67,9 @@
 #   - see Cloudflare's own documented Quick Tunnel limitations (rate
 #     limits, no SLA, intended for testing) before sharing the URL
 #     widely.
-#   - every time the URL changes, `frontend/vercel.json`'s rewrite
-#     destinations must be updated to the new hostname and the Vercel
-#     frontend redeployed -- see that file's comments.
+#   - every time the URL changes, the frontend's deployment (wherever
+#     it's hosted) needs its API rewrite destination updated to the
+#     new hostname and redeployed -- see deployment/README.md.
 #
 # Do NOT run this without first reading deployment/gpu_host_setup.md --
 # it assumes the host already has an NVIDIA driver and

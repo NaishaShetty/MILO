@@ -141,11 +141,11 @@ planning, execution in implementation detail) see
 | Type | Contribution |
 |---|---|
 | Research | A modular agent architecture with an explicit failure taxonomy and a reflection step that decides `continue`/`retry`/`replan`/`abort` from structured execution failures, not a hardcoded retry count |
-| Research | A memory system with distinct episodic, semantic, and failure memory types, ranked retrieval (similarity + confidence + recency + provenance + context), and an honestly-labeled memory-vs-no-memory ablation — confirmed engaging under real AI2-THOR, not just a synthetic harness |
+| Research | A memory system with distinct episodic, semantic, and failure memory types, ranked retrieval (similarity + confidence + recency + provenance + context), and a memory-vs-no-memory ablation confirmed engaging under real AI2-THOR |
 | Research | A provider-agnostic LLM abstraction letting the same planner/agent code run against OpenAI, Gemini, or a local OpenAI-compatible server (Ollama, vLLM) purely through configuration |
 | Research | [`milo_benchmark v1.0`](https://huggingface.co/datasets/naishashetty/milo_benchmark) — a published Hugging Face dataset (25 tasks, 5 real AI2-THOR scenes, 3 difficulty tiers) with a reproducible runner and a real three-planner baseline scored against live post-execution simulator state |
 | Engineering | Three interchangeable planner strategies behind one interface, with shared plan validation against a symbolic world model |
-| Engineering | A real-time frontend driven entirely by backend polling, with no fabricated/mocked state in production paths |
+| Engineering | A real-time frontend driven entirely by backend polling |
 | Product | MILO Lab — a research interface exposing perception benchmarks, planner evaluation, and a parse/plan sandbox as real, runnable operations |
 
 See [`docs/phases/phase8_7_final_audit.md`](../docs/phases/phase8_7_final_audit.md)
@@ -158,22 +158,21 @@ for the full research-contribution breakdown and final evaluation.
   `backend/tests/conftest.py` forces `VISION_ENABLE_SIMULATOR=false`
   for the whole suite regardless of a local `.env`'s interactive-dev
   setting — no manual env-var step needed for a clean, fast run.
-- **Real AI2-THOR mission, driven through the actual UI** (not a mocked
-  test): found and fixed a critical bug where the orchestrator/plan
-  validator ignored the LLM's parsed `target_location`, causing every
-  "put/place X in/on Y" instruction to fail 100% of the time. Fixed and
-  re-verified live — a second run correctly resolved the target,
-  planned, and executed against real AI2-THOR, but still ended in
-  `failed` after one real replan: AI2-THOR correctly rejected placing
-  into a closed receptacle, exposing a separate, pre-existing gap in
-  the rule-based planner's "place" template. Since fixed: `_deposit()`
-  now inserts an `open` step whenever the destination's current
-  `WorldState.is_open` is known `False` (and skips a redundant
-  `open`/`close` when it's already known `True`) — see
-  `backend/planner/rule_based.py`.
+- **Real AI2-THOR mission, driven through the actual UI**: found and
+  fixed a critical bug where the orchestrator/plan validator ignored
+  the LLM's parsed `target_location`, causing every "put/place X in/on
+  Y" instruction to fail 100% of the time. Fixed and re-verified live
+  — a second run correctly resolved the target, planned, and executed
+  against real AI2-THOR, but still ended in `failed` after one real
+  replan: AI2-THOR correctly rejected placing into a closed
+  receptacle, exposing a separate, pre-existing gap in the rule-based
+  planner's "place" template. Since fixed: `_deposit()` now inserts an
+  `open` step whenever the destination's current `WorldState.is_open`
+  is known `False` (and skips a redundant `open`/`close` when it's
+  already known `True`) — see `backend/planner/rule_based.py`.
 - **Frontend↔backend connectivity**: every dynamic value on every page
-  traces to a real backend route; no fabricated data found in any
-  production path; polling correctly cancels on unmount.
+  traces to a real backend route; polling correctly cancels on
+  unmount.
 - **Memory benchmark, resolved end to end**: an initial controlled
   `FakeSimulator` ablation found memory reduced task success 90% → 80%.
   Re-run for real (real AI2-THOR + a real learned sentence-embedding
@@ -185,19 +184,18 @@ for the full research-contribution breakdown and final evaluation.
   field instead — now confirmed engaging on 5/5 real recall episodes
   across all 5 benchmark scenes (was 0/5). Full writeup:
   [`experiments/reports/phase_b_real_ablation_findings.md`](../experiments/reports/phase_b_real_ablation_findings.md).
-- **Planner/replanning**: reflection and dynamic replanning are real
-  and were observed live (see the mission result above), not merely
-  implemented-but-untested.
+- **Planner/replanning**: reflection and dynamic replanning were
+  observed live (see the mission result above).
 - **`milo_benchmark v1.0`** — a versioned, 25-task, 5-scene (all 4
   iTHOR room types), 3-tier dataset with a reproducible runner, scored
-  against **live** post-execution AI2-THOR state (not just "did nothing
-  error"). Published on the Hugging Face Hub:
+  against live post-execution AI2-THOR state. Published on the Hugging
+  Face Hub:
   [huggingface.co/datasets/naishashetty/milo_benchmark](https://huggingface.co/datasets/naishashetty/milo_benchmark)
   — companion leaderboard + episode replay Space (static, pre-recorded;
   AI2-THOR needs a GPU/Unity this Space's free tier doesn't have, so it
   isn't a live demo):
   [huggingface.co/spaces/naishashetty/milo_benchmark_companion](https://huggingface.co/spaces/naishashetty/milo_benchmark_companion).
-  Real planner-comparison baseline:
+  Planner-comparison baseline:
 
   | Planner | Goal success | tier1 (locate) | tier2 (pickup) | tier3 (store) |
   |---|---|---|---|---|
@@ -209,18 +207,59 @@ for the full research-contribution breakdown and final evaluation.
   placement/geometry limit, not a planner bug (two other failures — a
   `_deposit()` bug and a misleading execution-timeout message — were
   found by this benchmark and fixed; see [Roadmap](#roadmap)).
-  `react`'s baseline is real and clean (`goal_success`/
-  `execution_success`/`plan_success` agree on every episode, zero
-  rate-limit retries needed) — run locally against `qwen2.5:7b`
-  (Q4_K_M) served by Ollama on an RTX 4050 Laptop GPU, after an earlier
-  attempt against Gemini's free tier hit that tier's daily quota (20
-  requests/day) after 2 of 25 episodes and produced no usable number.
-  All 5 `react` failures are genuine multi-step reasoning mistakes
-  (proposing an action before its precondition chain is satisfied —
-  e.g. `pickup` before navigating close enough), not infrastructure.
-  Full methodology and both the failed-Gemini and successful-local-Qwen
-  attempts in full detail:
+  `react`'s baseline: `goal_success`/`execution_success`/`plan_success`
+  agree on every episode, zero rate-limit retries needed — run locally
+  against `qwen2.5:7b` (Q4_K_M) served by Ollama on an RTX 4050 Laptop
+  GPU, after an earlier attempt against Gemini's free tier hit that
+  tier's daily quota (20 requests/day) after 2 of 25 episodes and
+  produced no usable number. All 5 `react` failures are genuine
+  multi-step reasoning mistakes (proposing an action before its
+  precondition chain is satisfied — e.g. `pickup` before navigating
+  close enough), not infrastructure. Full methodology and both the
+  failed-Gemini and successful-local-Qwen attempts:
   [`experiments/reports/phase_e_milo_benchmark_report.md`](../experiments/reports/phase_e_milo_benchmark_report.md).
+
+- **`milo_benchmark v1.1`** — extends v1.0 with 4 more scenes (9
+  total, all 4 iTHOR room types) and a new `tier4_multi_step` tier
+  (two independent, sequential sub-goals per task against one live
+  episode); v1.0 stays the frozen reference set, v1.1 is the extended
+  one:
+
+  | Planner | Goal success | tier1 | tier2 | tier3 | tier4 |
+  |---|---|---|---|---|---|
+  | `rule_based` | 50/54 (92.6%) | 18/18 | 18/18 | 7/9 | 7/9 |
+  | `behavior_tree` | 50/54 (92.6%) | 18/18 | 18/18 | 7/9 | 7/9 |
+  | `react` (`qwen2.5:7b`) | 36/54 (66.7%) | 18/18 | 18/18 | 0/9 | 0/9 |
+
+  This scale-up surfaced a real, open `WorldState`-reseeding gap: when
+  a `tier4_multi_step` sub-goal fails mid-`place`, the object is left
+  physically held, but the next sub-goal's planner has no signal that
+  the hand is already occupied — tracked, not fixed (see
+  [Roadmap](#roadmap)). Dataset card:
+  [`backend/planning_evaluation/dataset/v1.1/README.md`](../backend/planning_evaluation/dataset/v1.1/README.md),
+  full writeup: Addendum 7 of the
+  [benchmark report](../experiments/reports/phase_e_milo_benchmark_report.md).
+
+- **`react` model comparison, `qwen2.5:3b` vs `qwen2.5:7b`** (same
+  v1.1 54-task set): identical aggregate score, 36/54 (66.7%) each,
+  confirmed task-for-task identical (0/54 differences) rather than a
+  coincidence of totals. `qwen2.5:3b` ran ~2.3x faster (~3.1s vs
+  ~7.2s avg/episode) with full GPU residency (vs. `7b`'s partial CPU
+  offload) and slightly fewer tokens, at zero accuracy cost.
+  Re-running 6 failing episodes with raw-completion capture (not just
+  inferring from the final error string) found both models share a
+  root cause: neither ever calls `locate` on the destination/container
+  object, only the primary object; `qwen2.5:7b` additionally confuses
+  which object identity belongs in `place`/`put_down`'s `target` field
+  — verified directly on those 6 episodes, not re-checked against all
+  27 originally-classified violations. Full writeup: Addendum 8 of the
+  [benchmark report](../experiments/reports/phase_e_milo_benchmark_report.md).
+
+- **Cost/latency** (v1.0, 25 episodes each): `rule_based` ~707ms,
+  `behavior_tree` ~865ms, `react`/`qwen2.5:7b` ~7.5s avg/episode.
+  Measured on a CPU-bound vision stack (PyTorch without CUDA — see
+  [Roadmap](#roadmap)), so these numbers likely understate what a
+  GPU-accelerated setup would achieve; not remeasured here.
 
 Full detail, methodology, and provenance:
 [`docs/phases/phase8_7_final_audit.md`](../docs/phases/phase8_7_final_audit.md).
@@ -314,36 +353,10 @@ Deployment/Docker: [`docker/README.md`](../docker/README.md) and
 
 ## Deployment
 
-**MILO is not currently deployed publicly.** Running it against a real
-GPU host turned out to require infrastructure (a dedicated CUDA-capable
-machine, always-on hosting) that isn't feasible to maintain at this
-stage, so the project's priority right now is local reproducibility --
-anyone cloning this repo can run the full stack on their own machine
-via [Quick Start](#quick-start).
-
-The deployment configuration below is real and was build/run-verified
-against a real backend, but is not currently running anywhere public:
-
-- **Frontend**: a static Vite build, deployable to Vercel --
-  [`frontend/README.md`](../frontend/README.md#deployment-vercel) and
-  `frontend/vercel.json`.
-- **Backend**: a GPU-enabled Docker image (`docker/Dockerfile.gpu`,
-  CUDA 12.1 + headless AI2-THOR `CloudRendering`) and
-  `docker-compose.prod.yml`, which fronts it with a Cloudflare Quick
-  Tunnel (no purchased domain required) rather than a public port. It
-  is **not** deployable to Vercel: task execution runs in a background
-  thread inside the FastAPI process (`backend/api/routes/tasks.py`)
-  that outlives the triggering request, `MemoryConfig`/
-  `SQLiteMemoryStore` persist to a local file
-  (`backend/outputs/memory/memory.db`), and
-  `VISION_ENABLE_SIMULATOR=true` launches a real AI2-THOR/Unity
-  subprocess (`backend/api/app.py`'s lifespan) -- none of which
-  survive Vercel's stateless, short-lived-per-request serverless
-  execution model.
-
-Wherever the backend runs, point the frontend at it via
-`frontend/vercel.json`'s rewrites and add the frontend's deployed
-origin to that backend's `API_ALLOWED_ORIGINS`.
+MILO is not currently deployed publicly -- see [Quick Start](#quick-start)
+to run it locally, or [`docker/README.md`](../docker/README.md) /
+[`deployment/README.md`](../deployment/README.md) for deployment
+configuration if you want to host it yourself.
 
 ## Project Structure
 
@@ -365,51 +378,24 @@ docker/          Container definitions (backend + frontend)
 
 | Item | Status |
 |---|---|
-| Core pipeline (perception → language → planning → execution → memory → reflection) | ✅ Done |
-| MILO frontend, voice, MILO Lab | ✅ Done |
-| Memory threaded into the ReAct/LLM planner | ✅ Done |
-| Rule-based planner closed-receptacle fix | ✅ Done |
-| Memory ablation re-run on real AI2-THOR + real embedder | ✅ Done |
-| Vision-grounded planner world model (existence/location grounding) | ✅ Done |
-| Floor-plan generalization sweep (5 scenes, all 4 iTHOR room types) | ✅ Done |
-| `milo_benchmark v1.0` dataset + runner (planner comparison, memory ablation, live goal-check scoring) | ✅ Done |
-| `_deposit()` non-openable store-target bug | ✅ Fixed |
-| Misleading `ACTION_TIMEOUT` message | ✅ Fixed |
-| Memory-hint `parentReceptacle` gap | ✅ Fixed |
-| Real `ReActPlanner` baseline on `milo_benchmark` | ✅ Done — 20/25 (80%) via local `qwen2.5:7b`/Ollama, after Gemini's free tier proved unworkable |
-| Test-suite `VISION_ENABLE_SIMULATOR` env-leak fix (`conftest.py`) | ✅ Fixed — also cut the full suite from ~13min to ~6s |
-| Publish `milo_benchmark v1.0` to the Hugging Face Hub | ✅ Done — [huggingface.co/datasets/naishashetty/milo_benchmark](https://huggingface.co/datasets/naishashetty/milo_benchmark) |
-| Companion Space: leaderboard + episode replay | ✅ Done — static (pre-recorded, no live AI2-THOR): [huggingface.co/spaces/naishashetty/milo_benchmark_companion](https://huggingface.co/spaces/naishashetty/milo_benchmark_companion) |
-| Perception-grounded `tier1_locate` check (`perceived_by_agent`, alongside unchanged `exists_in_scene`) | ✅ Done (infra) — real vision, dual signal, `goal_success` unchanged |
-| ↳ Vision sim-to-real detection gap it surfaced (0.35 threshold misses real, ground-truth-visible objects) | ⚠️ Open — real, measured, not fixed (a lowered threshold was explicitly not adopted, unvalidated elsewhere) |
-| ↳ CPU-bound vision inference (PyTorch not CUDA-enabled despite present GPU) | 🔜 Future — current cost/latency numbers understate real achievable performance |
+| Vision sim-to-real detection gap (0.35 threshold misses real, ground-truth-visible objects) | ⚠️ Open |
+| `tier4_multi_step` `WorldState`-reseeding gap (held-object state doesn't carry between sub-goals) | ⚠️ Open |
+| CPU-bound vision inference (PyTorch not CUDA-enabled despite present GPU) | 🔜 Future |
 | Full vision state fusion (open/held state) | 🔜 Future |
 | HTN planner | 🔜 Future |
 | Production auth/rate limiting | 🔜 Future |
 
-Full roadmap with rationale for every open item:
+Completed items and full rationale for every open item:
 [`docs/roadmap.md`](../docs/roadmap.md).
 
 ## Documentation
 
 - [`docs/application/architecture.md`](../docs/application/architecture.md) — current system & agent architecture
-- [`docs/application/overview.md`](../docs/application/overview.md) — what MILO does, in detail
 - [`docs/application/tech_stack.md`](../docs/application/tech_stack.md) — full technology stack
-- [`docs/application/limitations.md`](../docs/application/limitations.md) — honest, detailed limitations
-- [`docs/architecture/perception_pipeline.md`](../docs/architecture/perception_pipeline.md) — perception design
-- [`docs/architecture/spatial_perception.md`](../docs/architecture/spatial_perception.md) — depth/tracking/temporal scene
-- [`backend/docs/language_interface_spec.md`](../backend/docs/language_interface_spec.md) — language interface spec
-- [`docs/architecture/planning.md`](../docs/architecture/planning.md) — planner architecture
-- [`docs/phases/phase5_execution.md`](../docs/phases/phase5_execution.md) — execution architecture
-- [`docs/phases/phase6_memory.md`](../docs/phases/phase6_memory.md) — memory system design
-- [`docs/architecture/reflection.md`](../docs/architecture/reflection.md) — reflection/replanning design
-- [`docs/architecture/api_contracts.md`](../docs/architecture/api_contracts.md) — full API endpoint reference
 - [`docs/phases/phase8_7_final_audit.md`](../docs/phases/phase8_7_final_audit.md) — final research-readiness audit
-- [`docs/testing/running_tests.md`](../docs/testing/running_tests.md) — full test/benchmark command reference
-- [`docs/development_history.md`](../docs/development_history.md) — phase-by-phase development narrative
-- [`docs/repository_structure.md`](../docs/repository_structure.md) — full module-by-module repository map
 - [`backend/planning_evaluation/dataset/v1.0/README.md`](../backend/planning_evaluation/dataset/v1.0/README.md) — `milo_benchmark` dataset card
-- [`docker/README.md`](../docker/README.md) / [`deployment/README.md`](../deployment/README.md) — deployment
+
+More detailed docs in [`docs/`](../docs/).
 
 ## Screenshots
 
