@@ -309,13 +309,20 @@ both known-failing episodes with vision grounding layered on top did
 (it's unit-tested and does the right thing on a synthetic close
 detection), but because in both live re-runs the detector produced
 **zero detections** for the post-failure frame the held object should
-have appeared in. This is downstream of the *already-tracked*,
-separate sim-to-real detection-confidence gap (production
-`box_threshold=0.35` missing real, visible objects) -- the two gaps
-are not independent; the held-object heuristic cannot help until
-detection itself reliably sees the held object. Full appearance-model
--grade state fusion (reliable open/closed and held/not-held for every
-object) remains future work -- see `docs/roadmap.md`.
+have appeared in. This was downstream of the (at the time separately
+tracked) sim-to-real detection-confidence gap, production
+`box_threshold=0.35` missing real, visible objects -- since validated
+and fixed (`box_threshold` lowered to 0.25 after a real precision/
+recall measurement; see `docs/roadmap.md`). Re-testing both tier4
+episodes again at 0.25 still didn't close the gap, but for a more
+precise, per-episode reason this time: one episode still produced zero
+detections on the critical frame even at 0.25 (a genuine per-frame
+miss, not an aggregate-statistics contradiction); the other now
+detects the held object for real, but at a depth (0.713m) outside the
+held-object heuristic's own `HELD_OBJECT_MAX_DEPTH_M=0.5m` cutoff --
+a second, distinct miscalibration, not yet fixed. Full appearance
+-model-grade state fusion (reliable open/closed and held/not-held for
+every object) remains future work -- see `docs/roadmap.md`.
 
 ## Configuration
 

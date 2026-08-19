@@ -20,6 +20,15 @@ This is a standalone investigation script (not a change to
 reviewable -- see this repo's `docs/roadmap.md` for where the result
 gets recorded.
 
+Detector threshold: `box_threshold=0.25`/`text_threshold=0.25`, the
+validated recommendation from `validate_detection_threshold.py`
+(strictly dominates both production's 0.35 and the previously-
+considered 0.15 on real precision/recall -- see that script and
+`docs/roadmap.md`), not production's 0.35 -- this run is specifically
+asking whether the detection-confidence fix unblocks tier4 as
+hypothesized, so it needs to test at the threshold that fix would
+actually ship with.
+
 How to run
 -----------
     cd backend
@@ -52,7 +61,7 @@ def _run_episode(bt, *, use_vision: bool):
 
     vision_agent = None
     if use_vision:
-        detector = GroundingDINODetector()
+        detector = GroundingDINODetector(box_threshold=0.25, text_threshold=0.25)
         segmenter = SAM2Segmenter()
         depth = GroundTruthDepthEstimator(depth_provider=simulator.get_depth)
         vision_agent = VisionAgent(

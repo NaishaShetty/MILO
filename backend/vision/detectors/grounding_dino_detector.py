@@ -45,7 +45,7 @@ class GroundingDINODetector(BaseDetector):
     Wrapper around the Grounding DINO model.
     """
 
-    def __init__(self, box_threshold=0.35, text_threshold=0.25):
+    def __init__(self, box_threshold=0.25, text_threshold=0.25):
 
         self.device = get_device()
 
@@ -53,6 +53,22 @@ class GroundingDINODetector(BaseDetector):
         # rather than `process()` arguments, so that `process(image,
         # scene)` keeps the same two-argument shape as every other
         # perception module (segmenter, depth estimator, tracker).
+        #
+        # box_threshold was 0.35 before -- lowered to 0.25 after a
+        # real precision/recall validation across 8 scenes, 9 true
+        # positives (ground-truth-visible objects), 14 true negatives
+        # (confirmed-absent objects): 0.25 had the same recall as 0.15
+        # (77.8%) with meaningfully better precision (63.6% vs 53.8%),
+        # AND both equal-or-better recall (77.8% vs 55.6%) and
+        # equal-or-better precision (63.6% vs 62.5%) than the old 0.35
+        # -- it dominates both previously-considered values on real
+        # data, not just recall in isolation. This is what the
+        # sim-to-real detection-confidence gap's original finding
+        # explicitly deferred ("its effect on false-positive rate...
+        # was never measured, so shipping it would trade one
+        # unmeasured risk for another") -- now measured. See
+        # `planning_evaluation/validate_detection_threshold.py` and
+        # `docs/roadmap.md`.
         self.box_threshold = box_threshold
         self.text_threshold = text_threshold
 

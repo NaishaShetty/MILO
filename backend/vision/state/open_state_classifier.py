@@ -77,16 +77,17 @@ from vision.detectors.grounding_dino_detector import GroundingDINODetector
 CROP_MARGIN_PX = 20
 
 #: Lower than `GroundingDINODetector`'s production
-#: `box_threshold=0.35`/`text_threshold=0.25` (see that class's
-#: default args): this classifier scores exactly two candidate
-#: phrases against a small, single-object crop, a much easier
-#: decision than open-vocabulary detection across a whole cluttered
-#: scene, so a lower confidence bar is appropriate here without
-#: reproducing the sim-to-real detection-threshold gap
-#: `docs/roadmap.md` tracks for the main detector. Configurable, not
-#: hardcoded past this module boundary, so a future calibration pass
-#: (once real open/closed accuracy is measured) can adjust it without
-#: touching call sites.
+#: `box_threshold=0.25`/`text_threshold=0.25` (see that class's
+#: default args -- validated via `planning_evaluation/
+#: validate_detection_threshold.py`, see `docs/roadmap.md`): this
+#: classifier scores exactly two candidate phrases against a small,
+#: single-object crop, a much easier decision than open-vocabulary
+#: detection across a whole cluttered scene, so a lower confidence
+#: bar is appropriate here. Configurable, not hardcoded past this
+#: module boundary, so a future calibration pass (once real
+#: open/closed accuracy is measured with its own validation set, the
+#: same way the main detector's threshold now is) can adjust it
+#: without touching call sites.
 CLASSIFICATION_THRESHOLD = 0.2
 
 #: The two phrases classified against each crop. Order matters only
