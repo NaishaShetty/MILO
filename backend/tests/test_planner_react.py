@@ -158,3 +158,55 @@ def test_memory_context_is_threaded_into_the_prompt():
     planner_no_memory = ReActPlanner(llm_client=client_no_memory)
     planner_no_memory.plan(TASK, WorldState.initial())
     assert "[]" in client_no_memory.requests[0].system_prompt
+
+
+# ---------------------------------------------------------------------
+# Raw completion logging (module docstring's "Raw completion logging"
+# section) -- closes the gap a real failure investigation hit
+# (phase_e_milo_benchmark_report.md's Addendum 8, which had to re-run
+# episodes with a one-off diagnostic client just to see what a model
+# had actually proposed, because nothing persisted that text). These
+# tests confirm the raw text is actually readable from real log output
+# at the right level, not just that the logging call itself doesn't
+# raise.
+# ---------------------------------------------------------------------
+
+
+def test_raw_completion_is_captured_and_readable_at_debug_level(caplog):
+    distinctive_content = json.dumps(
+        {"action": "not_a_real_action", "target": "mug", "parameters": {}}
+    )
+    client = ScriptedClient([distinctive_content] + _VALID_SEQUENCE)
+    planner = ReActPlanner(llm_client=client, repair_attempts=3)
+
+    with caplog.at_level("DEBUG", logger="planner.react"):
+        result = planner.plan(TASK, WorldState.initial())
+
+    assert result.success
+    # The exact raw completion text must appear verbatim in the
+    # rendered log output -- not just recorded as an opaque `extra=`
+    # field a default formatter would drop.
+    assert distinctive_content in caplog.text
+    assert "planner.react.raw_completion" in caplog.text
+    assert f"task_id={TASK.task_id}" in caplog.text
+
+
+def test_raw_completion_is_silent_at_default_warning_level(caplog):
+    # Gating check: at this project's normal/default logging level
+    # (WARNING), the raw-completion DEBUG line must produce no output
+    # at all -- it should never bloat normal logs unless a caller
+    # explicitly opts into DEBUG for this logger.
+    distinctive_content = json.dumps(
+        {"action": "not_a_real_action", "target": "mug", "parameters": {}}
+    )
+    client = ScriptedClient([distinctive_content] + _VALID_SEQUENCE)
+    planner = ReActPlanner(llm_client=client, repair_attempts=3)
+
+    with caplog.at_level("WARNING", logger="planner.react"):
+        result = planner.plan(TASK, WorldState.initial())
+
+    assert result.success
+    assert "planner.react.raw_completion" not in caplog.text
+    assert distinctive_content not in caplog.text
+    # The short summary WARNING (no raw content) still fires as before.
+    assert "planner.react.malformed_output" in caplog.text

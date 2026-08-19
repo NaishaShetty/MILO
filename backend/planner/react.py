@@ -62,6 +62,38 @@ with a descriptive error -- never a crash. This is what section 10's
 "if an LLM is unavailable, the project should still be fully testable
 through the deterministic planner" requires, and it is enforced by this
 module, not left to callers to remember.
+
+Raw completion logging
+-----------------------
+`_propose_with_repair()` logs every raw LLM completion it receives
+(the full, unparsed response text -- whether that call's proposal
+ends up accepted or rejected) via `logger.debug("planner.react.raw_completion
+task_id=%s attempt=%s content=%r", ...)`. Two deliberate choices here,
+closing a real gap a past benchmark investigation hit (see
+`experiments/reports/phase_e_milo_benchmark_report.md`'s Addendum 8,
+which originally had to re-run several episodes with a one-off
+diagnostic `LLMClient` wrapper just to see what a model had actually
+proposed, because nothing in this module persisted that text):
+
+1. **DEBUG level, not INFO/WARNING** -- silent at this project's
+   normal/production logging configuration (nothing configures the
+   root logger below WARNING by default), so this adds zero output,
+   zero log volume, and zero performance cost to any existing caller
+   unless they explicitly opt in by lowering `logging.getLogger
+   ("planner.react")`'s (or the root logger's) level to `DEBUG` and
+   attaching a handler -- e.g. exactly what a benchmark run investigating
+   a `react` failure would want to do for that one run, not something
+   that should ever be on by default.
+2. **Interpolated into the message string itself** (`%s`/`%r` format
+   arguments), not passed via `extra=`. `extra=` dict values are
+   invisible under the default `logging.Formatter` (only the message
+   string is rendered) -- passing `extra={"content": response.content}`
+   the way `planner.react.malformed_output` passes its other fields
+   would silently reproduce the exact gap this section exists to close.
+   The short, existing `planner.react.malformed_output` WARNING
+   (task_id/attempt/error only, no raw content) is unchanged and stays
+   the always-visible summary; the new DEBUG line is the opt-in,
+   full-detail companion to it.
 """
 
 from __future__ import annotations
@@ -350,6 +382,29 @@ class ReActPlanner(Planner):
                 response = self._llm_client.complete(request)  # type: ignore[union-attr]
             except LanguageRuntimeError as exc:
                 raise LLMUnavailableError(f"LLM call failed: {exc}") from exc
+
+            # Raw-completion logging (see module docstring's "Raw
+            # completion logging" section): the full, unparsed LLM
+            # response text, for every call this method makes,
+            # regardless of whether it turns out to be accepted or
+            # rejected below. Deliberately at DEBUG (silent at this
+            # package's/production's default WARNING level -- see
+            # `planner.react.malformed_output` just below, which stays
+            # the short, always-visible summary) and deliberately
+            # interpolated into the message string itself (`%s`, not
+            # `extra=`) so it survives regardless of the configured
+            # formatter -- `extra=` dict values are invisible under the
+            # default `logging.Formatter`, which is exactly the gap
+            # that made an earlier real failure investigation
+            # (`phase_e_milo_benchmark_report.md`'s Addendum 8) have to
+            # re-run episodes with a one-off diagnostic client wrapper
+            # just to see what the model had actually proposed.
+            logger.debug(
+                "planner.react.raw_completion task_id=%s attempt=%s content=%r",
+                task.task_id,
+                attempt,
+                response.content,
+            )
 
             try:
                 proposal = _extract_json(response.content)

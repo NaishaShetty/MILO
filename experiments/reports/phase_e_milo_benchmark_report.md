@@ -893,3 +893,446 @@ fixed, known task vocabulary vs. open-ended instruction following) —
 this report does not take a position on that beyond reporting the real
 numbers plainly.
 
+---
+
+## Addendum 7 — `milo_benchmark v1.1`: scale-up + `tier4_multi_step`, real run
+
+`v1.1` extends `v1.0` (9 scenes, up from 5; 54 tasks, up from 25; a new
+`tier4_multi_step` tier) — see
+[`dataset/v1.1/README.md`](../../backend/planning_evaluation/dataset/v1.1/README.md)
+for the full card, collection methodology, and why `tier4_multi_step`
+is implemented as two sequential `TaskRunner.run()` calls against the
+same live episode rather than a `MultiTask`-level planner API (no
+planner in this repository implements one). Every `v1.0` task carried
+into `v1.1` is untouched on every scoring-relevant field (`scene`,
+`goal`, `object`, `target`, `instruction`, `task_id` — regression-tested:
+`test_v1_1_frozen_v1_0_tasks_scoring_fields_match_v1_0`), so a score
+against either file's copy of a `v1.0` task_id is directly comparable.
+This is **not** a byte-identical-JSON claim: the free-text, non-scoring
+`notes` field was deliberately edited on 2 of the 25 carried-over
+tasks — `milo-v1-fp301-t3a` (cosmetic addition) and, more
+substantively, `milo-v1-fp401-t3a` (`v1.0`'s note says the
+`_deposit()` non-openable-target bug is still unfixed; `v1.1`'s note
+says it has since been fixed and the task is now expected to succeed —
+see `dataset/v1.1/README.md`'s "What's new in v1.1" section).
+
+Full 54-task × 3-planner run (162 episodes, real AI2-THOR, real
+`qwen2.5:7b` via Ollama for `react`, identical harness/instrumentation
+to Addendum 3/5/6):
+
+```
+cd backend
+RUN_SIMULATOR_TESTS=true MILO_BENCHMARK_DATASET_VERSION=1.1 \
+  LANGUAGE_LLM_PROVIDER=qwen LANGUAGE_LLM_MODEL=qwen2.5:7b \
+  LANGUAGE_LLM_BASE_URL=http://localhost:11434/v1 \
+  QWEN_API_KEY=not-needed LANGUAGE_LLM_TIMEOUT_SECONDS=120 \
+  python -m planning_evaluation.run_benchmark
+```
+
+Raw output:
+[`experiments/results/milo_benchmark_20260819T072711Z.json`](../results/milo_benchmark_20260819T072711Z.json)
+/ [`..._episodes.csv`](../results/milo_benchmark_20260819T072711Z_episodes.csv).
+Every number below is read directly from that file.
+
+### Headline result
+
+```
+rule_based:      50/54 (92.6%)   tier1_locate 18/18   tier2_pickup 18/18   tier3_store 7/9   tier4_multi_step 7/9
+behavior_tree:   50/54 (92.6%)   tier1_locate 18/18   tier2_pickup 18/18   tier3_store 7/9   tier4_multi_step 7/9
+react (qwen2.5:7b): 36/54 (66.7%)  tier1_locate 18/18   tier2_pickup 18/18   tier3_store 0/9   tier4_multi_step 0/9
+```
+
+`execution_success` is identical to `goal_success` on all 162/162
+episodes (no predicate artifact, same as Addendum 3/5) — totals:
+136/162 across all three planners combined. `plan_success` is **not**
+identical to the other two on all episodes, though: it diverges on
+8/162 — all `rule_based`/`behavior_tree`, all on the same 4 tasks
+(`milo-v1-fp301-t3a`, `milo-v1.1-fp203-t3a`, `milo-v1.1-fp302-t4a`,
+`milo-v1.1-fp201-t4a`, each counted once per planner). In every one of
+these 8, `plan_success=True` but `execution_success=goal_success=False`
+— the plan itself was symbolically valid (a correct step sequence was
+generated), and it was *execution* that hit a real AI2-THOR
+physics-level failure (the same `"No valid positions to place object
+found"` geometry limit discussed below, plus its `tier4_multi_step`
+knock-on effect — see that section). This divergence is expected, not
+an artifact: `plan_success` only claims the plan validated against
+`planner.validator.PlanValidator`'s symbolic preconditions, never that
+real physics would cooperate. `react`'s own numbers have no such
+divergence — checked directly: `plan_success`, `execution_success`,
+and `goal_success` agree on all 54 of its episodes.
+
+### `tier1_locate`/`tier2_pickup`: unchanged from v1.0's shape
+
+All three planners solve every `tier1_locate`/`tier2_pickup` task
+across all 9 scenes (36/36 each) — object resolution, navigation, and
+pickup remain solid across the 4 new scenes exactly as they were
+across the original 5. No surprises here; not investigated further for
+that reason.
+
+### `tier3_store`: 2 new failures on the 4 new scenes, both real AI2-THOR geometry limits (not new planner bugs)
+
+`rule_based`/`behavior_tree` go from `v1.0`'s 8/9 (`FloorPlan301`
+book→drawer geometry limit — same task, unchanged, still fails
+identically) to **7/9** on `v1.1`'s 9 `tier3_store` tasks — one
+additional failure, `milo-v1.1-fp203-t3a` ("Put the book away in the
+drawer"), `cause=No valid positions to place object found`. This is
+the *same class* of failure as `FloorPlan301`'s already-documented,
+already-kept geometry limit (a book's bounding box not fitting a
+particular drawer's real interior volume) — a different scene,
+independently reproducing the same real physical constraint, not a
+planner regression. Not a coincidence worth treating as mysterious:
+book→drawer was reused as a `tier3_store` task shape for `FloorPlan203`
+specifically because it is one of `v1.0`'s two known
+hard-negative-shape choices (see `v1.0`'s card) — this outcome
+confirms the shape genuinely generalizes as a hard case, rather than
+being a `FloorPlan301`-specific fluke.
+
+### `tier4_multi_step`: real result, and a real new gap it surfaced
+
+**`rule_based`/`behavior_tree`: 7/9.** Both failures are worth
+reporting in full because they are not simple restatements of
+`tier3_store`'s known geometry limit — they are a genuine harness/
+sequencing gap this new tier is the first thing in this project to
+expose:
+
+```
+milo-v1.1-fp302-t4a  [alarmclock->drawer] No valid positions to place object found
+                     [cd->shelf] InvalidOperationException: Agent hand has something
+                     in it already! Can't pick up anything else.
+
+milo-v1.1-fp201-t4a  [book->drawer] No valid positions to place object found
+                     [watch->box] InvalidOperationException: Cannot teleport due to
+                     hand object collision.
+```
+
+Root cause, traced through, not left as a bare Unity exception: in
+both cases, sub-goal 1's `place` step fails at the AI2-THOR physics
+level (`"No valid positions to place object found"` — the same real
+geometry-limit class `tier3_store`'s `FloorPlan301`/`FloorPlan203`
+failures already document). Critically, **a failed `place` does not
+un-pick-up the object** — the agent is still physically holding it
+when sub-goal 1's episode ends. `run_benchmark.py`'s
+`_run_multi_subtask_episode()` re-seeds sub-goal 2's `WorldState` from
+live AI2-THOR metadata before planning
+(`_seed_initial_state_from_live_metadata`), but that helper only seeds
+`is_open`/`is_openable` for objects the *new* sub-goal references (see
+its own docstring) — it has no notion of "is the agent's hand already
+occupied by a *different* object left over from a prior sub-goal that
+failed." `RuleBasedPlanner`/`BehaviorTreePlanner` therefore plan
+sub-goal 2 exactly as if the hand were empty (as it always has been at
+the start of every single-subtask episode this project has ever run),
+issue a `pickup` (or a `navigate` while already holding something),
+and real AI2-THOR rejects it — `"Agent hand has something in it
+already!"` or a teleport/hand-collision error, depending on which
+action hits the mismatch first.
+
+**This is a real, newly-discovered limitation of the `v1.1` harness,
+not a planner defect and not a dataset authoring error**: both
+`RuleBasedPlanner`/`BehaviorTreePlanner` behaved exactly as designed
+given the (incomplete, for this new multi-subtask case) `WorldState`
+they were handed. It only became visible because `tier4_multi_step` is
+the first task shape in this project where a *second* sub-goal's plan
+can be built while a *first* sub-goal's real-world side effect
+(an object left in-hand after a failed placement) is still live and
+un-modeled. Recorded here as a known, understood, currently-open gap —
+not fixed in this pass, per this report's own "investigate and report
+honestly, do not silently patch mid-benchmark" discipline; a fix would
+need `_seed_initial_state_from_live_metadata` (or a
+`tier4_multi_step`-specific seeding step) to also read and seed
+whichever object(s) the live simulator currently reports as held,
+regardless of which sub-goal's names it was called for. Tracked as a
+new `docs/roadmap.md` row rather than patched inline.
+
+**`react` (`qwen2.5:7b`): 0/9, and it is a direct, expected consequence of `tier3_store`'s existing 0% rate, not a new failure mode.** Every `tier4_multi_step` task requires TWO independent `store` sequences to both succeed; `react` was already at 0/9 on single-`store` `tier3_store` tasks in this same run (and 0/5 in `v1.0`'s Addendum 3) for the same root cause documented there — precondition-order mistakes (`put_down`/`place` proposed before `holding_target`; `pickup`/`navigate`/`open` proposed before `target_near`/`target_located`). Confirmed identical here: every one of `react`'s 9 `tier4_multi_step` failures shows the same `LLM produced malformed output after 3 attempt(s)` pattern on at least one of its two sub-goals, with the same precondition-violation messages Addendum 3 already catalogued. A planner that cannot reliably clear one `store` sub-goal cannot be expected to clear two in the same episode — 0/9 is the arithmetically expected result of 0/9 (`tier3_store`, this run) composed with itself, not a separate discovery. Not investigated further beyond confirming the failure signature matches, for that reason.
+
+### `tier1_locate` perception-grounded check (informational, same convention as Addendum 5)
+
+```
+rule_based:         exists_in_scene 18/18   perceived_by_agent 11/18   diverged 7/18
+behavior_tree:      exists_in_scene 18/18   perceived_by_agent 11/18   diverged 7/18
+react (qwen2.5:7b):  exists_in_scene 18/18   perceived_by_agent 9/18   diverged 9/18
+```
+
+Consistent with Addendum 5's finding on `v1.0`'s 5 scenes (real,
+repeated divergence between "a real object exists" and "the agent's
+own `GroundingDINODetector` actually detected it" — a genuine
+sim-to-real domain gap, not investigated again here since Addendum 5
+already root-caused the mechanism and this run's divergence rate
+(39-50%) is in the same range). `goal_success` is unaffected by this
+signal, per the same "never silently merge these two questions"
+discipline Addendum 5 established.
+
+### Cost/latency
+
+```
+rule_based:      1284.0ms avg   (min 12ms, max 6376ms)
+behavior_tree:   1247.2ms avg   (min 12ms, max 6114ms)
+react:           7156.5ms avg   (min 1633ms, max 20515ms)
+
+react by tier:  tier1_locate 2804ms   tier2_pickup 5625ms   tier3_store 9545ms   tier4_multi_step 16536ms
+react LLM calls/episode (avg): 4.07   prompt tokens/episode (avg, real): 1280.3   completion tokens/episode (avg, real): 158.9
+```
+
+`tier4_multi_step`'s ~16.5s average for `react` is expected, not a new
+finding: it is two sub-goals' worth of LLM planning/repair time in one
+episode (roughly 2x a single `tier3_store` episode, consistent with
+9545ms × ~1.7, the "some tier4 sub-goals fail faster once the first
+sub-goal's early precondition mismatch is hit" effect keeping it under
+a clean 2x). No harness exceptions across all 162 episodes; 0/54
+`react` episodes needed the transient-LLM-error retry wrapper; 0/54
+needed the token-count approximation fallback (real provider `usage`
+on every call, same as Addendum 6).
+
+### What this run does and does not establish
+
+**Does establish**: `v1.1`'s scale-up (9 scenes) reproduces `v1.0`'s
+findings at a larger sample size with no regressions —
+`tier1_locate`/`tier2_pickup` remain solid for all three planners
+across double the scenes; the `tier3_store` geometry-limit failure
+mode generalizes to a second scene under repetition, not a one-off; and
+`react`'s `tier3_store` weakness composes exactly as expected into a
+0% `tier4_multi_step` rate. The new `tier4_multi_step` tier also
+surfaced one genuine, previously-invisible harness gap — WorldState
+re-seeding does not carry a failed-placement's "still holding it"
+fact across sub-goal boundaries — that no single-subtask task shape in
+this project could ever have exposed.
+
+**Does not establish**: a fix for the held-object re-seeding gap (open,
+tracked, not patched here); whether a different `tier4_multi_step`
+task shape (e.g. sub-goals in different rooms, or with an explicit
+"put down first" dependency) would behave differently; anything about
+`react`'s ceiling on `tier4_multi_step` beyond "it inherits
+`tier3_store`'s existing failure rate," since it never got far enough
+into most episodes to be limited by anything else.
+
+---
+
+## Addendum 8 — a second local model for `react`: `qwen2.5:3b` vs `qwen2.5:7b`
+
+Item 5 of this session's plan: a second small local model, run through
+the identical `react` harness/instrumentation as Addendum 7's
+`qwen2.5:7b` run, against the same `milo_benchmark v1.1` 54-task set
+(which already contains `v1.0`'s 25 tasks as its first 25 rows, so one
+run covers both).
+
+### Setup
+
+- **Hardware**: same RTX 4050 Laptop GPU, 6.0 GiB total VRAM, confirmed
+  fresh via `nvidia-smi` immediately before picking a model: 0 MiB
+  used, 5920 MiB free (Ollama server already running, idle, no model
+  loaded) — not assumed from an earlier reading.
+- **Model chosen**: `qwen2.5:3b` (Ollama default tag, Q4_K_M
+  quantization, 1.9 GB on disk). Reasoning: picking a different size
+  *within the same model family* isolates scale as the one variable
+  under test, rather than confounding it with an architecture change a
+  different small open model would introduce — the question this
+  addendum asks is "does scale alone change the failure mode already
+  documented for `qwen2.5:7b`," which a same-family comparison answers
+  more cleanly. `qwen2.5:14b` (Q4_K_M, ~9 GB) was the other option
+  considered and rejected: it does not fit this card's 6 GB VRAM at
+  that quantization, so it would mostly measure heavy CPU-offload
+  slowness rather than model quality — not the more interesting
+  comparison. After a warm request, `nvidia-smi` showed 2161 MiB used
+  (full GPU residency for `qwen2.5:3b`, unlike `qwen2.5:7b`'s
+  documented 82/18 GPU/CPU split in Addendum 3) — confirmed, not
+  assumed.
+- **Wiring**: identical to Addendum 7 — `LANGUAGE_LLM_PROVIDER=qwen`,
+  `LANGUAGE_LLM_MODEL=qwen2.5:3b`,
+  `LANGUAGE_LLM_BASE_URL=http://localhost:11434/v1`,
+  `QWEN_API_KEY=not-needed`, `LANGUAGE_LLM_TIMEOUT_SECONDS=120`,
+  `MILO_BENCHMARK_DATASET_VERSION=1.1`. Only `react` was re-run (a
+  small wrapper script sets `run_benchmark.PLANNERS = {"react":
+  _make_react_planner}` before calling the real, unmodified `main()`)
+  — `rule_based`/`behavior_tree` are deterministic and were already
+  scored in Addendum 7; re-running them against a different `react`
+  backend would reproduce identical numbers for no new information.
+  Same code path, same `BenchmarkEpisodeResult` shape, same JSON/CSV
+  output convention as every other run in this report.
+
+Raw output:
+[`experiments/results/milo_benchmark_20260819T084307Z.json`](../results/milo_benchmark_20260819T084307Z.json)
+/ [`..._episodes.csv`](../results/milo_benchmark_20260819T084307Z_episodes.csv).
+
+### Result: identical aggregate score to `qwen2.5:7b` — verified this is not a coincidence of totals
+
+```
+qwen2.5:3b:  36/54 (66.7%)   tier1_locate 18/18   tier2_pickup 18/18   tier3_store 0/9   tier4_multi_step 0/9
+qwen2.5:7b:  36/54 (66.7%)   tier1_locate 18/18   tier2_pickup 18/18   tier3_store 0/9   tier4_multi_step 0/9   (Addendum 7, same run)
+```
+
+This match was checked task-by-task, not assumed from the totals: all
+54 task_ids were compared and **all 54 have the identical
+`goal_success` outcome between the two models** (0 differences). Both
+models' `plan_success`/`execution_success`/`goal_success` agree on
+every one of their own 54 episodes (0 mismatches each — no predicate
+artifact for either model), 0/54 episodes needed a retry for either
+model, and 0/54 needed the token-count approximation fallback (real
+provider `usage` throughout).
+
+### Cost/latency: `qwen2.5:3b` is materially faster, at equal accuracy
+
+```
+                 avg wall-clock/episode   tier1     tier2     tier3     tier4     avg LLM calls   avg prompt tok   avg completion tok
+qwen2.5:3b       3107.3ms                 1043.8ms  3085.7ms  4020.6ms  6364.3ms  3.54             1099.6           164.9
+qwen2.5:7b       7156.5ms                 2804.3ms  5624.7ms  9545.4ms  16535.6ms 4.07             1280.3           158.9
+```
+
+`qwen2.5:3b` is roughly **2.3x faster on average** (3.1s vs 7.2s per
+episode) with slightly fewer LLM calls and ~14% fewer prompt tokens on
+average, for an **identical** goal-success outcome on this task set —
+a real, measured accuracy/latency tradeoff point, not a projection.
+
+### Investigated: same failure *class*, and — after looking at the actual raw completions, not just the final error string — a more specific shared root cause than first reported
+
+Every one of both models' `tier3_store`/`tier4_multi_step` failures
+has `action_count=0` for both models — i.e. **neither model ever gets
+partway into a working plan and then breaks**; both fail their whole
+planning attempt every time. That rules out "one model gets further
+before failing" as an explanation for anything below.
+
+Classifying every `tier3_store`/`tier4_multi_step` failure's violated
+precondition(s) from its *final* recorded `failure_cause` (a
+`tier4_multi_step` episode can report up to two, one per sub-goal) —
+this is the same classification the original write-up of this
+addendum used:
+
+```
+qwen2.5:3b:  target_located 19   target_near 6   holding_target 2
+qwen2.5:7b:  missing_target_arg 10   target_located 9   target_near 5   holding_target 1   container_ready 1
+```
+
+**Correction to this addendum's original conclusion from this table
+alone**: the first version of this section characterized `qwen2.5:3b`
+as "skipping the first step of the whole chain" and `qwen2.5:7b` as
+"choosing the right final action but omitting a required argument."
+Both of those were inferred from the *final* repair attempt's error
+string only, because that string is the only thing the original full
+benchmark run persisted (`BenchmarkEpisodeResult.failure_cause`) — no
+run before this addendum captured the actual per-attempt raw LLM JSON.
+**This logging gap is now closed** (`planner.react._propose_with_repair()`
+logs every raw completion at DEBUG level, interpolated directly into
+the message string so it survives regardless of formatter config — see
+`react.py`'s own "Raw completion logging" docstring section and
+`docs/roadmap.md`) — a future `react` failure investigation can enable
+`DEBUG` on the `planner.react` logger for one run and get this same
+evidence directly, without a special diagnostic re-run like the one
+below. Re-running 6 of these episodes (3 per model, covering
+`milo-v1-fp1-t3a`/`milo-v1-fp5-t3a`/`milo-v1-fp301-t3a` for
+`qwen2.5:3b` and `milo-v1-fp5-t3a`/`milo-v1.1-fp202-t3a`/
+`milo-v1.1-fp302-t3a` for `qwen2.5:7b`) with a diagnostic LLM-client
+wrapper that captures every raw request/response — reproducing the
+exact same `goal_success`/`failure_cause` as the original run on all 6
+(so these are representative re-runs, not different outcomes) — shows
+a more precise and *partly shared* mechanism:
+
+**`qwen2.5:3b`, `milo-v1-fp1-t3a` ("Put the bread away in the
+fridge") — locates the object, then never locates the container:**
+```
+call 1: {"action": "locate", "target": "bread", ...}          -> accepted
+call 2: {"action": "navigate", "target": "fridge", ...}       -> REJECTED: target_located
+call 3: {"action": "navigate", "target": "fridge", ...}       -> REJECTED again (same mistake repeated)
+call 4: {"action": "navigate", "target": "fridge", ...}       -> REJECTED again, repair budget exhausted
+```
+
+**`qwen2.5:3b`, `milo-v1-fp5-t3a` ("Put the mug away in the
+cabinet") — never locates anything at all:**
+```
+call 1: {"action": "navigate", "target": "cabinet", ...}      -> REJECTED: target_located
+call 2: {"action": "navigate", "target": "cabinet", ...}      -> REJECTED again
+call 3: {"action": "navigate", "target": "cabinet", ...}      -> REJECTED again, gives up
+```
+
+Of the 3 `qwen2.5:3b` episodes re-run with full capture, 2
+(`milo-v1-fp1-t3a`, `milo-v1-fp301-t3a`) *did* call `locate` on the
+primary object first — contradicting "skips locate entirely" as a
+general description. What all 3 share is that **the destination
+container's own `locate` step is never called**, even when the
+object's was. `_deposit()` (`rule_based.py`) requires two independent
+`locate` calls per `store` task — one for the object, one for the
+container — and the LLM's proposals here only ever account for one of
+the two, or neither.
+
+**`qwen2.5:7b`, `milo-v1-fp5-t3a` ("Put the mug away in the
+cabinet") — gets further (locate, navigate, pickup all accepted), then
+misuses `put_down`/`place`'s `target` argument:**
+```
+call 1: {"action": "locate", "target": "mug", ...}            -> accepted
+call 2: {"action": "navigate", "target": "mug", ...}           -> accepted
+call 3: {"action": "pickup", "target": "mug", ...}              -> accepted
+call 4: {"action": "put_down", "target": "cabinet", ...}       -> REJECTED: holding_target
+call 5: {"action": "place", "target": "cabinet", ...}          -> REJECTED: holding_target, container_ready
+call 6: {"action": "put_down", "target": null, ...}             -> REJECTED: "requires a target" (final, gives up)
+```
+
+This is genuinely a different, and more advanced, failure point than
+`qwen2.5:3b`'s: the object is correctly located, navigated to, and
+picked up. But calls 4-5 are not "missing an argument" — they supply
+`target: "cabinet"`/`"box"`/`"safe"` explicitly. The mistake is a
+**wrong value**: `put_down`/`place`'s `target` field is defined
+(`planner/actions.py`'s `_require_holding_target`:
+`state.robot_holding == target.strip().lower()`) to mean *the object
+being placed* (which must match what is currently held, `"mug"`), not
+the destination. The model consistently substitutes the destination's
+name for it, which is why `holding_target` fails despite `target`
+never being empty on the first two attempts. It only degrades to a
+**literal** `target: null` on the 3rd, final repair attempt — which
+is the one message `failure_cause` recorded, and the one the original
+version of this section over-generalized from as "omitted a required
+argument."
+
+**Corrected conclusion, based on the real transcripts**: both models
+share a more specific root cause than "3b forgets to locate, 7b forgets
+an argument" — **neither model's proposals ever include a `locate`
+call for the destination/container object**, only (sometimes) for the
+primary object. Where the models differ is what happens once that gap
+is hit: `qwen2.5:3b`'s proposals stall immediately at `navigate`
+against the unlocated container and never progress past it in any of
+the 3 re-run episodes. `qwen2.5:7b`'s proposals, in the one re-run
+episode that reached that point, get further — it successfully
+completes `locate`/`navigate`/`pickup` on the primary object, then
+fails at the placement step by giving the container's identity to a
+field that expects the held object's identity — a mistake about
+*argument semantics*, not sequencing order. **This deeper mechanism is
+verified directly on 6 real re-run episodes (3 per model), not on all
+27 originally-classified precondition violations** — it is offered as
+the correct reading of *why* the classified numbers above look the
+way they do in the cases actually inspected, not as a re-verified
+claim about every one of the 27.
+
+### What this addendum does and does not establish
+
+**Does establish**: on this 54-task benchmark, `qwen2.5:3b` matches
+`qwen2.5:7b`'s goal-success rate exactly (task-for-task, not just in
+aggregate) at roughly 2.3x lower latency and modestly fewer tokens —
+for this specific task vocabulary (single- and two-step
+locate/pickup/store goals, no open-ended reasoning depth beyond a
+`store` sequence's 4-6 steps), the smaller model is a strictly better
+cost/latency tradeoff with no accuracy cost observed. The two models'
+failures, while equally fatal to the episode, differ in kind, on the 6
+episodes actually inspected with full raw-completion capture: both
+never issue a `locate` call for the destination/container object, but
+`qwen2.5:3b`'s proposals stall immediately at that gap (never getting
+past `navigate` against the unlocated container in any of the 3
+episodes checked), while `qwen2.5:7b`, in the 1 of 3 checked episodes
+that reached this far, first correctly completes
+`locate`/`navigate`/`pickup` on the primary object, then fails at
+placement by supplying the container's name to `put_down`/`place`'s
+`target` field, which the action schema defines as the *held object's*
+identity, not the destination.
+
+**Does not establish**: that `qwen2.5:3b` is a strictly better choice
+in general — this is one task vocabulary, one hardware/quantization
+combination, and a task set that happens to have a hard floor (every
+`tier3_store`/`tier4_multi_step` task) neither model's `react`
+integration crosses; a harder single-object task or a different
+prompt/repair strategy could easily separate the two models'
+`tier1_locate`/`tier2_pickup` scores, which are saturated (18/18 each)
+here and so cannot show a difference even if one exists. Also does not
+establish that the failure-mechanism difference above holds across all
+27 originally-classified precondition violations, only the 6 directly
+re-run with full capture; nor whether it reflects a genuine
+reasoning-capability difference between the two model sizes in
+general, or is specific to this exact prompt/action
+vocabulary — a claim about *this* benchmark's failure taxonomy, not a
+general claim about `qwen2.5:3b` vs. `qwen2.5:7b` reasoning ability.
+
