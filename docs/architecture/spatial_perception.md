@@ -283,9 +283,39 @@ That fusion, and any subsequent planning/execution, was **Phase 4**
 **Phase C** for grounding the planner's `WorldState` in this phase's
 `Scene` output: `backend/planner/grounding.py`'s
 `ground_world_state()`, wired into
-`orchestration.orchestrator.Orchestrator._observe()`. See that
-module's docstring for what is (existence/proximity/containment) and
-isn't (open/held state, full fusion) grounded yet.
+`orchestration.orchestrator.Orchestrator._observe()`.
+
+`ground_world_state()` grounds five things from a `Scene`:
+existence (`is_located`), proximity (`is_near_robot`), containment
+(`location`, from `RelationshipType.INSIDE` edges), open/closed
+state (`is_open`, from `Detection.attributes["is_open"]` -- see
+`backend/vision/state/open_state_classifier.py`, a Grounding-DINO
+phrase-grounded open/closed classifier reusing the already-loaded
+detector, not a new model), and a depth-proxied held-object heuristic
+(`WorldState.robot_holding`, from the closest sufficiently-near
+detection each frame). Vision overrides a stale symbolic belief on
+disagreement for `is_open`; the held-object heuristic only ever adds
+positive evidence, never clears `robot_holding` to `None` on an
+inconclusive frame -- see that module's docstring for the full
+reconciliation policy.
+
+**Real, honest limitation found investigating this**: the held-object
+heuristic was built partly to test whether it could close
+`docs/roadmap.md`'s `tier4_multi_step` `WorldState`-reseeding gap (a
+failed `place` leaves an object physically held, but re-seeding
+between sub-goals has no signal for "hand still full"). Re-running
+both known-failing episodes with vision grounding layered on top did
+**not** fix the gap -- not because the heuristic's logic is wrong
+(it's unit-tested and does the right thing on a synthetic close
+detection), but because in both live re-runs the detector produced
+**zero detections** for the post-failure frame the held object should
+have appeared in. This is downstream of the *already-tracked*,
+separate sim-to-real detection-confidence gap (production
+`box_threshold=0.35` missing real, visible objects) -- the two gaps
+are not independent; the held-object heuristic cannot help until
+detection itself reliably sees the held object. Full appearance-model
+-grade state fusion (reliable open/closed and held/not-held for every
+object) remains future work -- see `docs/roadmap.md`.
 
 ## Configuration
 

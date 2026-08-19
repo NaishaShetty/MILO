@@ -388,8 +388,7 @@ docker/          Container definitions (backend + frontend)
 | Item | Status |
 |---|---|
 | Vision sim-to-real detection gap (0.35 threshold misses real, ground-truth-visible objects) | ⚠️ Open |
-| `tier4_multi_step` `WorldState`-reseeding gap (held-object state doesn't carry between sub-goals) | ⚠️ Open |
-| Full vision state fusion (open/held state) | 🔜 Future |
+| `tier4_multi_step` `WorldState`-reseeding gap (held-object state doesn't carry between sub-goals; vision-grounded fix investigated, blocked by the detection gap above) | ⚠️ Open |
 | HTN planner | 🔜 Future |
 | Production auth/rate limiting | ❌ Not planned — no publicly reachable API to protect |
 
