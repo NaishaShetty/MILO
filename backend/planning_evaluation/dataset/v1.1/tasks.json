@@ -1,0 +1,96 @@
+[
+  {"task_id": "milo-v1-fp1-t1a", "scene": "FloorPlan1", "room_type": "kitchen", "difficulty_tier": "tier1_locate", "instruction": "Find the mug.", "goal": "find", "object": "mug", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp1-t1b", "scene": "FloorPlan1", "room_type": "kitchen", "difficulty_tier": "tier1_locate", "instruction": "Find the tomato.", "goal": "find", "object": "tomato", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp1-t2a", "scene": "FloorPlan1", "room_type": "kitchen", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the apple.", "goal": "pick_up", "object": "apple", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp1-t2b", "scene": "FloorPlan1", "room_type": "kitchen", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the spoon.", "goal": "pick_up", "object": "spoon", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp1-t3a", "scene": "FloorPlan1", "room_type": "kitchen", "difficulty_tier": "tier3_store", "instruction": "Put the bread away in the fridge.", "goal": "store", "object": "bread", "target": "fridge", "subtasks": null, "notes": "fridge is a confirmed openable container in this scene."},
+
+  {"task_id": "milo-v1-fp5-t1a", "scene": "FloorPlan5", "room_type": "kitchen", "difficulty_tier": "tier1_locate", "instruction": "Find the bowl.", "goal": "find", "object": "bowl", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp5-t1b", "scene": "FloorPlan5", "room_type": "kitchen", "difficulty_tier": "tier1_locate", "instruction": "Find the kettle.", "goal": "find", "object": "kettle", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp5-t2a", "scene": "FloorPlan5", "room_type": "kitchen", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the potato.", "goal": "pick_up", "object": "potato", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp5-t2b", "scene": "FloorPlan5", "room_type": "kitchen", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the pan.", "goal": "pick_up", "object": "pan", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp5-t3a", "scene": "FloorPlan5", "room_type": "kitchen", "difficulty_tier": "tier3_store", "instruction": "Put the mug away in the cabinet.", "goal": "store", "object": "mug", "target": "cabinet", "subtasks": null, "notes": "cabinet is a confirmed openable container in this scene."},
+
+  {"task_id": "milo-v1-fp201-t1a", "scene": "FloorPlan201", "room_type": "living_room", "difficulty_tier": "tier1_locate", "instruction": "Find the laptop.", "goal": "find", "object": "laptop", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp201-t1b", "scene": "FloorPlan201", "room_type": "living_room", "difficulty_tier": "tier1_locate", "instruction": "Find the vase.", "goal": "find", "object": "vase", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp201-t2a", "scene": "FloorPlan201", "room_type": "living_room", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the newspaper.", "goal": "pick_up", "object": "newspaper", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp201-t2b", "scene": "FloorPlan201", "room_type": "living_room", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the pillow.", "goal": "pick_up", "object": "pillow", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp201-t3a", "scene": "FloorPlan201", "room_type": "living_room", "difficulty_tier": "tier3_store", "instruction": "Put the remote control away in the drawer.", "goal": "store", "object": "remotecontrol", "target": "drawer", "subtasks": null, "notes": "drawer is a confirmed openable container in this scene."},
+
+  {"task_id": "milo-v1-fp301-t1a", "scene": "FloorPlan301", "room_type": "bedroom", "difficulty_tier": "tier1_locate", "instruction": "Find the alarm clock.", "goal": "find", "object": "alarmclock", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp301-t1b", "scene": "FloorPlan301", "room_type": "bedroom", "difficulty_tier": "tier1_locate", "instruction": "Find the cell phone.", "goal": "find", "object": "cellphone", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp301-t2a", "scene": "FloorPlan301", "room_type": "bedroom", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the boots.", "goal": "pick_up", "object": "boots", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp301-t2b", "scene": "FloorPlan301", "room_type": "bedroom", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the CD.", "goal": "pick_up", "object": "cd", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp301-t3a", "scene": "FloorPlan301", "room_type": "bedroom", "difficulty_tier": "tier3_store", "instruction": "Put the book away in the drawer.", "goal": "store", "object": "book", "target": "drawer", "subtasks": null, "notes": "drawer is a confirmed openable container in this scene. Phase D found this exact task fails at execution due to a real AI2-THOR placement/geometry limit (no room found for the object's bounding box inside this drawer), not a planner defect -- kept in v1.0 (and here, unchanged) anyway since it is a genuine, reproducible ground-truth data point, not authoring error. See experiments/reports/phase_d_floorplan_generalization_findings.md section 5."},
+
+  {"task_id": "milo-v1-fp401-t1a", "scene": "FloorPlan401", "room_type": "bathroom", "difficulty_tier": "tier1_locate", "instruction": "Find the towel.", "goal": "find", "object": "towel", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp401-t1b", "scene": "FloorPlan401", "room_type": "bathroom", "difficulty_tier": "tier1_locate", "instruction": "Find the candle.", "goal": "find", "object": "candle", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp401-t2a", "scene": "FloorPlan401", "room_type": "bathroom", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the soap bar.", "goal": "pick_up", "object": "soapbar", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp401-t2b", "scene": "FloorPlan401", "room_type": "bathroom", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the toilet paper.", "goal": "pick_up", "object": "toiletpaper", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1-fp401-t3a", "scene": "FloorPlan401", "room_type": "bathroom", "difficulty_tier": "tier3_store", "instruction": "Put the spray bottle away on the shelf.", "goal": "store", "object": "spraybottle", "target": "shelf", "subtasks": null, "notes": "shelf is a real receptacle in this scene that is NOT openable. This was a known reproducible rule_based.py bug in v1.0 (_deposit() tried to open a non-openable target) -- since fixed (see origin repo's phase_e_milo_benchmark_report.md addendum, 'is_openable is False' carve-out in _deposit()). Kept unchanged here for direct v1.0 comparability; expected to now succeed against the fixed planner code."},
+
+  {"task_id": "milo-v1.1-fp202-t1a", "scene": "FloorPlan202", "room_type": "living_room", "difficulty_tier": "tier1_locate", "instruction": "Find the watch.", "goal": "find", "object": "watch", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp202-t1b", "scene": "FloorPlan202", "room_type": "living_room", "difficulty_tier": "tier1_locate", "instruction": "Find the statue.", "goal": "find", "object": "statue", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp202-t2a", "scene": "FloorPlan202", "room_type": "living_room", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the key chain.", "goal": "pick_up", "object": "keychain", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp202-t2b", "scene": "FloorPlan202", "room_type": "living_room", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the credit card.", "goal": "pick_up", "object": "creditcard", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp202-t3a", "scene": "FloorPlan202", "room_type": "living_room", "difficulty_tier": "tier3_store", "instruction": "Put the remote control away in the box.", "goal": "store", "object": "remotecontrol", "target": "box", "subtasks": null, "notes": "box is a confirmed openable, pickupable receptacle in this scene -- an unusual but real AI2-THOR combination (a container you can also carry); used here deliberately for tier3_store diversity, not an authoring error."},
+  {"task_id": "milo-v1.1-fp202-t4a", "scene": "FloorPlan202", "room_type": "living_room", "difficulty_tier": "tier4_multi_step", "instruction": "Put the pillow on the sofa and the laptop on the coffee table.", "goal": null, "object": null, "target": null, "subtasks": [
+    {"goal": "store", "object": "pillow", "target": "sofa"},
+    {"goal": "store", "object": "laptop", "target": "coffeetable"}
+  ], "notes": "tier4_multi_step: two independent single-object store sub-goals in the same scene, each targeting a confirmed non-openable receptacle (Sofa, CoffeeTable) -- exercises _deposit()'s is_openable-False carve-out across two sequential sub-goals, distinct from tier3_store's single-object chain."},
+
+  {"task_id": "milo-v1.1-fp302-t1a", "scene": "FloorPlan302", "room_type": "bedroom", "difficulty_tier": "tier1_locate", "instruction": "Find the laptop.", "goal": "find", "object": "laptop", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp302-t1b", "scene": "FloorPlan302", "room_type": "bedroom", "difficulty_tier": "tier1_locate", "instruction": "Find the tennis racket.", "goal": "find", "object": "tennisracket", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp302-t2a", "scene": "FloorPlan302", "room_type": "bedroom", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the pen.", "goal": "pick_up", "object": "pen", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp302-t2b", "scene": "FloorPlan302", "room_type": "bedroom", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the pencil.", "goal": "pick_up", "object": "pencil", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp302-t3a", "scene": "FloorPlan302", "room_type": "bedroom", "difficulty_tier": "tier3_store", "instruction": "Put the key chain away in the safe.", "goal": "store", "object": "keychain", "target": "safe", "subtasks": null, "notes": "safe is a confirmed openable container in this scene."},
+  {"task_id": "milo-v1.1-fp302-t4a", "scene": "FloorPlan302", "room_type": "bedroom", "difficulty_tier": "tier4_multi_step", "instruction": "Put the alarm clock away in the drawer and the CD away on the shelf.", "goal": null, "object": null, "target": null, "subtasks": [
+    {"goal": "store", "object": "alarmclock", "target": "drawer"},
+    {"goal": "store", "object": "cd", "target": "shelf"}
+  ], "notes": "tier4_multi_step: two independent single-object store sub-goals -- one openable-container target (Drawer), one non-openable receptacle (Shelf) -- requiring sequential planning/execution in the same scene."},
+
+  {"task_id": "milo-v1.1-fp402-t1a", "scene": "FloorPlan402", "room_type": "bathroom", "difficulty_tier": "tier1_locate", "instruction": "Find the cloth.", "goal": "find", "object": "cloth", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp402-t1b", "scene": "FloorPlan402", "room_type": "bathroom", "difficulty_tier": "tier1_locate", "instruction": "Find the plunger.", "goal": "find", "object": "plunger", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp402-t2a", "scene": "FloorPlan402", "room_type": "bathroom", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the scrub brush.", "goal": "pick_up", "object": "scrubbrush", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp402-t2b", "scene": "FloorPlan402", "room_type": "bathroom", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the tissue box.", "goal": "pick_up", "object": "tissuebox", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp402-t3a", "scene": "FloorPlan402", "room_type": "bathroom", "difficulty_tier": "tier3_store", "instruction": "Put the soap bottle away in the cabinet.", "goal": "store", "object": "soapbottle", "target": "cabinet", "subtasks": null, "notes": "cabinet is a confirmed openable container in this scene."},
+  {"task_id": "milo-v1.1-fp402-t4a", "scene": "FloorPlan402", "room_type": "bathroom", "difficulty_tier": "tier4_multi_step", "instruction": "Put the candle away in the cabinet and the soap bar away on the shelf.", "goal": null, "object": null, "target": null, "subtasks": [
+    {"goal": "store", "object": "candle", "target": "cabinet"},
+    {"goal": "store", "object": "soapbar", "target": "shelf"}
+  ], "notes": "tier4_multi_step: two independent single-object store sub-goals -- one openable-container target (Cabinet), one non-openable receptacle (Shelf) -- requiring sequential planning/execution in the same scene."},
+
+  {"task_id": "milo-v1.1-fp203-t1a", "scene": "FloorPlan203", "room_type": "living_room", "difficulty_tier": "tier1_locate", "instruction": "Find the newspaper.", "goal": "find", "object": "newspaper", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp203-t1b", "scene": "FloorPlan203", "room_type": "living_room", "difficulty_tier": "tier1_locate", "instruction": "Find the vase.", "goal": "find", "object": "vase", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp203-t2a", "scene": "FloorPlan203", "room_type": "living_room", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the boots.", "goal": "pick_up", "object": "boots", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp203-t2b", "scene": "FloorPlan203", "room_type": "living_room", "difficulty_tier": "tier2_pickup", "instruction": "Pick up the watch.", "goal": "pick_up", "object": "watch", "target": null, "subtasks": null, "notes": ""},
+  {"task_id": "milo-v1.1-fp203-t3a", "scene": "FloorPlan203", "room_type": "living_room", "difficulty_tier": "tier3_store", "instruction": "Put the book away in the drawer.", "goal": "store", "object": "book", "target": "drawer", "subtasks": null, "notes": "drawer is a confirmed openable container in this scene."},
+  {"task_id": "milo-v1.1-fp203-t4a", "scene": "FloorPlan203", "room_type": "living_room", "difficulty_tier": "tier4_multi_step", "instruction": "Put the pencil away in the box and the credit card away on the side table.", "goal": null, "object": null, "target": null, "subtasks": [
+    {"goal": "store", "object": "pencil", "target": "box"},
+    {"goal": "store", "object": "creditcard", "target": "sidetable"}
+  ], "notes": "tier4_multi_step: two independent single-object store sub-goals -- one openable-container target (Box), one non-openable receptacle (SideTable) -- requiring sequential planning/execution in the same scene."},
+
+  {"task_id": "milo-v1.1-fp1-t4a", "scene": "FloorPlan1", "room_type": "kitchen", "difficulty_tier": "tier4_multi_step", "instruction": "Put the knife away in the drawer and the cup away in the cabinet.", "goal": null, "object": null, "target": null, "subtasks": [
+    {"goal": "store", "object": "knife", "target": "drawer"},
+    {"goal": "store", "object": "cup", "target": "cabinet"}
+  ], "notes": "tier4_multi_step: two independent single-object store sub-goals (Knife->Drawer, Cup->Cabinet), both confirmed openable containers, requiring sequential planning/execution in the same scene."},
+
+  {"task_id": "milo-v1.1-fp5-t4a", "scene": "FloorPlan5", "room_type": "kitchen", "difficulty_tier": "tier4_multi_step", "instruction": "Put the egg away in the fridge and the lettuce away in the cabinet.", "goal": null, "object": null, "target": null, "subtasks": [
+    {"goal": "store", "object": "egg", "target": "fridge"},
+    {"goal": "store", "object": "lettuce", "target": "cabinet"}
+  ], "notes": "tier4_multi_step: two independent single-object store sub-goals (Egg->Fridge, Lettuce->Cabinet), both confirmed openable containers, requiring sequential planning/execution in the same scene."},
+
+  {"task_id": "milo-v1.1-fp201-t4a", "scene": "FloorPlan201", "room_type": "living_room", "difficulty_tier": "tier4_multi_step", "instruction": "Put the book away in the drawer and the watch away in the box.", "goal": null, "object": null, "target": null, "subtasks": [
+    {"goal": "store", "object": "book", "target": "drawer"},
+    {"goal": "store", "object": "watch", "target": "box"}
+  ], "notes": "tier4_multi_step: two independent single-object store sub-goals (Book->Drawer, Watch->Box), both confirmed openable containers, requiring sequential planning/execution in the same scene."},
+
+  {"task_id": "milo-v1.1-fp301-t4a", "scene": "FloorPlan301", "room_type": "bedroom", "difficulty_tier": "tier4_multi_step", "instruction": "Put the pen away in the drawer and the watch away in the box.", "goal": null, "object": null, "target": null, "subtasks": [
+    {"goal": "store", "object": "pen", "target": "drawer"},
+    {"goal": "store", "object": "watch", "target": "box"}
+  ], "notes": "tier4_multi_step: two independent single-object store sub-goals (Pen->Drawer, Watch->Box), both confirmed openable containers, requiring sequential planning/execution in the same scene."},
+
+  {"task_id": "milo-v1.1-fp401-t4a", "scene": "FloorPlan401", "room_type": "bathroom", "difficulty_tier": "tier4_multi_step", "instruction": "Put the dish sponge away on the side table and the paper towel roll away on the shelf.", "goal": null, "object": null, "target": null, "subtasks": [
+    {"goal": "store", "object": "dishsponge", "target": "sidetable"},
+    {"goal": "store", "object": "papertowelroll", "target": "shelf"}
+  ], "notes": "tier4_multi_step: two independent single-object store sub-goals, both targeting confirmed non-openable receptacles (SideTable, Shelf) -- exercises _deposit()'s is_openable-False carve-out across two sequential sub-goals in the one FloorPlan401 scene that has no non-Toilet openable receptacle at all."}
+]

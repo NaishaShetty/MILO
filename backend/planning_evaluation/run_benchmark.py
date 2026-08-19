@@ -126,6 +126,7 @@ from planning_evaluation.live_state import (
     TIER1_LOCATE_GOALS,
     check_goal_live,
     check_goal_live_grounded,
+    check_goal_live_multi,
 )
 from planning_evaluation.loader import BenchmarkTask, load_tasks
 from simulator.simulator import Simulator
@@ -383,9 +384,183 @@ class BenchmarkEpisodeResult:
     llm_token_usage_is_approximate: Optional[bool] = None
 
 
+def _run_multi_subtask_episode(
+    planner_name: str, planner: Planner, bt: BenchmarkTask
+) -> BenchmarkEpisodeResult:
+    """
+    `run_episode()`'s branch for `tier4_multi_step` tasks (`v1.1`):
+    `bt.to_single_tasks()` returns the task's independent sub-goals in
+    order; each is planned and executed as its own `TaskRunner.run()`
+    call against the SAME live `Simulator` (one Unity process for the
+    whole episode, not restarted between sub-goals -- this is what
+    makes it "sequencing," not two unrelated episodes). Each sub-goal's
+    `WorldState` is freshly re-seeded from the simulator's live
+    metadata right before that sub-goal plans, exactly like a
+    single-subtask episode -- so the second sub-goal's planner sees the
+    real post-first-sub-goal world (e.g. the first object now placed,
+    the agent's hand empty again), never stale pre-episode state.
+
+    No planner in this project accepts anything but a `SingleTask` (see
+    `loader.py`'s docstring) -- this function is what "two independent
+    sub-goals requiring sequencing" means operationally here, at the
+    benchmark-harness level, rather than via a `planner.Planner`-level
+    `MultiTask` API this project's planners do not implement.
+
+    `goal_success` is `check_goal_live_multi()`'s `all_succeeded`: both
+    sub-goals must independently hold live against ONE final metadata
+    snapshot taken after both have executed -- a first sub-goal cannot
+    be silently undone by the second and still count as a success.
+    `plan_success`/`execution_success` are similarly the AND across
+    both sub-goals. Both sub-goals are always attempted regardless of
+    whether the first one's plan/execution succeeded (mirrors a real
+    agent continuing to the next sub-goal rather than aborting the
+    whole instruction over one failed part); `failure_cause` records
+    every sub-goal that failed, tagged by its object/target, not just
+    the first.
+    """
+    tasks = bt.to_single_tasks()
+    simulator = Simulator(scene=bt.scene)
+    simulator.start()
+    counting_client = getattr(planner, "_llm_client", None)
+    if isinstance(counting_client, _CountingLLMClient):
+        counting_client.reset()
+    else:
+        counting_client = None
+    try:
+        total_wall_clock_ms = 0.0
+        total_action_count = 0
+        total_plan_step_count = 0
+        plan_success_all = True
+        execution_success_all = True
+        sub_failure_causes: List[str] = []
+
+        for sub_task in tasks:
+            pre_metadata = simulator.get_metadata()
+            initial_state = _seed_initial_state_from_live_metadata(
+                sub_task, pre_metadata
+            )
+            runner = TaskRunner(planner, simulator)
+            started = time.perf_counter()
+            run_result = runner.run(
+                sub_task,
+                episode_id=str(uuid.uuid4()),
+                memory_enabled=False,
+                initial_state=initial_state,
+            )
+            total_wall_clock_ms += (time.perf_counter() - started) * 1000.0
+
+            plan = run_result.planning_result.plan
+            plan_targets = [s.target for s in plan.steps] if plan is not None else []
+            total_plan_step_count += len(plan_targets)
+            total_action_count += (
+                len(run_result.execution_record.step_results)
+                if run_result.execution_record is not None
+                else 0
+            )
+            plan_success_all = plan_success_all and run_result.planning_result.success
+            execution_success_all = execution_success_all and run_result.succeeded
+
+            sub_failure = None
+            if run_result.execution_record is not None:
+                for step in run_result.execution_record.step_results:
+                    if step.error is not None:
+                        sub_failure = step.error.message
+                        break
+            if sub_failure is None and not run_result.planning_result.success:
+                sub_failure = (
+                    "; ".join(run_result.planning_result.errors) or "planning failed"
+                )
+            if sub_failure is not None:
+                sub_failure_causes.append(
+                    f"[{sub_task.object}->{sub_task.target}] {sub_failure}"
+                )
+
+        post_metadata = simulator.get_metadata()
+        multi_result = check_goal_live_multi(tasks, post_metadata)
+        goal_success = multi_result.all_succeeded
+
+        if not goal_success:
+            diverged = [
+                t.object
+                for t, ok in zip(tasks, multi_result.per_subtask)
+                if not ok and t.object
+            ]
+            if diverged:
+                sub_failure_causes.append(
+                    "goal predicate failed live for: " + ", ".join(diverged)
+                )
+        failure_cause = "; ".join(sub_failure_causes) if sub_failure_causes else None
+
+        return BenchmarkEpisodeResult(
+            planner=planner_name,
+            task_id=bt.task_id,
+            scene=bt.scene,
+            room_type=bt.room_type,
+            difficulty_tier=bt.difficulty_tier,
+            instruction=bt.instruction,
+            goal="multi_step",
+            object=None,
+            target=None,
+            plan_success=plan_success_all,
+            execution_success=execution_success_all,
+            goal_success=goal_success,
+            action_count=total_action_count,
+            plan_step_count=total_plan_step_count,
+            failure_cause=failure_cause,
+            wall_clock_ms=total_wall_clock_ms,
+            llm_call_count=counting_client.call_count if counting_client else 0,
+            llm_prompt_tokens=(
+                counting_client.prompt_tokens if counting_client else None
+            ),
+            llm_completion_tokens=(
+                counting_client.completion_tokens if counting_client else None
+            ),
+            llm_token_usage_is_approximate=(
+                counting_client.any_approximated
+                if counting_client and counting_client.call_count
+                else None
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001 -- record, don't abort the run
+        return BenchmarkEpisodeResult(
+            planner=planner_name,
+            task_id=bt.task_id,
+            scene=bt.scene,
+            room_type=bt.room_type,
+            difficulty_tier=bt.difficulty_tier,
+            instruction=bt.instruction,
+            goal="multi_step",
+            object=None,
+            target=None,
+            plan_success=False,
+            execution_success=False,
+            goal_success=False,
+            action_count=0,
+            plan_step_count=0,
+            failure_cause=f"harness_exception: {exc!r}",
+            wall_clock_ms=0.0,
+            llm_call_count=counting_client.call_count if counting_client else 0,
+            llm_prompt_tokens=(
+                counting_client.prompt_tokens if counting_client else None
+            ),
+            llm_completion_tokens=(
+                counting_client.completion_tokens if counting_client else None
+            ),
+            llm_token_usage_is_approximate=(
+                counting_client.any_approximated
+                if counting_client and counting_client.call_count
+                else None
+            ),
+        )
+    finally:
+        simulator.stop()
+
+
 def run_episode(
     planner_name: str, planner: Planner, bt: BenchmarkTask
 ) -> BenchmarkEpisodeResult:
+    if bt.subtasks is not None:
+        return _run_multi_subtask_episode(planner_name, planner, bt)
     task = bt.to_single_task()
     simulator = Simulator(scene=bt.scene)
     simulator.start()
@@ -601,7 +776,12 @@ def main() -> None:
         )
         sys.exit(0)
 
-    tasks = load_tasks()
+    #: Which `dataset/v<version>/tasks.json` to run -- defaults to the
+    #: original `v1.0` set so every existing invocation/CI-adjacent
+    #: command stays unchanged; set `MILO_BENCHMARK_DATASET_VERSION=1.1`
+    #: to run the v1.1 scale-up set instead (see `dataset/v1.1/README.md`).
+    dataset_version = os.environ.get("MILO_BENCHMARK_DATASET_VERSION", "1.0")
+    tasks = load_tasks(version=dataset_version)
     all_results: List[BenchmarkEpisodeResult] = []
     for planner_name, planner_factory in PLANNERS.items():
         planner = planner_factory()
@@ -645,7 +825,7 @@ def main() -> None:
     report = {
         "reproducibility": {
             "generated_at_utc": timestamp,
-            "dataset": "milo_benchmark v1.0",
+            "dataset": f"milo_benchmark v{dataset_version}",
             "simulator": "Simulator (real AI2-THOR/Unity, restarted between episodes)",
             "planners": list(PLANNERS.keys()),
             "react_llm_provider": REACT_LLM_PROVIDER,

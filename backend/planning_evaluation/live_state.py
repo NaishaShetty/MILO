@@ -82,7 +82,7 @@ practice.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from execution.resolver import ObjectResolver
 from schemas.task import SingleTask
@@ -176,6 +176,45 @@ def check_goal_live(task: SingleTask, metadata: Dict[str, Any]) -> Optional[bool
         return ref is not None
 
     return None
+
+
+@dataclass
+class MultiGoalResult:
+    """
+    `check_goal_live()` applied to every sub-goal of a
+    `tier4_multi_step` task (see `loader.BenchmarkTask.to_single_tasks()`),
+    kept per-subtask so a caller can report exactly which sub-goal(s)
+    failed rather than only a collapsed boolean -- the same
+    "never hide which part failed" discipline `check_goal_live_grounded()`
+    already applies to `tier1_locate`.
+    """
+
+    #: `check_goal_live()`'s result for each subtask, in order. A `None`
+    #: entry (goal this module has no live check for) counts as failed
+    #: in `all_succeeded`, matching how `run_benchmark.py` treats an
+    #: unverifiable single-task goal as not a success.
+    per_subtask: List[Optional[bool]]
+
+    @property
+    def all_succeeded(self) -> bool:
+        return len(self.per_subtask) > 0 and all(bool(r) for r in self.per_subtask)
+
+
+def check_goal_live_multi(
+    tasks: List[SingleTask], metadata: Dict[str, Any]
+) -> MultiGoalResult:
+    """
+    `check_goal_live()` for each of `tasks` (a `tier4_multi_step`
+    task's independent sub-goals, all evaluated against the *same*
+    post-execution `metadata` snapshot -- taken once, after both
+    sub-goals have been planned and executed in sequence). A
+    `tier4_multi_step` episode's `goal_success` is
+    `MultiGoalResult.all_succeeded`: every sub-goal must independently
+    hold live, not just the last one attempted.
+    """
+    return MultiGoalResult(
+        per_subtask=[check_goal_live(task, metadata) for task in tasks]
+    )
 
 
 def check_goal_live_grounded(

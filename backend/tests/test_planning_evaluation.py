@@ -23,6 +23,7 @@ from planning_evaluation.live_state import (
     GroundedTier1Result,
     check_goal_live,
     check_goal_live_grounded,
+    check_goal_live_multi,
 )
 from planning_evaluation.loader import load_tasks
 from scene.detection import Detection
@@ -239,3 +240,179 @@ def test_tier1_locate_goals_matches_check_goal_live_vocabulary():
         "inspect",
         "count",
     }
+
+
+# ---------------------------------------------------------------------
+# v1.1: scale-up (more scenes) + tier4_multi_step (two independent
+# sub-goals, see loader.py's/live_state.py's docstrings).
+# ---------------------------------------------------------------------
+
+
+def test_v1_1_dataset_extends_v1_0_with_more_scenes_and_a_tier4_tier():
+    tasks = load_tasks(version="1.1")
+    assert len(tasks) == 54
+    assert {t.scene for t in tasks} == {
+        "FloorPlan1",
+        "FloorPlan5",
+        "FloorPlan201",
+        "FloorPlan301",
+        "FloorPlan401",
+        "FloorPlan202",
+        "FloorPlan302",
+        "FloorPlan402",
+        "FloorPlan203",
+    }
+    assert {t.difficulty_tier for t in tasks} == {
+        "tier1_locate",
+        "tier2_pickup",
+        "tier3_store",
+        "tier4_multi_step",
+    }
+    ids = [t.task_id for t in tasks]
+    assert len(ids) == len(set(ids))
+
+
+def test_v1_1_tier4_tasks_have_two_subtasks_each():
+    tasks = load_tasks(version="1.1")
+    tier4 = [t for t in tasks if t.difficulty_tier == "tier4_multi_step"]
+    assert len(tier4) == 9
+    for bt in tier4:
+        assert bt.subtasks is not None
+        assert len(bt.subtasks) == 2
+        # Distinct objects -- "two independent sub-goals", not the same
+        # object touched twice.
+        assert bt.subtasks[0].object != bt.subtasks[1].object
+
+
+def test_v1_1_frozen_v1_0_tasks_scoring_fields_match_v1_0():
+    # v1.0 stays frozen per its own versioning policy -- every task_id
+    # that also exists in v1.0 must round-trip to the exact same
+    # SCORING-RELEVANT fields (scene/goal/object/target/instruction) in
+    # v1.1's copy of it, so a score computed against either file's copy
+    # of a v1.0 task_id is directly comparable.
+    #
+    # This does NOT assert the two rows are byte-identical JSON --
+    # `notes` (free-text, non-scoring) was deliberately edited on 2
+    # tasks when v1.1 was authored: `milo-v1-fp301-t3a` (cosmetic
+    # addition) and `milo-v1-fp401-t3a` (substantively rewritten to
+    # reflect the `_deposit()` non-openable-target bug now being fixed,
+    # where v1.0's note still says it is unfixed -- see
+    # `dataset/v1.1/README.md`'s "What's new in v1.1" section). `notes`
+    # is intentionally not compared here for that reason.
+    v1_0_tasks = {t.task_id: t for t in load_tasks(version="1.0")}
+    v1_1_tasks = {t.task_id: t for t in load_tasks(version="1.1")}
+    shared_ids = set(v1_0_tasks) & set(v1_1_tasks)
+    assert shared_ids == set(v1_0_tasks)  # every v1.0 task_id survives into v1.1
+    for task_id in shared_ids:
+        old, new = v1_0_tasks[task_id], v1_1_tasks[task_id]
+        assert old.scene == new.scene
+        assert old.goal == new.goal
+        assert old.object == new.object
+        assert old.target == new.target
+        assert old.instruction == new.instruction
+
+
+def test_benchmark_task_to_single_tasks_flat_row_returns_one_task():
+    bt = next(t for t in load_tasks(version="1.1") if t.task_id == "milo-v1-fp1-t3a")
+    singles = bt.to_single_tasks()
+    assert len(singles) == 1
+    assert singles[0].goal == "store"
+    assert singles[0].task_id == "milo-v1-fp1-t3a"
+
+
+def test_benchmark_task_to_single_tasks_tier4_row_returns_two_ordered_tasks():
+    bt = next(t for t in load_tasks(version="1.1") if t.task_id == "milo-v1.1-fp1-t4a")
+    singles = bt.to_single_tasks()
+    assert [s.object for s in singles] == ["knife", "cup"]
+    assert [s.target for s in singles] == ["drawer", "cabinet"]
+    assert [s.goal for s in singles] == ["store", "store"]
+    # Suffixed task_ids so per-subtask episodes stay individually
+    # identifiable without colliding with the parent task_id.
+    assert singles[0].task_id == "milo-v1.1-fp1-t4a-sub1"
+    assert singles[1].task_id == "milo-v1.1-fp1-t4a-sub2"
+
+
+def test_to_single_task_raises_for_a_tier4_multi_subtask_row():
+    bt = next(t for t in load_tasks(version="1.1") if t.task_id == "milo-v1.1-fp1-t4a")
+    try:
+        bt.to_single_task()
+        raise AssertionError("expected ValueError for a multi-subtask row")
+    except ValueError:
+        pass
+
+
+# ---------------------------------------------------------------------
+# check_goal_live_multi() -- tier4_multi_step's success-predicate
+# extension: AND across every independent sub-goal, evaluated against
+# one shared post-execution metadata snapshot.
+# ---------------------------------------------------------------------
+
+
+def test_check_goal_live_multi_true_when_every_subtask_holds():
+    tasks = [
+        SingleTask(goal="store", object="knife", target="drawer"),
+        SingleTask(goal="store", object="cup", target="cabinet"),
+    ]
+    metadata = {
+        "objects": [
+            _obj(
+                "Knife|1",
+                "Knife",
+                isPickedUp=False,
+                parentReceptacles=["Drawer|1"],
+            ),
+            _obj("Drawer|1", "Drawer"),
+            _obj("Cup|1", "Cup", isPickedUp=False, parentReceptacles=["Cabinet|1"]),
+            _obj("Cabinet|1", "Cabinet"),
+        ]
+    }
+    result = check_goal_live_multi(tasks, metadata)
+    assert result.per_subtask == [True, True]
+    assert result.all_succeeded is True
+
+
+def test_check_goal_live_multi_false_when_only_one_subtask_holds():
+    """
+    The case tier4 exists to catch: a planner that completes the first
+    sub-goal but mis-sequences/never reaches the second must not be
+    scored a success -- `all_succeeded` requires BOTH, not "at least
+    one."
+    """
+    tasks = [
+        SingleTask(goal="store", object="knife", target="drawer"),
+        SingleTask(goal="store", object="cup", target="cabinet"),
+    ]
+    metadata = {
+        "objects": [
+            _obj(
+                "Knife|1",
+                "Knife",
+                isPickedUp=False,
+                parentReceptacles=["Drawer|1"],
+            ),
+            _obj("Drawer|1", "Drawer"),
+            # Cup never made it into the cabinet -- still held.
+            _obj("Cup|1", "Cup", isPickedUp=True, parentReceptacles=[]),
+            _obj("Cabinet|1", "Cabinet"),
+        ]
+    }
+    result = check_goal_live_multi(tasks, metadata)
+    assert result.per_subtask == [True, False]
+    assert result.all_succeeded is False
+
+
+def test_check_goal_live_multi_false_when_both_subtasks_fail():
+    tasks = [
+        SingleTask(goal="store", object="knife", target="drawer"),
+        SingleTask(goal="store", object="cup", target="cabinet"),
+    ]
+    metadata = {"objects": []}
+    result = check_goal_live_multi(tasks, metadata)
+    assert result.per_subtask == [False, False]
+    assert result.all_succeeded is False
+
+
+def test_check_goal_live_multi_empty_list_does_not_succeed():
+    # Defensive: an empty subtask list should never read as a vacuous
+    # success.
+    assert check_goal_live_multi([], {"objects": []}).all_succeeded is False
