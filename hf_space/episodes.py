@@ -39,9 +39,10 @@ from dataclasses import dataclass, field
 CURATED_EPISODES = [
     ("rule_based", "milo-v1-fp1-t3a", "rule_based success on a tier3_store task (bread -> fridge)."),
     ("behavior_tree", "milo-v1-fp5-t3a", "behavior_tree success on a different scene's tier3_store task (mug -> cabinet), for scene variety."),
+    ("htn", "milo-v1-fp401-t3a", "htn success on a tier3_store task requiring real open/place decomposition (spray bottle -> shelf, non-openable target) -- a genuine HTN method-library expansion (DepositObject), not a second implementation of rule_based's control flow, reaching the identical plan shape."),
     ("react", "milo-v1-fp1-t2a", "react's strongest tier: a genuine tier2_pickup success (apple), plan produced and executed for real."),
     ("react", "milo-v1-fp1-t3a", "react's typical tier3_store failure mode: mis-sequenced action rejected by the precondition validator, not an infrastructure error."),
-    ("rule_based", "milo-v1-fp301-t3a", "The known, still-failing FloorPlan301 book->drawer case: a real AI2-THOR geometry limit (the drawer has no room for this book), not a planner defect. Documented in the dataset README's 'Known limitations' and reproduced identically by all three planners."),
+    ("rule_based", "milo-v1-fp301-t3a", "The known, still-failing FloorPlan301 book->drawer case: a real AI2-THOR geometry limit (the drawer has no room for this book), not a planner defect. Documented in the dataset README's 'Known limitations' and reproduced identically by all three symbolic planners (rule_based, behavior_tree, htn)."),
 ]
 
 SCREENSHOT_ASSOCIATIONS = {
@@ -85,6 +86,7 @@ class EpisodeDisplay:
 MODEL_LABELS = {
     "rule_based": "rule_based — deterministic symbolic planner, no LLM",
     "behavior_tree": "behavior_tree — deterministic BT composition of the same goal templates, no LLM",
+    "htn": "htn — deterministic Hierarchical Task Network engine (compound tasks, method library, recursive decomposition), no LLM",
     "react": "react — qwen2.5:7b via Ollama, local (no cloud API, no external quota)",
 }
 

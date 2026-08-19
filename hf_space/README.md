@@ -15,10 +15,10 @@ A read-only companion demo to
 on the Hugging Face Hub, and to the
 [MILO vision-language-robotics project](https://github.com/NaishaShetty/MILO)
 (origin repository). It shows a **leaderboard** and an **episode replay
-browser** built entirely from a real benchmark results JSON — three
-planners (`rule_based`, `behavior_tree`, `react` on a local `qwen2.5:7b`
-model via Ollama) scored against a fixed 25-task, 5-scene, 3-tier AI2-THOR
-benchmark.
+browser** built entirely from a real benchmark results JSON — four
+planners (`rule_based`, `behavior_tree`, `htn`, `react` on a local
+`qwen2.5:7b` model via Ollama) scored against a fixed 25-task, 5-scene,
+3-tier AI2-THOR benchmark.
 
 ## This is not a live demo, and that's deliberate
 
@@ -149,7 +149,7 @@ Space's copy is a summary, not a re-derivation.
 
 - Dataset: [huggingface.co/datasets/naishashetty/milo_benchmark](https://huggingface.co/datasets/naishashetty/milo_benchmark)
 - Origin repository: [github.com/NaishaShetty/MILO](https://github.com/NaishaShetty/MILO)
-- Full benchmark report (methodology, all three planners' real numbers,
+- Full benchmark report (methodology, all four planners' real numbers,
   every caveat this README summarizes): `experiments/reports/phase_e_milo_benchmark_report.md`
   in the origin repository.
 

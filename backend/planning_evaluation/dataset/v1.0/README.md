@@ -27,7 +27,9 @@ a GPU/Unity this Space's free tier doesn't have — is live at
 Every task pairs a natural-language
 instruction with a structured goal/object/target spec and a
 machine-checkable success predicate, across 5 real AI2-THOR scenes
-spanning all 4 iTHOR room types.
+spanning all 4 iTHOR room types. `v1.0` is frozen (see "Versioning"
+below) — for a larger, 9-scene extension with a fourth difficulty
+tier, see [`v1.1`](../v1.1/README.md).
 
 **This is a synthetic, AI2-THOR-derived dataset, not a human-collected
 one.** Every instruction was authored by a human against a live scan
@@ -99,13 +101,14 @@ Reference implementation: `backend/planning_evaluation/live_state.py`'s
 `check_goal_live()` in the [MILO
 repository](https://github.com/NaishaShetty/MILO) (this dataset's origin repo).
 
-## Baselines (v1.0, real runs, all three planners)
+## Baselines (v1.0, real runs, all four planners)
 
 | Planner | Goal success | tier1_locate | tier2_pickup | tier3_store | Notes |
 |---|---|---|---|---|---|
 | `rule_based` | 24/25 (96%) | 10/10 | 10/10 | 4/5 | Deterministic, no LLM. One failure is a real AI2-THOR placement/geometry limit, not a planner defect. |
 | `behavior_tree` | 24/25 (96%) | 10/10 | 10/10 | 4/5 | Same task/plan-step outcomes as `rule_based` (shares its goal-handler templates); same single failure. |
-| `react` (`qwen2.5:7b`, Q4_K_M, via Ollama, local) | 20/25 (80%) | 10/10 | 10/10 | 0/5 | `goal_success`/`execution_success`/`plan_success` agree on every episode — no predicate artifact. All 5 failures are genuine multi-step reasoning failures (the model proposes an action before its precondition chain is satisfied, e.g. `pickup` before navigating close enough), not infrastructure. Run on an RTX 4050 Laptop GPU (6GB VRAM, 82%/18% GPU/CPU split), zero rate-limit retries needed (fully local, no quota). |
+| `htn` | 24/25 (96%) | 10/10 | 10/10 | 4/5 | A real Hierarchical Task Network engine (compound tasks, a state-conditional method library, recursive decomposition) — not a second implementation of `rule_based`'s control flow. Matches `rule_based`/`behavior_tree` exactly, including the identical single failure, at comparable latency (~647ms/episode avg vs. ~620–633ms). Slice 1 only: covers `tier1_locate`/`tier2_pickup`/`tier3_store`, not this project's `tier4_multi_step` tier (see `v1.1`'s card). |
+| `react` (`qwen2.5:7b`, Q4_K_M, via Ollama, local) | 20/25 (80%) | 10/10 | 10/10 | 0/5 | `goal_success`/`execution_success`/`plan_success` agree on every episode — no predicate artifact. All 5 failures are genuine multi-step reasoning failures (the model proposes an action before its precondition chain is satisfied, e.g. `pickup` before navigating close enough), not infrastructure. Run on an RTX 4050 Laptop GPU (6GB VRAM, 82%/18% GPU/CPU split), zero rate-limit retries needed (fully local, no quota). Reconfirmed unchanged (identical 20/25, identical per-task failures) after later detection-threshold/prompt fixes described below — those fixes don't touch this planner's LLM-proposal path. |
 
 `react` was also attempted against Gemini's free tier
 (`gemini-flash-latest`) first; that attempt is **not** a valid
@@ -146,21 +149,27 @@ keeps as ground truth.
 
 ## Known limitations — kept deliberately, not hidden
 
-Two `tier3_store` tasks are **known, currently reproducible failures**
-against the reference planner, kept in v1.0 on purpose as honest
-negative examples rather than removed to inflate a headline number:
+When this section was first written, two `tier3_store` tasks were
+**known, currently reproducible failures** against the reference
+planner, kept in v1.0 on purpose as honest negative examples rather
+than removed to inflate a headline number:
 
 - `milo-v1-fp301-t3a` ("Put the book away in the drawer.") fails at
   execution due to a real AI2-THOR physics/geometry limit — the
   drawer opens correctly, but AI2-THOR cannot find room for this
   particular book inside this particular drawer's real interior
-  volume. Not a planner defect.
-- `milo-v1-fp401-t3a` ("Put the spray bottle away on the shelf.")
-  fails because the reference rule-based planner tries to `open` the
+  volume. Not a planner defect. **Still failing** — this is the one
+  remaining failure in the Baselines table above, reproduced
+  identically by `rule_based`, `behavior_tree`, and `htn`.
+- `milo-v1-fp401-t3a` ("Put the spray bottle away on the shelf.") used
+  to fail because the reference rule-based planner tried to `open` the
   shelf before placing — a shelf is a valid receptacle but is not
-  openable, and the planner's `_deposit()` logic doesn't yet check
-  `openable` before deciding to open. A genuine, reproducible planner
-  bug, tracked in the origin repo's roadmap.
+  openable, and `_deposit()` didn't check `openable` before deciding
+  to open. **Fixed since this section was first written**: `_deposit()`
+  now checks the target's `is_openable` before inserting an `open`
+  step (see `backend/planner/rule_based.py`). This task now passes for
+  every planner in the Baselines table above — it is not the source of
+  any of their current failures.
 
 A different, honest limitation of the success predicate itself:
 `tier1_locate`'s live check (existence of an object of the named
@@ -238,6 +247,30 @@ describes the vision system's own, currently limited, detection
 reliability on AI2-THOR's synthetic renders — a different, still-open
 question this dataset now measures separately instead of conflating
 with the first.
+
+### Second addendum — detection threshold properly validated and changed (0.35 → 0.25)
+
+The root-cause data point above (0.15 recovers detections but was
+never validated for false positives) has since been followed up
+properly, not left open: a dedicated validation set (8 real AI2-THOR
+scenes, 9 true positives, 14 confirmed-absent true negatives) swept
+real precision/recall at `box_threshold` 0.15/0.20/0.25/0.30/0.35
+(two independent runs, consistent). **0.25 was adopted as the new
+default** (`GroundingDINODetector`'s default `box_threshold`, changed
+from 0.35): same recall as 0.15 (77.8%) with meaningfully better
+precision (63.6% vs. 53.8%), and better recall than the old 0.35
+(77.8% vs. 55.6%) with equal-or-better precision. This is a real
+config-default change to the detector this dataset's `perceived_by_agent`
+signal depends on, not a re-measurement of the numbers above — the
+`perceived_by_agent` counts reported in the first addendum
+(`rule_based`/`behavior_tree` 6/10, `react` 5/10) were measured at the
+old 0.35 threshold and have not been re-run at 0.25; treat them as
+historical, not current, if reproducing this check. `goal_success` is
+unaffected either way (it has never depended on vision detection for
+any tier). See the origin repository's `docs/roadmap.md` for the full
+validation methodology and a methodology bug this pass also caught and
+fixed (`GroundingDINODetector` sometimes merges adjacent prompt phrases
+into one compound label, which naive exact-string matching missed).
 
 ## Collection methodology
 

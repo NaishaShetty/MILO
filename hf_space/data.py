@@ -32,12 +32,13 @@ from dataclasses import dataclass, field
 
 RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
 
-PLANNER_ORDER = ["rule_based", "behavior_tree", "react"]
+PLANNER_ORDER = ["rule_based", "behavior_tree", "htn", "react"]
 TIER_ORDER = ["tier1_locate", "tier2_pickup", "tier3_store"]
 
 PLANNER_LABELS = {
     "rule_based": "rule_based (deterministic, no LLM)",
     "behavior_tree": "behavior_tree (deterministic, no LLM)",
+    "htn": "htn (deterministic, no LLM -- HTN task-network engine)",
     "react": "react (LLM-driven)",
 }
 

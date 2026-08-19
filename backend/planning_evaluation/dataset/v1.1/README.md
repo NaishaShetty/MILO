@@ -184,19 +184,59 @@ addendum) on both of a `tier4_multi_step` task's independent sub-goals
 in several cases (`FloorPlan202`, `FloorPlan402`'s second sub-goal,
 `FloorPlan401`), not only single-object `tier3_store` tasks.
 
-## Baselines (v1.1, real runs, all three planners)
+## Baselines (v1.1, real runs, all four planners)
 
 | Planner | Goal success | tier1_locate | tier2_pickup | tier3_store | tier4_multi_step | Notes |
 |---|---|---|---|---|---|---|
-| `rule_based` | 50/54 (92.6%) | 18/18 | 18/18 | 7/9 | 7/9 | Both `tier3_store` failures are the same real AI2-THOR placement-geometry limit `v1.0` already documents (`FloorPlan301`, now also `FloorPlan203` -- same task shape, independently reproducing). Both `tier4_multi_step` failures are a real, newly-surfaced harness gap (not a planner defect): a failed `place` in sub-goal 1 leaves the object physically held, and `WorldState` re-seeding between sub-goals has no signal for that, so sub-goal 2's plan assumes an empty hand and AI2-THOR rejects it. |
+| `rule_based` | 50/54 (92.6%) | 18/18 | 18/18 | 7/9 | 7/9 | Both `tier3_store` failures are the same real AI2-THOR placement-geometry limit `v1.0` already documents (`FloorPlan301`, now also `FloorPlan203` -- same task shape, independently reproducing). Both `tier4_multi_step` failures are a real, newly-surfaced harness gap (not a planner defect): a failed `place` in sub-goal 1 leaves the object physically held, and `WorldState` re-seeding between sub-goals has no signal for that, so sub-goal 2's plan assumes an empty hand and AI2-THOR rejects it. See "`tier4_multi_step` investigation update" below for the current, precise per-episode status. |
 | `behavior_tree` | 50/54 (92.6%) | 18/18 | 18/18 | 7/9 | 7/9 | Same task/plan-step outcomes as `rule_based` (shares its goal-handler templates); same failures for the same reasons. |
+| `htn` | 43/45 (95.6%)¹ | 18/18 | 18/18 | 7/9 | not attempted¹ | A real Hierarchical Task Network engine (compound tasks, a state-conditional method library, recursive decomposition) -- not a second implementation of `rule_based`'s control flow. ¹Slice 1 only: does not yet support `tier4_multi_step`'s multi-subtask decomposition, so those 9 tasks were deliberately not attempted, not scored as failures -- goal success is out of 45, not 54. Both `tier3_store` failures (`milo-v1-fp301-t3a`, `milo-v1.1-fp203-t3a`) are the identical placement-geometry limit `rule_based`/`behavior_tree` hit on the same pair -- no new failure mode across the 4 additional scenes, i.e. `v1.0`'s 5-scene result generalizes. |
 | `react` (`qwen2.5:7b`, Q4_K_M, via Ollama, local) | 36/54 (66.7%) | 18/18 | 18/18 | 0/9 | 0/9 | `tier4_multi_step`'s 0/9 is the arithmetically expected composition of `tier3_store`'s already-0% rate (a tier requiring two consecutive successful `store` sequences cannot score above a planner's single-`store` success rate) -- confirmed by inspecting each failure, not assumed: every one shows the same precondition-mis-sequencing pattern `v1.0`'s Addendum 3 already documents. `goal_success`/`execution_success`/`plan_success` agree on every episode; 0/54 episodes needed a retry. |
 
 See the origin repository's `experiments/reports/
 phase_e_milo_benchmark_report.md`'s Addendum 7 for full methodology,
-per-failure root-cause detail (including the `tier4_multi_step`
-WorldState-reseeding gap above, tracked open in `docs/roadmap.md`, not
-fixed in this pass), cost/latency, and exact reproduction commands.
+per-failure root-cause detail, cost/latency, and exact reproduction
+commands.
+
+### `tier4_multi_step` investigation update
+
+The `WorldState`-reseeding gap noted in the `rule_based`/`behavior_tree`
+row above has since been investigated in depth (not fixed and
+re-benchmarked -- the table above is still the original publish run).
+Two distinct causes were found behind the two known-failing episodes:
+
+- **`milo-v1.1-fp302-t4a`**: the engine-crash *symptom* (the planner
+  blindly issuing a doomed action once a hand is already occupied) is
+  fixed and verified -- re-seeding `robot_holding` with one detection
+  call per object name (rather than one joint multi-phrase prompt) at
+  a validated `box_threshold=0.25` correctly detects the held object
+  and lets the planner correctly *decline* to plan the second sub-goal
+  instead of crashing AI2-THOR. This fix is demonstrated via a targeted
+  investigation script, not yet merged into the production benchmark
+  harness's `_seed_initial_state_from_live_metadata()` path -- the
+  table above does not yet reflect it. The task's `goal_success` is
+  still `False` either way, now solely because sub-goal 1 hits the same
+  real placement-geometry limit `tier3_store` already has, unrelated to
+  this bug.
+- **`milo-v1.1-fp201-t4a`**: still open. Per-name detection queries do
+  find the held object, but at a measured depth (0.853m) outside the
+  held-object heuristic's `HELD_OBJECT_MAX_DEPTH_M=0.5m` cutoff --
+  calibrated against smaller held objects (0.347m-0.459m) than this
+  one. A separate, nearer, *not*-held object was also wrongly preferred
+  by the heuristic's "closest wins" tie-break. The concrete next step
+  identified (seeding `robot_holding` from AI2-THOR's own live
+  `isPickedUp`/`inventoryObjects` metadata, sidestepping both the
+  detection-prompt and depth-calibration dependencies) has not been
+  implemented.
+
+A related, broader finding surfaced during this investigation: Grounding
+DINO's confidence measurably drops under multi-phrase joint prompts
+(confirmed on 2 independent objects/frames) -- this does not affect
+`goal_success` for any tier in this dataset or `perceived_by_agent`'s
+`tier1_locate` check (both already query one object name at a time),
+but does affect some manual demo scripts in the origin repository. Full
+chain, exact numbers, and regression tests: the origin repository's
+`docs/roadmap.md`.
 
 ## Second local model for `react`: `qwen2.5:3b` comparison
 
