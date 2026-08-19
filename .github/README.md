@@ -44,13 +44,19 @@ about generalization across many environments (see
   removed/occluded objects).
 - **Language understanding** — natural-language instructions parsed
   into structured goals via a real LLM call (not rule-based NLU).
-- **Planning** — three interchangeable strategies behind one interface:
-  a deterministic rule-based planner, an LLM-driven ReAct planner, and
-  a Behavior Tree planner, each validated against a symbolic world
+- **Planning** — four interchangeable strategies behind one interface:
+  a deterministic rule-based planner, an LLM-driven ReAct planner, a
+  Behavior Tree planner, and `HTNPlanner`, a real Hierarchical Task
+  Network engine (compound tasks, a state-conditional method library,
+  recursive decomposition) — each validated against a symbolic world
   model.
 - **Vision-grounded planning** — the planner's world model is grounded
-  from a live Vision `Scene` before planning (existence, proximity, and
-  containment), not just a symbolic default or a raw simulator scan.
+  from a live Vision `Scene` before planning: existence, proximity, and
+  containment, plus `is_open` (from a vision open/closed classifier)
+  and held-object state (from a depth-proxied heuristic over live
+  detections) — not just a symbolic default or a raw simulator scan.
+  Held-object grounding has known calibration limits; see
+  [Known Limitations](#known-limitations).
 - **Execution** — plans are driven step by step through real AI2-THOR,
   with preconditions checked before every action and results validated
   against simulator ground truth, never assumed.
@@ -69,9 +75,10 @@ about generalization across many environments (see
 - **LLM provider abstraction** — OpenAI, Google Gemini, or a local
   Qwen-compatible server (e.g. Ollama, vLLM), selected purely through
   configuration.
-- **A published benchmark** — `milo_benchmark v1.0`, a 25-task/5-scene
-  dataset on the Hugging Face Hub with a reproducible runner and a
-  real three-planner baseline. See [Current Results](#current-results).
+- **Two published benchmarks** — `milo_benchmark v1.0` (25 tasks, 5
+  scenes) and `v1.1` (54 tasks, 9 scenes) on the Hugging Face Hub, with
+  a reproducible runner and real four-planner baselines. See
+  [Current Results](#current-results).
 
 Only capabilities that are actually implemented and verified are
 listed here — see [Known Limitations](#known-limitations) for what
@@ -81,10 +88,11 @@ isn't.
 
 **Backend** — Python, FastAPI + Uvicorn (API layer), Pydantic (data
 models), AI2-THOR (simulated environment), Grounding DINO (open-vocab
-detection), SAM2 (segmentation), SQLite + a vector store (memory
-persistence), OpenAI / Google Gemini / local Qwen-compatible server
-(pluggable LLM providers), OpenAI Whisper (local STT), ElevenLabs
-(cloud STT + TTS), pytest (test suite).
+detection), SAM2 (segmentation), CUDA-enabled PyTorch (GPU vision
+inference — see [Current Results](#current-results)), SQLite + a
+vector store (memory persistence), OpenAI / Google Gemini / local Qwen-
+compatible server (pluggable LLM providers), OpenAI Whisper (local
+STT), ElevenLabs (cloud STT + TTS), pytest (test suite).
 
 **Frontend** — React + TypeScript, built with Vite, react-router-dom
 (routing across 7 pages), Vitest + Testing Library (unit/component
@@ -126,8 +134,9 @@ A single `Orchestrator` runs this loop for every task: parse → retrieve
 memory → plan → observe/execute → reflect → replan (bounded) or finish
 → write memory. Every step publishes a real event the frontend polls
 and renders live. Before planning, the planner's `WorldState` is
-grounded from a live Vision `Scene` (existence, proximity, and
-containment), not just a symbolic default.
+grounded from a live Vision `Scene` — existence, proximity, and
+containment, plus `is_open` and held-object state — not just a
+symbolic default.
 
 For the full agent/frontend architecture (with diagrams of the real,
 verified implementation) see
@@ -143,8 +152,8 @@ planning, execution in implementation detail) see
 | Research | A modular agent architecture with an explicit failure taxonomy and a reflection step that decides `continue`/`retry`/`replan`/`abort` from structured execution failures, not a hardcoded retry count |
 | Research | A memory system with distinct episodic, semantic, and failure memory types, ranked retrieval (similarity + confidence + recency + provenance + context), and a memory-vs-no-memory ablation confirmed engaging under real AI2-THOR |
 | Research | A provider-agnostic LLM abstraction letting the same planner/agent code run against OpenAI, Gemini, or a local OpenAI-compatible server (Ollama, vLLM) purely through configuration |
-| Research | [`milo_benchmark v1.0`](https://huggingface.co/datasets/naishashetty/milo_benchmark) — a published Hugging Face dataset (25 tasks, 5 real AI2-THOR scenes, 3 difficulty tiers) with a reproducible runner and a real three-planner baseline scored against live post-execution simulator state |
-| Engineering | Three interchangeable planner strategies behind one interface, with shared plan validation against a symbolic world model |
+| Research | [`milo_benchmark`](https://huggingface.co/datasets/naishashetty/milo_benchmark) — two published Hugging Face dataset versions (`v1.0`: 25 tasks/5 scenes; `v1.1`: 54 tasks/9 scenes, all 4 iTHOR room types) with a reproducible runner and real four-planner baselines scored against live post-execution simulator state |
+| Engineering | Four interchangeable planner strategies behind one interface — including a real Hierarchical Task Network engine (`HTNPlanner`), not a second implementation reusing another strategy's control flow — with shared plan validation against a symbolic world model |
 | Engineering | A real-time frontend driven entirely by backend polling |
 | Product | MILO Lab — a research interface exposing perception benchmarks, planner evaluation, and a parse/plan sandbox as real, runnable operations |
 
@@ -153,126 +162,105 @@ for the full research-contribution breakdown and final evaluation.
 
 ## Current Results
 
-- **Tests**: backend `917 passed, 2 skipped, 0 failed` (~6 seconds);
-  frontend `186 passed, 0 failed` (29 files); production build clean.
+- **Tests**: backend `968 passed, 2 skipped, 0 failed` (~9 seconds; the
+  2 skips are LLM smoke tests requiring a live API key); frontend `186
+  passed, 0 failed` (29 files, ~3.5s); production build clean.
   `backend/tests/conftest.py` forces `VISION_ENABLE_SIMULATOR=false`
   for the whole suite regardless of a local `.env`'s interactive-dev
   setting — no manual env-var step needed for a clean, fast run.
-- **Real AI2-THOR mission, driven through the actual UI**: found and
-  fixed a critical bug where the orchestrator/plan validator ignored
-  the LLM's parsed `target_location`, causing every "put/place X in/on
-  Y" instruction to fail 100% of the time. Fixed and re-verified live
-  — a second run correctly resolved the target, planned, and executed
-  against real AI2-THOR, but still ended in `failed` after one real
-  replan: AI2-THOR correctly rejected placing into a closed
-  receptacle, exposing a separate, pre-existing gap in the rule-based
-  planner's "place" template. Since fixed: `_deposit()` now inserts an
-  `open` step whenever the destination's current `WorldState.is_open`
-  is known `False` (and skips a redundant `open`/`close` when it's
-  already known `True`) — see `backend/planner/rule_based.py`.
-- **Frontend↔backend connectivity**: every dynamic value on every page
-  traces to a real backend route; polling correctly cancels on
-  unmount.
-- **Memory benchmark, resolved end to end**: an initial controlled
-  `FakeSimulator` ablation found memory reduced task success 90% → 80%.
-  Re-run for real (real AI2-THOR + a real learned sentence-embedding
-  model): the drop did **not** reproduce — the memory-hint mechanism
-  the FakeSimulator finding depends on never engaged under real
-  AI2-THOR, because it depended on AI2-THOR's deprecated singular
-  `parentReceptacle` metadata field, which is always empty. Fixed by
-  reading the correct, reliably-populated `parentReceptacles` (plural)
-  field instead — now confirmed engaging on 5/5 real recall episodes
-  across all 5 benchmark scenes (was 0/5). Full writeup:
-  [`experiments/reports/phase_b_real_ablation_findings.md`](../experiments/reports/phase_b_real_ablation_findings.md).
-- **Planner/replanning**: reflection and dynamic replanning were
-  observed live (see the mission result above).
-- **`milo_benchmark v1.0`** — a versioned, 25-task, 5-scene (all 4
-  iTHOR room types), 3-tier dataset with a reproducible runner, scored
-  against live post-execution AI2-THOR state. Published on the Hugging
-  Face Hub:
+  Static gates (`black`, `ruff`, `mypy`, `eslint`, `tsc`) all clean;
+  CI green on the latest commit (backend, frontend, Docker build, and
+  Playwright E2E jobs).
+- **`milo_benchmark v1.0`** (25 tasks, 5 scenes, all 4 iTHOR room
+  types), scored against live post-execution AI2-THOR state. Published
+  on the Hugging Face Hub:
   [huggingface.co/datasets/naishashetty/milo_benchmark](https://huggingface.co/datasets/naishashetty/milo_benchmark)
   — companion leaderboard + episode replay Space (static, pre-recorded;
   AI2-THOR needs a GPU/Unity this Space's free tier doesn't have, so it
   isn't a live demo):
   [huggingface.co/spaces/naishashetty/milo_benchmark_companion](https://huggingface.co/spaces/naishashetty/milo_benchmark_companion).
-  Planner-comparison baseline:
 
   | Planner | Goal success | tier1 (locate) | tier2 (pickup) | tier3 (store) |
   |---|---|---|---|---|
   | `rule_based` | 24/25 (96%) | 10/10 | 10/10 | 4/5 |
   | `behavior_tree` | 24/25 (96%) | 10/10 | 10/10 | 4/5 |
+  | `htn` | 24/25 (96%) | 10/10 | 10/10 | 4/5 |
   | `react` (`qwen2.5:7b`, local, via Ollama) | 20/25 (80%) | 10/10 | 10/10 | 0/5 |
 
-  Both symbolic planners' one remaining failure is a real AI2-THOR
-  placement/geometry limit, not a planner bug (two other failures — a
-  `_deposit()` bug and a misleading execution-timeout message — were
-  found by this benchmark and fixed; see [Roadmap](#roadmap)).
-  `react`'s baseline: `goal_success`/`execution_success`/`plan_success`
-  agree on every episode, zero rate-limit retries needed — run locally
-  against `qwen2.5:7b` (Q4_K_M) served by Ollama on an RTX 4050 Laptop
-  GPU, after an earlier attempt against Gemini's free tier hit that
-  tier's daily quota (20 requests/day) after 2 of 25 episodes and
-  produced no usable number. All 5 `react` failures are genuine
-  multi-step reasoning mistakes (proposing an action before its
-  precondition chain is satisfied — e.g. `pickup` before navigating
-  close enough), not infrastructure. Full methodology and both the
-  failed-Gemini and successful-local-Qwen attempts:
+  All three symbolic planners fail the identical single task
+  (`milo-v1-fp301-t3a`) — a real AI2-THOR placement/geometry limit, not
+  a planner bug. `htn` matches `rule_based`/`behavior_tree` exactly,
+  including that shared failure, at comparable latency (~647ms/episode
+  avg vs. ~620–633ms) — a real task-network engine, not a second
+  implementation of the same control flow. `react`'s baseline:
+  `goal_success`/`execution_success`/`plan_success` agree on every
+  episode, zero rate-limit retries needed, reconfirmed unchanged after
+  this session's detection/prompt fixes (identical 20/25, identical
+  per-task failure signatures). Run locally against `qwen2.5:7b`
+  (Q4_K_M) served by Ollama on an RTX 4050 Laptop GPU. All 5 `react`
+  failures are genuine multi-step reasoning mistakes (proposing an
+  action before its precondition chain is satisfied), not
+  infrastructure. Full methodology:
   [`experiments/reports/phase_e_milo_benchmark_report.md`](../experiments/reports/phase_e_milo_benchmark_report.md).
 
-- **`milo_benchmark v1.1`** — extends v1.0 with 4 more scenes (9
-  total, all 4 iTHOR room types) and a new `tier4_multi_step` tier
-  (two independent, sequential sub-goals per task against one live
-  episode); v1.0 stays the frozen reference set, v1.1 is the extended
-  one:
+- **`milo_benchmark v1.1`** (54 tasks, 9 scenes, all 4 iTHOR room
+  types) — extends `v1.0` with 4 more scenes and a `tier4_multi_step`
+  tier (two independent, sequential sub-goals per task against one
+  live episode); `v1.0` stays the frozen reference set.
 
   | Planner | Goal success | tier1 | tier2 | tier3 | tier4 |
   |---|---|---|---|---|---|
   | `rule_based` | 50/54 (92.6%) | 18/18 | 18/18 | 7/9 | 7/9 |
   | `behavior_tree` | 50/54 (92.6%) | 18/18 | 18/18 | 7/9 | 7/9 |
+  | `htn` | 43/45 (95.6%)¹ | 18/18 | 18/18 | 7/9 | not attempted¹ |
   | `react` (`qwen2.5:7b`) | 36/54 (66.7%) | 18/18 | 18/18 | 0/9 | 0/9 |
 
-  This scale-up surfaced a real `WorldState`-reseeding gap: when a
-  `tier4_multi_step` sub-goal fails mid-`place`, the object is left
-  physically held, but the next sub-goal's planner has no signal that
-  the hand is already occupied. Investigated in depth since this table
-  was first published — fixed for one of the two known-failing
-  episodes, still open for the other (a real, object-size-dependent
-  limit in vision-grounded held-object detection); this table's
-  numbers are the original v1.1 publish run, not re-benchmarked (see
-  [Roadmap](#roadmap) for the full investigation). Dataset card:
-  [`backend/planning_evaluation/dataset/v1.1/README.md`](../backend/planning_evaluation/dataset/v1.1/README.md),
-  full writeup: Addendum 7 of the
-  [benchmark report](../experiments/reports/phase_e_milo_benchmark_report.md).
+  ¹ `HTNPlanner` is slice 1 — it does not yet support
+  `tier4_multi_step`'s multi-subtask decomposition, so those 9 tasks
+  were deliberately not attempted, not scored as failures. Its 43/45
+  across the 45 non-`tier4` tasks (all 9 scenes) is a generalization
+  check on the `v1.0` result above: no new failure mode appeared across
+  the 4 additional scenes — both `tier3_store` failures
+  (`milo-v1-fp301-t3a`, `milo-v1.1-fp203-t3a`) are the same shared
+  placement-geometry limit `rule_based`/`behavior_tree` hit on the
+  identical pair. Design-doc detail:
+  [`docs/architecture/planning.md`](../docs/architecture/planning.md)'s
+  "Generalization check" section.
+
+  Scaling to 9 scenes surfaced a real `WorldState`-reseeding gap in
+  `tier4_multi_step`: a failed `place` sub-goal can leave an object
+  physically held with no signal to the next sub-goal's planner.
+  Investigation traced this to two distinct causes — a Grounding DINO
+  multi-phrase joint-prompt confidence drop (confirmed on 2 independent
+  objects/frames, unrelated to any scored planning or benchmark path,
+  which already query one object name at a time) and a held-object
+  depth cutoff calibrated on smaller objects than some real held items.
+  One of the two known-failing episodes has its engine-crash symptom
+  fixed (demonstrated via targeted re-seeding, not yet merged into the
+  production harness); the other remains open on the depth-calibration
+  gap, with a concrete next step identified but not implemented. Full
+  chain: [`docs/roadmap.md`](../docs/roadmap.md).
 
 - **`react` model comparison, `qwen2.5:3b` vs `qwen2.5:7b`** (same
   v1.1 54-task set): identical aggregate score, 36/54 (66.7%) each,
   confirmed task-for-task identical (0/54 differences) rather than a
   coincidence of totals. `qwen2.5:3b` ran ~2.3x faster (~3.1s vs
   ~7.2s avg/episode) with full GPU residency (vs. `7b`'s partial CPU
-  offload) and slightly fewer tokens, at zero accuracy cost.
-  Re-running 6 failing episodes with raw-completion capture (not just
-  inferring from the final error string) found both models share a
-  root cause: neither ever calls `locate` on the destination/container
-  object, only the primary object; `qwen2.5:7b` additionally confuses
-  which object identity belongs in `place`/`put_down`'s `target` field
-  — verified directly on those 6 episodes, not re-checked against all
-  27 originally-classified violations. Full writeup: Addendum 8 of the
+  offload) and slightly fewer tokens, at zero accuracy cost. Full
+  writeup: Addendum 8 of the
   [benchmark report](../experiments/reports/phase_e_milo_benchmark_report.md).
 
-- **Cost/latency** (v1.0, 25 episodes each): `rule_based` ~707ms,
-  `behavior_tree` ~865ms, `react`/`qwen2.5:7b` ~7.5s avg/episode. This
-  table is plan+execution time only (captured before any
-  perception-grounding check runs), so it was never affected by the
-  vision stack's CPU/GPU status and isn't being remeasured.
-- **Vision inference, CPU vs. GPU** — the actual CPU-bound component
-  (PyTorch previously resolved to a CPU-only build despite the RTX
-  4050 being present; now fixed, see [Roadmap](#roadmap)). Same
+- **Cost/latency** (v1.0, 25 episodes each): `rule_based` ~620ms,
+  `behavior_tree` ~633ms, `htn` ~647ms, `react`/`qwen2.5:7b` ~7.5s
+  avg/episode. Plan+execution time only (captured before any
+  perception-grounding check runs).
+- **Vision inference, CPU vs. GPU** — PyTorch previously resolved to a
+  CPU-only build despite the RTX 4050 being present; now fixed. Same
   machine, same image, same code path, 5 iterations (first excluded as
   warmup): `GroundingDINODetector` 6189ms → 511ms (~12.1x), `SAM2Segmenter`
   39120ms → 4734ms (~8.3x). Running vision inference and a loaded
   `qwen2.5:7b` Ollama model concurrently peaks at ~5.9GB of this card's
-  6.1GB VRAM (~96%) — fits, with little headroom, and doesn't yet
-  include AI2-THOR/Unity's own footprint running at the same time.
+  6.1GB VRAM (~96%) — fits, with little headroom.
 
 Full detail, methodology, and provenance:
 [`docs/phases/phase8_7_final_audit.md`](../docs/phases/phase8_7_final_audit.md).
@@ -281,23 +269,32 @@ Full detail, methodology, and provenance:
 
 - **AI2-THOR only** — no physical robot validation; all execution
   results are simulator results.
-- **Scene diversity validated but shallow** — a `milo_benchmark v1.0`
-  5-scene sweep (all 4 iTHOR room types, 3 tasks each) found object
-  resolution, navigation, and pickup generalize cleanly (24/25 on both
-  symbolic planners); 5 of ~120 iTHOR scenes is a first real number,
-  not a statistically powered study. See [Current Results](#current-results).
-- **Vision grounding covers existence/location only, not full state
-  fusion** — the planner's `WorldState` is grounded from a live Vision
-  `Scene` before planning, but only existence, proximity, and
-  containment; open/closed and held/not-held state are still
-  symbolic-only, since vision doesn't yet observe grasp or appearance
-  state.
-- **HTN planning covers tier1-3 only (slice 1)** — a real fourth
-  planner strategy exists (`HTNPlanner`) and matches `rule_based`/
-  `behavior_tree` exactly on the full v1.0 benchmark (24/25, 96.0%),
-  but `tier4_multi_step`, `fetch`/`deliver`/`navigate_to`, and
-  memory-conditioned methods are explicit next-slice work, not yet
-  built.
+- **Scene diversity validated, not exhaustive** — `milo_benchmark
+  v1.1`'s 9-scene sweep (all 4 iTHOR room types, up to 6 tasks each)
+  found object resolution, navigation, pickup, and (for the three
+  symbolic planners) store generalize cleanly across every new scene;
+  9 of ~120 iTHOR scenes is a broader real number than `v1.0`'s
+  original 5, still not a statistically powered study. See
+  [Current Results](#current-results).
+- **Held-object vision grounding has real, measured calibration
+  limits** — `is_open` and held-object state are now fused into the
+  planner's `WorldState` from live vision (not symbolic-only), but the
+  held-object heuristic's depth cutoff was calibrated against smaller
+  objects than some real held items measure, and it can misattribute
+  "holding" to the nearest detected object rather than the actually-
+  held one. Separately, Grounding DINO's confidence measurably drops
+  under multi-phrase joint prompts (confirmed on 2 independent
+  objects/frames) — this does not affect any scored planning or
+  benchmark path (those already query one object name at a time), but
+  does affect the frontend's default multi-object Vision-panel prompt
+  and several manual demo/verification scripts. See
+  [Current Results](#current-results) and `backend/planner/grounding.py`.
+- **HTN planning covers tier1-3 only (slice 1)** — `HTNPlanner` matches
+  `rule_based`/`behavior_tree` exactly on `v1.0` (24/25, 96%) and
+  generalizes cleanly across `v1.1`'s 9 scenes on the same three tiers
+  (43/45, 95.6%), but `tier4_multi_step`, `fetch`/`deliver`/
+  `navigate_to`, and memory-conditioned methods are explicit next-slice
+  work, not yet built.
 - **External API dependence** — cloud LLM providers and ElevenLabs are
   paid third-party services; a fully local setup (Ollama/vLLM + local
   Whisper) avoids this but isn't the default.
@@ -391,23 +388,15 @@ deployment/      Environment/target-specific deployment config
 docker/          Container definitions (backend + frontend)
 ```
 
-## Roadmap
-
-| Item | Status |
-|---|---|
-| `tier4_multi_step` `WorldState`-reseeding gap (held-object state doesn't carry between sub-goals) | ⚠️ Open — fixed for one of two known-failing episodes; the other exposed a real, object-size-dependent limit in the held-object depth heuristic |
-| HTN planner: `tier4_multi_step`/`fetch`/`deliver`/`navigate_to`/memory-hint coverage (slice 1 -- tier1-3 -- is done) | 🔜 Future |
-| Production auth/rate limiting | ❌ Not planned — no publicly reachable API to protect |
-
-Completed items and full rationale for every open item:
-[`docs/roadmap.md`](../docs/roadmap.md).
+Open items and full rationale: [`docs/roadmap.md`](../docs/roadmap.md).
 
 ## Documentation
 
 - [`docs/application/architecture.md`](../docs/application/architecture.md) — current system & agent architecture
 - [`docs/application/tech_stack.md`](../docs/application/tech_stack.md) — full technology stack
 - [`docs/phases/phase8_7_final_audit.md`](../docs/phases/phase8_7_final_audit.md) — final research-readiness audit
-- [`backend/planning_evaluation/dataset/v1.0/README.md`](../backend/planning_evaluation/dataset/v1.0/README.md) — `milo_benchmark` dataset card
+- [`backend/planning_evaluation/dataset/v1.0/README.md`](../backend/planning_evaluation/dataset/v1.0/README.md) — `milo_benchmark v1.0` dataset card
+- [`backend/planning_evaluation/dataset/v1.1/README.md`](../backend/planning_evaluation/dataset/v1.1/README.md) — `milo_benchmark v1.1` dataset card
 
 More detailed docs in [`docs/`](../docs/).
 
