@@ -117,6 +117,7 @@ class Orchestrator:
         event_bus: Optional[EventBus] = None,
         registry: Optional[AgentRegistry] = None,
         planner_factory: Optional[Callable[[str], PlannerAgentWrapper]] = None,
+        episode_logger=None,
     ) -> None:
         self._planner = planner_agent
         #: Builds a planner wrapper for a requested strategy name; without
@@ -124,6 +125,14 @@ class Orchestrator:
         self._planner_factory = planner_factory
         self._default_planner = planner_agent
         self._current_state: Optional[TaskState] = None
+        #: Optional `learning.episode_log.EpisodeLogger` (the data flywheel).
+        self._episode_logger = episode_logger
+        #: Extra fields for the logger's `begin()` (scene id, seed, injected fault...).
+        self.episode_context: Dict = {}
+        self._snapshots: Dict[int, Dict] = {}
+        self._retries = 0
+        self._replans = 0
+        self._memory_stats: Dict[str, float] = {}
         self._execution = execution_agent
         self._memory = memory_agent
         self._vision = vision_agent
@@ -178,6 +187,28 @@ class Orchestrator:
     def run(
         self,
         task: Union[SingleTask, MultiTask],
+        **kwargs,
+    ) -> TaskState:
+        """Runs a task (see `_run`) and, if an episode logger is attached, records the outcome."""
+        started = time.perf_counter()
+        self._retries = self._replans = 0
+        self._snapshots = {}
+        self._memory_stats = {}
+        state = self._run(task, **kwargs)
+        if self._episode_logger is not None:
+            self._episode_logger.finish(
+                state.task_id,
+                outcome=state.status.value,
+                replans=self._replans,
+                retries=self._retries,
+                total_steps=sum(len(r.step_results) for r in state.execution_history),
+                duration_ms=(time.perf_counter() - started) * 1000.0,
+            )
+        return state
+
+    def _run(
+        self,
+        task: Union[SingleTask, MultiTask],
         *,
         input_source: InputSource = InputSource.TEXT,
         max_replans: int = DEFAULT_MAX_REPLANS,
@@ -217,9 +248,21 @@ class Orchestrator:
             on_created(task_state)
         self._publish(task_state, EventType.TASK_CREATED)
         self._publish(task_state, EventType.TASK_PARSED)
+        if self._episode_logger is not None:
+            self._episode_logger.begin(
+                task_state.task_id,
+                **{
+                    "task_text": task_state.user_request,
+                    "parsed_task": task.model_dump(mode="json"),
+                    "task_kind": task.goal or "",
+                    "planner": task_state.planner or "",
+                    **self.episode_context,
+                },
+            )
 
         memory_context = self._retrieve_memory(task, episode_id, task_state)
         self._think_about_memory(task_state, memory_context)
+        self._memory_stats = self._memory_stats_of(memory_context)
 
         if subtasks is None and (task.goal or "") in COMPOSITE_GOALS:
             # "Clear the table" / "tidy up": look at the room, decide which
@@ -354,6 +397,22 @@ class Orchestrator:
                 + (time.perf_counter() - started) * 1000.0
             )
             self._explain_reflection(task_state, record, failures, reflection.action)
+            if self._episode_logger is not None:
+                self._episode_logger.log_attempt(
+                    task_state.task_id,
+                    attempt=attempt,
+                    record=record,
+                    snapshots=self._snapshots,
+                    retries_so_far=self._retries,
+                    replans_so_far=self._replans,
+                    memory_stats=self._memory_stats,
+                    verdict=reflection.action,
+                )
+                self._snapshots = {}
+            if reflection.action == "retry":
+                self._retries += 1
+            elif reflection.action == "replan":
+                self._replans += 1
             self._publish(
                 task_state,
                 EventType.REFLECTION_COMPLETED,
@@ -501,11 +560,47 @@ class Orchestrator:
                 "planner made this plan."
             )
 
+    def _snapshot(self, step: PlanStep, status: str) -> None:
+        """Feature snapshots around a step, for the episode log."""
+        from learning.features import world_features
+
+        meta = self._execution.get_metadata()
+        snap = self._snapshots.setdefault(step.step_id, {})
+        if status == "started":
+            snap["before"] = world_features(meta, step.target)
+        elif status in ("success", "failed", "blocked", "already_done"):
+            snap["after"] = world_features(meta, step.target)
+
+    @staticmethod
+    def _memory_stats_of(memory_context) -> Dict[str, float]:
+        results = getattr(memory_context, "results", None) or []
+        if not results:
+            return {"hits": 0, "sim_max": 0.0, "sim_mean": 0.0, "prior_success": -1.0}
+        sims = [float(r.similarity) for r in results]
+        outcomes = [
+            r.memory.metadata.get("outcome")
+            for r in results
+            if isinstance(r.memory.metadata, dict) and r.memory.metadata.get("outcome")
+        ]
+        prior = (
+            sum(1 for o in outcomes if o == "success") / len(outcomes)
+            if outcomes
+            else -1.0
+        )
+        return {
+            "hits": len(results),
+            "sim_max": max(sims),
+            "sim_mean": sum(sims) / len(sims),
+            "prior_success": prior,
+        }
+
     def _step_listener(self, task_state: TaskState) -> Callable[[PlanStep, str], None]:
         """Narrates execution live: sets each step's `explanation`, the
         task's `current_step`, and adds a thought when a step finishes."""
 
         def listen(step: PlanStep, status: str) -> None:
+            if self._episode_logger is not None:
+                self._snapshot(step, status)
             if status == "started":
                 task_state.current_step = step.step_id
                 step.explanation = explain_step(step, "doing")
