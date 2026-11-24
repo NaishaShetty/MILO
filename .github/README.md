@@ -110,6 +110,30 @@ method calls through a single `Orchestrator`), no ORM.
 
 Full stack detail: [`docs/application/tech_stack.md`](../docs/application/tech_stack.md).
 
+## What's New: Friendly MILO (task library, planner choice, live updates, new look)
+
+**Task library.** MILO does fetch, deliver, put in/on, open/close, turn on/off, find (and says where), clear a table and tidy up (using what it remembers). Ask in plain words ("could you grab me the mug", "is the fridge open?"); questions are answered without moving, and vague or impossible requests get a clear question or reason. `GET /api/v1/tasks/library` lists everything with examples.
+
+**Planner choice.** `POST /api/v1/tasks` accepts `planner`: `rule_based` (default), `react`, `behavior_tree` or `htn`. The choice is validated and reported on the task (`planner`, plus `planner_note` if a planner fell back).
+
+**Live updates (SSE).** `GET /api/v1/tasks/{id}/stream` pushes task state and events (`GET /api/v1/tasks/stream` for all tasks); the UI falls back to polling if the stream fails. `POST /api/v1/tasks/{id}/cancel` stops between steps and puts down whatever MILO holds.
+
+**API key and limits (optional).** Set `API_KEY` to require an `X-API-Key` header on task, lab and memory routes (the two `/stream` routes also accept `?api_key=`). Set `RATE_LIMIT_PER_MINUTE=N` to rate-limit per caller, and `SPEECH_MAX_UPLOAD_BYTES` to cap audio uploads (default 10 MB). In the UI, store the key with `VITE_API_KEY` or in browser storage under `milo.apiKey`.
+
+**Memory.** "Forget this" archives a memory (`POST /api/v1/memory/{id}/forget`). Each mission writes what it learned; tell MILO preferences like "the mug goes on the shelf".
+
+**New design.** Four spaces (Play, Missions, Memory, Lab), About/Settings under the gear, Activity as a drawer, and a bottom tab dock on phones. Design tokens are in `frontend/src/tokens.css`; MILO is the layered SVG `MiloRobot` (front and side rigs), driven by real task state through `state/miloDirector.ts`. Visual snapshots: `npx playwright test visual.spec.ts`.
+
+**Measured (Phase 1; RTX 4050 laptop, 25 interleaved runs, real simulator).**
+
+| Metric | Before | After |
+|---|---|---|
+| Observe per planning loop, mean | 2720 ms (full pipeline) | 2066 ms (no SAM2 masks) |
+| SAM2 stage alone | 117 ms median | skipped on the planning path |
+| Vector search at 5,000 memories | 59 ms | 6.9 ms (one run; later runs 0.1-0.7 ms) |
+
+Grounding DINO's time swung between 0.5 and 4 s on this machine and was not root-caused, so treat the observe mean as indicative and the SAM2 figure as solid. Reproduce with `python -m scripts.measure_observe_cost` and `pytest tests/test_memory_scaling_benchmark.py -s`.
+
 ## Architecture
 
 ```mermaid
