@@ -9,6 +9,7 @@ import { SpeechProvider } from "./state/SpeechContext";
 import { TaskProvider } from "./state/TaskContext";
 import { VoiceProvider } from "./state/VoiceContext";
 import { AboutPage } from "./pages/AboutPage";
+import { ModelsPanel } from "./components/ModelsPanel";
 import { LabPage } from "./pages/LabPage";
 import { MemoryPage } from "./pages/MemoryPage";
 import { MissionsPage } from "./pages/MissionsPage";
@@ -34,7 +35,7 @@ export default function App() {
                         <Route path="/missions" element={<MissionsPage />} />
                         <Route path="/mission-control" element={<Navigate to="/missions" replace />} />
                         <Route path="/memory" element={<MemoryPage />} />
-                        <Route path="/lab" element={<div className="legacy-page"><LabPage /></div>} />
+                        <Route path="/lab" element={<div className="legacy-page"><ModelsPanel /><LabPage /></div>} />
                         <Route path="/about" element={<div className="legacy-page"><AboutPage /></div>} />
                         <Route path="/settings" element={<div className="legacy-page"><SettingsPage /></div>} />
                         <Route path="*" element={<Navigate to="/" replace />} />

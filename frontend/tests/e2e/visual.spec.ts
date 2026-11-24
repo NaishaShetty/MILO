@@ -12,6 +12,19 @@ const FREEZE = `
 
 async function settle(page: Page, route: string) {
   await mockBaselineApi(page);
+  await page.route("**/api/v1/lab/models", (r) =>
+    r.fulfill({
+      json: {
+        models: [
+          {
+            name: "outcome_predictor", title: "Step outcome predictor", available: true, version: "v1", mode: "off",
+            metrics: { auroc: 0.968, pr_auc: 0.99, brier: 0.046, ece: 0.005 }, trained_on: 19430, date: "2026-11-24",
+            shadow: null, latency: null, drift_score: null, healthy: null, problem: null, explains: "Off: built-in rules.",
+          },
+        ],
+      },
+    }),
+  );
   await page.addInitScript(() => window.localStorage.setItem("milo.tourSeen", "1"));
   await page.goto(route);
   await page.waitForLoadState("networkidle");

@@ -243,3 +243,36 @@ def get_lab_stats(
         memories_created=memories_created,
         tasks_run=len(tasks),
     )
+
+
+@router.get(
+    "/models",
+    summary="Learned models: what is active and how it is doing",
+)
+def get_models() -> dict:
+    from api.routes.tasks import current_orchestrator
+    from learning.config import models_status
+
+    return models_status(current_orchestrator())
+
+
+@router.post(
+    "/models/outcome_predictor",
+    summary="Turn the step outcome predictor off, to shadow, or on",
+)
+def set_outcome_predictor_mode(body: dict) -> dict:
+    from api.routes.tasks import current_orchestrator
+    from learning.config import REFLECTOR_MODES, models_status, set_reflector_mode
+
+    orchestrator = current_orchestrator()
+    mode = str(body.get("mode", ""))
+    if orchestrator is None or mode not in REFLECTOR_MODES:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "category": "invalid_request",
+                "message": "Choose off, shadow or on (and start the simulator first).",
+            },
+        )
+    result = set_reflector_mode(orchestrator, mode)
+    return {**models_status(orchestrator), "result": result}

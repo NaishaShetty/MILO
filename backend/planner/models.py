@@ -154,6 +154,15 @@ class PlanStep(BaseModel):
         description="Human-readable facts this step guarantees to be "
         "true in the WorldState immediately after it executes.",
     )
+    confidence: Optional[float] = Field(
+        default=None,
+        description="Predicted probability this step succeeds (learned outcome "
+        "predictor), set by the Orchestrator just before the step runs.",
+    )
+    why: Optional[str] = Field(
+        default=None,
+        description="The predictor's top reasons, in plain words.",
+    )
     explanation: Optional[str] = Field(
         default=None,
         description="A plain-language sentence about what MILO is doing in, "

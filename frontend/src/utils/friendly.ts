@@ -44,3 +44,11 @@ export function stepTitle(step: { action: string; target?: string | null; parame
       return `Work on ${t}`;
   }
 }
+
+/** Plain-language confidence for a predicted success probability. */
+export function confidenceWord(p: number): string {
+  if (p >= 0.85) return "Pretty sure";
+  if (p >= 0.6) return "Fairly sure";
+  if (p >= 0.35) return "Not sure";
+  return "Probably won't work";
+}

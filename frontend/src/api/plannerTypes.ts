@@ -48,6 +48,10 @@ export interface PlanStep {
   postconditions: string[];
   /** MILO's plain-language note on this step ("Walking to the fridge."), set while the task runs. */
   explanation?: string | null;
+  /** Predicted probability this step succeeds (learned model), when one is on. */
+  confidence?: number | null;
+  /** The model's top reasons, in plain words. */
+  why?: string | null;
   status: StepStatus;
 }
 

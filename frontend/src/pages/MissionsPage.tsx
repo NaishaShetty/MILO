@@ -10,7 +10,7 @@ import { MissionTrack } from "../components/MissionTrack";
 import { MiloRobot } from "../components/MiloRobot";
 import { directMilo } from "../state/miloDirector";
 import { useTask } from "../state/TaskContext";
-import { stepTitle } from "../utils/friendly";
+import { confidenceWord, stepTitle } from "../utils/friendly";
 
 const WHO: Record<string, string> = { memory: "M", planner: "P", eyes: "E", hands: "H", reflect: "R" };
 const TERMINAL = ["succeeded", "failed", "cancelled"];
@@ -156,6 +156,12 @@ export function MissionsPage() {
                   <span className="pill">{step.status === "completed" ? "Done" : step.status === "running" ? "Now" : step.status === "failed" ? "Oops" : "Next"}</span>
                   <div className="step__title">{stepTitle(step)}</div>
                   <div className="step__meta">{step.explanation ?? `${step.action} · ${step.target ?? ""}`}</div>
+                  {typeof step.confidence === "number" && (
+                    <div className="step__meta" title={`${Math.round(step.confidence * 100)}% chance this works`}>
+                      <strong>{confidenceWord(step.confidence)}</strong>
+                      {step.why ? ` · Why: ${step.why}` : ""}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

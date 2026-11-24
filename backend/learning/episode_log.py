@@ -98,6 +98,7 @@ class EpisodeLogger:
         memory_stats: Optional[Dict[str, float]] = None,
         perception_conf: float = -1.0,
         verdict: Optional[str] = None,
+        model_decisions: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         """Writes one row per step of an `ExecutionRecord` (one plan attempt)."""
         results: List[Any] = list(record.step_results)
@@ -113,6 +114,13 @@ class EpisodeLogger:
             code = step.error.code.value if step.error is not None else None
             message = step.error.message if step.error is not None else None
             duration = step.result.duration_ms if step.result is not None else None
+            if (
+                step.result is not None
+                and step.result.metadata.get("simDurationMs") is not None
+            ):
+                duration = float(
+                    step.result.metadata["simDurationMs"]
+                )  # simulated time
             rows.append(
                 (
                     episode_id,
@@ -136,7 +144,7 @@ class EpisodeLogger:
                     failure_type(code, message, success) if labelled else None,
                     duration,
                     verdict,
-                    None,
+                    json.dumps(model_decisions) if model_decisions else None,
                 )
             )
         marks = ",".join("?" * len(STEP_COLUMNS))

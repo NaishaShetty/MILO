@@ -34,3 +34,33 @@ export async function runSandbox(instruction: string, plannerType = "rule_based"
 export async function getLabStats(): Promise<LabStatsResponse> {
   return request<LabStatsResponse>("/api/v1/lab/stats");
 }
+
+export interface ModelStatus {
+  name: string;
+  title: string;
+  available: boolean;
+  version: string | null;
+  mode: "off" | "shadow" | "on";
+  metrics: { auroc: number; pr_auc: number; brier: number; ece: number } | null;
+  trained_on: number | null;
+  date: string | null;
+  shadow: { compared: number; agree: number; used: number; fallbacks: number } | null;
+  latency: { p50_ms: number; p95_ms: number } | null;
+  drift_score: number | null;
+  healthy: boolean | null;
+  problem: string | null;
+  explains: string;
+}
+
+/** `GET /api/v1/lab/models` -- which learned models are active and how they are doing. */
+export async function getModels(): Promise<{ models: ModelStatus[] }> {
+  return request<{ models: ModelStatus[] }>("/api/v1/lab/models");
+}
+
+/** `POST /api/v1/lab/models/outcome_predictor` -- switch the model off, to shadow, or on. */
+export async function setOutcomeMode(mode: ModelStatus["mode"]): Promise<{ models: ModelStatus[] }> {
+  return request<{ models: ModelStatus[] }>("/api/v1/lab/models/outcome_predictor", {
+    method: "POST",
+    body: JSON.stringify({ mode }),
+  });
+}

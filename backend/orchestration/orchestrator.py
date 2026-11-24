@@ -118,6 +118,8 @@ class Orchestrator:
         registry: Optional[AgentRegistry] = None,
         planner_factory: Optional[Callable[[str], PlannerAgentWrapper]] = None,
         episode_logger=None,
+        outcome_predictor=None,
+        plan_ranker=None,
     ) -> None:
         self._planner = planner_agent
         #: Builds a planner wrapper for a requested strategy name; without
@@ -127,6 +129,11 @@ class Orchestrator:
         self._current_state: Optional[TaskState] = None
         #: Optional `learning.episode_log.EpisodeLogger` (the data flywheel).
         self._episode_logger = episode_logger
+        #: Optional `learning.serving.OutcomePredictor` (per-step confidence) and
+        #: `learning.ranker.PlanRanker` (choose among planners' plans). Both optional.
+        self._predictor = outcome_predictor
+        self._ranker = plan_ranker
+        self._contexts: Dict[int, Dict] = {}
         #: Extra fields for the logger's `begin()` (scene id, seed, injected fault...).
         self.episode_context: Dict = {}
         self._snapshots: Dict[int, Dict] = {}
@@ -194,6 +201,7 @@ class Orchestrator:
         self._retries = self._replans = 0
         self._snapshots = {}
         self._memory_stats = {}
+        self._contexts = {}
         state = self._run(task, **kwargs)
         if self._episode_logger is not None:
             self._episode_logger.finish(
@@ -389,14 +397,26 @@ class Orchestrator:
 
             task_state.status = TaskStatus.REFLECTING
             started = time.perf_counter()
+            extra = (
+                {"contexts": self._contexts}
+                if getattr(self._reflection, "uses_contexts", False)
+                else {}
+            )
             reflection = self._reflection.reflect(
-                record, failures, attempt=attempt, max_attempts=max_replans
+                record, failures, attempt=attempt, max_attempts=max_replans, **extra
+            )
+            decisions = (
+                self._reflection.pop_decisions()  # type: ignore[attr-defined]
+                if hasattr(self._reflection, "pop_decisions")
+                else []
             )
             task_state.latencies_ms["reflection_ms"] = (
                 task_state.latencies_ms.get("reflection_ms", 0.0)
                 + (time.perf_counter() - started) * 1000.0
             )
-            self._explain_reflection(task_state, record, failures, reflection.action)
+            self._explain_reflection(
+                task_state, record, failures, reflection.action, reflection.explanation
+            )
             if self._episode_logger is not None:
                 self._episode_logger.log_attempt(
                     task_state.task_id,
@@ -407,6 +427,7 @@ class Orchestrator:
                     replans_so_far=self._replans,
                     memory_stats=self._memory_stats,
                     verdict=reflection.action,
+                    model_decisions=decisions,
                 )
                 self._snapshots = {}
             if reflection.action == "retry":
@@ -416,7 +437,10 @@ class Orchestrator:
             self._publish(
                 task_state,
                 EventType.REFLECTION_COMPLETED,
-                payload=reflection.model_dump(mode="json"),
+                payload={
+                    **reflection.model_dump(mode="json"),
+                    "model_decisions": decisions,
+                },
             )
 
             if reflection.action == "continue":
@@ -513,7 +537,29 @@ class Orchestrator:
                 goal=task.goal or "multi_step",
             )
         single = self._planner.replan if replan else self._planner.plan
-        return single(task, world_state, memory_context)
+        result = single(task, world_state, memory_context)
+        if (
+            self._ranker is not None
+            and self._planner_factory is not None
+            and not replan
+        ):
+            result = self._rank(task, world_state, memory_context, result)
+        return result
+
+    def _rank(self, task, world_state, memory_context, first):
+        """Flagged: also ask the other planners and keep the plan the predictor likes best."""
+        try:
+            candidates = [first]
+            for name in self._ranker.planner_names:
+                if name == self._planner.planner_type or self._planner_factory is None:
+                    continue
+                candidates.append(
+                    self._planner_factory(name).plan(task, world_state, memory_context)
+                )
+            return self._ranker.best(candidates, self._execution.get_metadata())
+        except Exception:
+            logger.warning("orchestrator.rank_failed", exc_info=True)
+            return first
 
     def _select_planner(self, planner_type: Optional[str]) -> PlannerAgentWrapper:
         """The planner for this run: the requested strategy, else the default."""
@@ -560,6 +606,37 @@ class Orchestrator:
                 "planner made this plan."
             )
 
+    def _predict_step(self, task_state: TaskState, step: PlanStep) -> None:
+        """Confidence for the step about to run (never blocks: failures are logged and ignored)."""
+        predictor = self._predictor
+        plan = task_state.current_plan
+        if predictor is None or plan is None or not predictor.usable:
+            return
+        try:
+            from learning.predictor_features import context_from_live
+
+            steps = plan.steps
+            index = next(
+                (i for i, s in enumerate(steps) if s.step_id == step.step_id), 0
+            )
+            ctx = context_from_live(
+                action=step.action,
+                target=step.target,
+                metadata=self._execution.get_metadata(),
+                step_index=index,
+                remaining_steps=len(steps) - index - 1,
+                retries_so_far=self._retries,
+                replans_so_far=self._replans,
+                planner=task_state.planner or "rule_based",
+                memory_stats=self._memory_stats,
+            )
+            self._contexts[step.step_id] = ctx
+            pred = predictor.predict(ctx, explain=True)
+            step.confidence = round(pred.p_success, 3)
+            step.why = "; ".join(pred.top_factors) or None
+        except Exception:
+            logger.warning("orchestrator.predict_failed", exc_info=True)
+
     def _snapshot(self, step: PlanStep, status: str) -> None:
         """Feature snapshots around a step, for the episode log."""
         from learning.features import world_features
@@ -601,6 +678,8 @@ class Orchestrator:
         def listen(step: PlanStep, status: str) -> None:
             if self._episode_logger is not None:
                 self._snapshot(step, status)
+            if status == "started" and self._predictor is not None:
+                self._predict_step(task_state, step)
             if status == "started":
                 task_state.current_step = step.step_id
                 step.explanation = explain_step(step, "doing")
@@ -620,6 +699,7 @@ class Orchestrator:
         record: ExecutionRecord,
         failures: List[AgentFailure],
         verdict: str,
+        explanation: Optional[str] = None,
     ) -> None:
         """Turns a reflection verdict into a sentence on the failed step
         and a thought -- "I couldn't reach the fridge, so I'm trying
@@ -636,7 +716,7 @@ class Orchestrator:
                 None,
             )
             failed_step = next((s for s in plan.steps if s.step_id == failed_id), None)
-        sentence = explain_verdict(
+        sentence = explanation or explain_verdict(
             verdict, failed_step, failures[0] if failures else None
         )
         if failed_step is not None and verdict != "continue":

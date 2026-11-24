@@ -127,6 +127,8 @@ class SyntheticSimulator:
         self.inventory_objects: List[Dict[str, Any]] = []
         self.faults = faults or Faults()
         self._fault_hits = 0
+        self.clock_s = 0.0  # simulated time spent so far
+        self._current = "navigate"
         self.calls: List[str] = []
 
     # -- helpers -----------------------------------------------------------
@@ -146,9 +148,22 @@ class SyntheticSimulator:
     def _fault_active(self) -> bool:
         return self._fault_hits < self.faults.times
 
+    #: Simulated seconds per action; a failure costs extra, a timeout a lot.
+    _SECONDS = {
+        "navigate": 4.0,
+        "pickup": 1.5,
+        "put": 1.5,
+        "open": 1.0,
+        "close": 1.0,
+        "toggle": 1.0,
+    }
+
     def _event(self, ok: bool, error: str = "") -> FakeEvent:
+        seconds = self._SECONDS.get(self._current, 1.0) * (1.0 if ok else 1.6)
+        self.clock_s += seconds
         return FakeEvent(
             {
+                "simDurationMs": seconds * 1000.0,
                 "lastActionSuccess": ok,
                 "errorMessage": error,
                 "objects": self.objects,
@@ -166,10 +181,12 @@ class SyntheticSimulator:
             and self._fault_active()
         ):
             self._fault_hits += 1
+            self.clock_s += 10.0
             raise TimeoutError("simulator call timed out")
 
     # -- actions -----------------------------------------------------------
     def navigate_to(self, object_id: str) -> FakeEvent:
+        self._current = "navigate"
         obj = self._obj(object_id)
         self._maybe_timeout(obj)
         if obj is None:
@@ -195,6 +212,7 @@ class SyntheticSimulator:
         return self._event(True)
 
     def navigate_home(self) -> FakeEvent:
+        self._current = "navigate"
         return self._event(True)
 
     def _interactable(
@@ -210,6 +228,7 @@ class SyntheticSimulator:
         return None
 
     def pickup_object(self, object_id: str) -> FakeEvent:
+        self._current = "pickup"
         obj = self._obj(object_id)
         bad = self._interactable(obj, "pick up")
         if bad is not None:
@@ -225,6 +244,7 @@ class SyntheticSimulator:
         return self._event(True)
 
     def put_object(self, object_id: str) -> FakeEvent:
+        self._current = "put"
         target = self._obj(object_id)
         bad = self._interactable(target, "put")
         if bad is not None:
@@ -238,6 +258,7 @@ class SyntheticSimulator:
         return self._event(True)
 
     def open_object(self, object_id: str) -> FakeEvent:
+        self._current = "open"
         obj = self._obj(object_id)
         bad = self._interactable(obj, "open")
         if bad is not None:
@@ -254,6 +275,7 @@ class SyntheticSimulator:
         return self._event(True)
 
     def close_object(self, object_id: str) -> FakeEvent:
+        self._current = "close"
         obj = self._obj(object_id)
         bad = self._interactable(obj, "close")
         if bad is not None:
@@ -263,6 +285,7 @@ class SyntheticSimulator:
         return self._event(True)
 
     def _toggle(self, object_id: str, on: bool) -> FakeEvent:
+        self._current = "toggle"
         obj = self._obj(object_id)
         bad = self._interactable(obj, "toggle")
         if bad is not None:
@@ -278,5 +301,6 @@ class SyntheticSimulator:
         return self._toggle(object_id, False)
 
     def drop_held_object(self) -> FakeEvent:
+        self._current = "put"
         self.inventory_objects = []
         return self._event(True)

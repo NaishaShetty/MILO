@@ -79,6 +79,7 @@ from language.agent import LanguageAgent
 from language.exceptions import LanguageRuntimeError
 from language.interpreter import InstructionInterpreter
 from language.llm_client import LLMClient
+from learning.config import learning_kwargs
 from memory.habits import usual_place_of
 from memory.models import MemoryType
 from orchestration.answerer import QuestionAnswerer
@@ -656,6 +657,11 @@ def _step_timeout_from_env() -> Optional[float]:
     return value if value > 0 else None
 
 
+def current_orchestrator() -> Optional[Orchestrator]:
+    """The orchestrator the task routes use (for the Lab's Models panel)."""
+    return _store._orchestrator
+
+
 def build_orchestrator(
     simulator: Simulator,
     memory_agent: Optional[MemoryAgentWrapper] = None,
@@ -686,6 +692,7 @@ def build_orchestrator(
         vision_agent=vision_agent,
         registry=registry,
         planner_factory=planner_for,
+        **learning_kwargs(),
     )
     _store.set_orchestrator(orchestrator)
     return orchestrator

@@ -134,6 +134,18 @@ Full stack detail: [`docs/application/tech_stack.md`](../docs/application/tech_s
 
 Grounding DINO's time swung between 0.5 and 4 s on this machine and was not root-caused, so treat the observe mean as indicative and the SAM2 figure as solid. Reproduce with `python -m scripts.measure_observe_cost` and `pytest tests/test_memory_scaling_benchmark.py -s`.
 
+## Models (learned components)
+
+All learned components are **off by default** and fall back to the rule-based behaviour if a model is missing, slow, unsure or the inputs drift. See `docs/models/` for model cards.
+
+| Model | What it does | Data | Held-out result | Flag |
+|---|---|---|---|---|
+| Step outcome predictor | Per-step success / retry / failure-type / duration; drives per-step confidence, a learned reflector and plan ranking | 28,896 labelled steps, 6,000 synthetic episodes, 50 scenes (2026-11-24, seed 0) | AUROC 0.968, ECE 0.005 (rules: 0.661); online 600 episodes: success 0.717 -> 0.783, wasted steps 1.94 -> 1.22 | `MILO_LEARNED_REFLECTOR=off\|shadow\|on`, `MILO_PLAN_RANKING=1` |
+
+**Pipeline.** `make data` (resumable episode generator with failure injection) -> `make dataset` (scene-held-out splits + report) -> `make train-outcome` -> `make eval-outcome` -> `make promote-outcome` (only promotes a model that wins; keeps the previous for rollback). Trained artifacts and data live in `backend/artifacts/` and `backend/data/` (not in git); `registry.json` records name, version, data hash, metrics and date. The Lab page has a Models panel with a per-model toggle.
+
+**Honest status.** The data is synthetic (a fast simulator with injected faults), so the online gain is not yet shown on AI2-THOR: keep the reflector at `shadow` until real episodes are logged and compared.
+
 ## Architecture
 
 ```mermaid
