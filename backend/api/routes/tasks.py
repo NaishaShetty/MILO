@@ -286,8 +286,12 @@ def create_task(
             )
             return None
 
+    from learning.parser.serving import build_learned_parser
+
     interpreter = InstructionInterpreter(
-        fallback=_parse_with_model, usual_place=_usual_place
+        fallback=_parse_with_model,
+        usual_place=_usual_place,
+        learned=build_learned_parser(),
     )
     interpretation = interpreter.interpret(body.instruction)
 

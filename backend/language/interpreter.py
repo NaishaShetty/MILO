@@ -148,7 +148,7 @@ class Interpretation:
     message: str = ""
     #: Short echo of how MILO understood the request ("Fetch the mug").
     understood_as: str = ""
-    #: Which part of the system understood it: "rules" or "model".
+    #: Which part of the system understood it: "rules", "learned" or "model".
     source: str = "rules"
     details: dict = field(default_factory=dict)
 
@@ -255,7 +255,12 @@ class InstructionInterpreter:
         self,
         fallback: Optional[FallbackParser] = None,
         usual_place: Optional[UsualPlace] = None,
+        learned: Optional[Callable[[str], Optional[SingleTask]]] = None,
     ) -> None:
+        #: Optional small learned parser (`learning.parser`), tried after help/question/
+        #: preference/chain and before the single-task phrasebook; it only answers when
+        #: confident, otherwise the phrasebook and the LLM run exactly as before.
+        self._learned = learned
         self._fallback = fallback
         self._usual_place = usual_place
 
@@ -275,9 +280,10 @@ class InstructionInterpreter:
             self._question,
             self._preference,
             self._chain,
+            self._learned_task,
             self._single,
         ):
-            result = step(t)
+            result = step(t) if step != self._learned_task else step(raw)
             if result is not None:
                 return result
 
@@ -303,6 +309,16 @@ class InstructionInterpreter:
         return self._unsupported(t)
 
     # steps -------------------------------------------------------------------
+
+    def _learned_task(self, t: str) -> Optional[Interpretation]:
+        if self._learned is None:
+            return None
+        task = self._learned(t)
+        if task is None:
+            return None
+        return Interpretation(
+            kind="task", task=task, understood_as=_echo(task), source="learned"
+        )
 
     def _help(self, t: str) -> Optional[Interpretation]:
         if re.fullmatch(

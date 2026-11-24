@@ -52,3 +52,7 @@ eval-retrieval:
 ## Missions with memory in the loop: hashing vs learned embedder
 eval-retrieval-missions:
 	cd backend && MEMORY_LEARNED_EMBEDDER_DIR=artifacts/memory_embedder $(PY) -m learning.retrieval.eval_missions --episodes 200
+
+## Small instruction parser: train, then held-out-phrasing evaluation vs the rule phrasebook
+eval-parser:
+	cd backend && $(PY) -m learning.parser.eval_parser --out artifacts/parser
