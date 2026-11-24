@@ -142,6 +142,8 @@ All learned components are **off by default** and fall back to the rule-based be
 |---|---|---|---|---|
 | Step outcome predictor | Per-step success / retry / failure-type / duration; drives per-step confidence, a learned reflector and plan ranking | 28,896 labelled steps, 6,000 synthetic episodes, 50 scenes (2026-11-24, seed 0) | AUROC 0.968, ECE 0.005 (rules: 0.661); online 600 episodes: success 0.717 -> 0.783, wasted steps 1.94 -> 1.22 | `MILO_LEARNED_REFLECTOR=off\|shadow\|on`, `MILO_PLAN_RANKING=1` |
 
+| Lightweight detector | Fast ONNX object detector for the planning loop's observe step, Grounding DINO as fallback | 21,777 real AI2-THOR frames, 119 scenes, ground-truth boxes (2026-11-24) | Held-out scenes: mAP@0.5 0.567 vs 0.315 for zero-shot Grounding DINO; 5.9 ms vs 547 ms per frame; real missions (30 per mode): success 0.90 both, observe time 1.37 s -> 0.07 s | `MILO_FAST_DETECTOR=1`, `MILO_DETECTOR_FALLBACK=confidence\|target` |
+
 **Pipeline.** `make data` (resumable episode generator with failure injection) -> `make dataset` (scene-held-out splits + report) -> `make train-outcome` -> `make eval-outcome` -> `make promote-outcome` (only promotes a model that wins; keeps the previous for rollback). Trained artifacts and data live in `backend/artifacts/` and `backend/data/` (not in git); `registry.json` records name, version, data hash, metrics and date. The Lab page has a Models panel with a per-model toggle.
 
 **Honest status.** The data is synthetic (a fast simulator with injected faults), so the online gain is not yet shown on AI2-THOR: keep the reflector at `shadow` until real episodes are logged and compared.

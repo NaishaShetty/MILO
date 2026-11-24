@@ -23,3 +23,20 @@ eval-outcome:
 ## Retrain; promote only if it beats the model in service (keeps the previous for rollback)
 promote-outcome:
 	cd backend && $(PY) -m learning.promote
+
+.PHONY: frames train-detector eval-detector eval-detector-missions
+## Collect labelled AI2-THOR frames (ground-truth boxes), one simulator window
+frames:
+	cd backend && $(PY) -m learning.detector.collect --out data/frames --frames 22000 --shard 0 --shards 1
+
+## Fine-tune the small detector and export ONNX
+train-detector:
+	cd backend && $(PY) -m learning.detector.train_detector --data data/frames --out artifacts/detector
+
+## Held-out-scene mAP/recall/latency vs Grounding DINO
+eval-detector:
+	cd backend && $(PY) -m learning.detector.eval_detector --data data/frames --model artifacts/detector
+
+## Real-simulator missions: Grounding DINO vs fast detector (both fallback policies)
+eval-detector-missions:
+	cd backend && $(PY) -m learning.detector.eval_missions --model artifacts/detector --episodes 30
