@@ -161,6 +161,95 @@ def models_status(
                     else None
                 ),
                 "explains": "Off: MILO uses its built-in rules. Shadow: the model watches and logs what it would do. On: the model chooses retry, replan or stop; if it is missing, slow, unsure or the inputs drift, MILO falls back to the rules.",
-            }
+            },
+            *other_models_status(env),
         ]
     }
+
+
+def _flag(name: str, env: Optional[Mapping[str, str]], default: str = "0") -> bool:
+    value = (env or os.environ).get(name, default).strip().lower()
+    return value in ("1", "true", "yes", "on")
+
+
+def _read_json(path: Path) -> Any:
+    import json
+
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return None
+
+
+def _pick(data: Any, *keys: str) -> Any:
+    for key in keys:
+        if not isinstance(data, dict) or key not in data:
+            return None
+        data = data[key]
+    return data
+
+
+def _num(value: Any) -> Optional[str]:
+    return f"{value:.2f}" if isinstance(value, (int, float)) else None
+
+
+def other_models_status(env: Optional[Mapping[str, str]] = None) -> list:
+    """Read-only rows for the other learned models: is it switched on (environment
+    flag), is a trained model on disk, and its headline held-out number."""
+    art = Path((env or os.environ).get("MILO_ARTIFACTS_DIR", "artifacts"))
+    embedder = _read_json(art / "memory_embedder" / "eval.json")
+    parser = _read_json(art / "parser" / "eval.json")
+    world = _read_json(art / "worldmodel" / "eval.json")
+    recall = _num(_pick(embedder, "fine_tuned", "all", "recall@5"))
+    base = _num(_pick(embedder, "hashing_baseline", "all", "recall@5"))
+    parsed = _num(_pick(parser, "learned_alone", "exact_accuracy"))
+    rules = _num(_pick(parser, "rules", "exact_accuracy"))
+    reach = _num(_pick(world, "transition", "reachable", "learned_acc"))
+    reach_base = _num(_pick(world, "transition", "reachable", "copy_before_acc"))
+    provider = (env or os.environ).get("MEMORY_EMBEDDING_PROVIDER", "")
+    return [
+        {
+            "name": "fast_detector",
+            "title": "Fast object detector",
+            "available": (art / "detector" / "detector.onnx").exists(),
+            "enabled": _flag("MILO_FAST_DETECTOR", env),
+            "headline": None,
+            "explains": "Replaces the slow open-vocabulary detector for ordinary objects and hands over to it when unsure.",
+        },
+        {
+            "name": "memory_embedder",
+            "title": "Memory search model",
+            "available": (art / "memory_embedder" / "eval.json").exists(),
+            "enabled": provider == "learned",
+            "headline": (
+                f"Finds the right memory in its top 5: {recall} vs {base} for the built-in search (synthetic test)"
+                if recall and base
+                else None
+            ),
+            "explains": "Helps MILO find memories worded differently from how they were saved. It made no difference to mission success in tests.",
+        },
+        {
+            "name": "instruction_parser",
+            "title": "Instruction parser",
+            "available": (art / "parser" / "parser.pkl").exists(),
+            "enabled": _flag("MILO_LEARNED_PARSER", env),
+            "headline": (
+                f"Understands new wordings: {parsed} exact vs {rules} for the built-in phrasebook (synthetic test)"
+                if parsed and rules
+                else None
+            ),
+            "explains": "Tried before the phrasebook, and only used when confident.",
+        },
+        {
+            "name": "world_model",
+            "title": "World model",
+            "available": (art / "worldmodel" / "world.pkl").exists(),
+            "enabled": _flag("MILO_WORLD_MODEL", env) and ranking_enabled(env),
+            "headline": (
+                f"Predicts what is in reach after a step: {reach} vs {reach_base} for assuming nothing changes"
+                if reach and reach_base
+                else None
+            ),
+            "explains": "Used only to compare plans. It did not change mission success in tests, so it is best left off.",
+        },
+    ]

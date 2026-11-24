@@ -27,6 +27,22 @@ describe("ModelsPanel", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Shadow" })).toHaveAttribute("aria-pressed", "true"));
   });
 
+  it("lists the other models read-only with their on/off state and headline number", async () => {
+    vi.mocked(labApi.getModels).mockResolvedValue({
+      models: [
+        model("off"),
+        { name: "instruction_parser", title: "Instruction parser", available: true, enabled: false,
+          headline: "Understands new wordings: 0.62 exact vs 0.14", explains: "Tried before the phrasebook." },
+      ],
+    });
+    render(<ModelsPanel />);
+    expect(await screen.findByText("Instruction parser")).toBeInTheDocument();
+    expect(screen.getByText(/0.62 exact vs 0.14/)).toBeInTheDocument();
+    expect(screen.getByText("off", { selector: ".pill" })).toBeInTheDocument();
+    expect(screen.getByText(/Input drift: 0.50/)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Shadow" })).toHaveLength(1);
+  });
+
   it("says what went wrong when the list can't load", async () => {
     vi.mocked(labApi.getModels).mockRejectedValue(new Error("down"));
     render(<ModelsPanel />);

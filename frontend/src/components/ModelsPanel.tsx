@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { getModels, setOutcomeMode } from "../api/lab";
 import type { ModelStatus } from "../api/lab";
 
-const MODES: Array<{ id: ModelStatus["mode"]; label: string }> = [
+const MODES: Array<{ id: NonNullable<ModelStatus["mode"]>; label: string }> = [
   { id: "off", label: "Off" },
   { id: "shadow", label: "Shadow" },
   { id: "on", label: "On" },
@@ -22,7 +22,7 @@ export function ModelsPanel() {
       .catch(() => setProblem("I couldn't load the models list. Is MILO's server running?"));
   }, []);
 
-  async function choose(mode: ModelStatus["mode"]) {
+  async function choose(mode: NonNullable<ModelStatus["mode"]>) {
     try {
       setModels((await setOutcomeMode(mode)).models);
       setProblem(null);
@@ -36,11 +36,19 @@ export function ModelsPanel() {
       <h2>Models</h2>
       {problem && <div className="notice notice--error" role="alert">{problem}</div>}
       {models === null && !problem && <p className="muted">Checking the models...</p>}
-      {models?.map((model) => (
+      {models?.map((model) =>
+        model.mode === undefined ? (
+          <div key={model.name} className="library__item">
+            <strong>{model.title}</strong>{" "}
+            <span className="pill">{!model.available ? "not trained yet" : model.enabled ? "on" : "off"}</span>
+            {model.headline && <p className="muted">{model.headline}</p>}
+            <p className="muted">{model.explains}</p>
+          </div>
+        ) : (
         <div key={model.name} className="library__item">
           <strong>{model.title}</strong>{" "}
           <span className="pill">{model.available ? `version ${model.version}` : "not trained yet"}</span>
-          {model.metrics && (
+          {model.metrics && model.trained_on != null && (
             <p className="muted">
               Trained on {model.trained_on} steps ({model.date}). Held-out scenes: AUROC {model.metrics.auroc.toFixed(3)}, calibration error{" "}
               {model.metrics.ece.toFixed(3)}.
@@ -72,9 +80,13 @@ export function ModelsPanel() {
               Speed: typical {model.latency.p50_ms.toFixed(1)} ms, slowest 5% {model.latency.p95_ms.toFixed(1)} ms.
             </p>
           )}
+          {model.drift_score != null && (
+            <p className="muted">Input drift: {model.drift_score.toFixed(2)} (the model is set aside above 2.5).</p>
+          )}
           {model.problem && <div className="notice notice--error">Using the built-in rules because: {model.problem}.</div>}
         </div>
-      ))}
+        ),
+      )}
     </section>
   );
 }
