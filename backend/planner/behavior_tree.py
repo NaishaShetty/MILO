@@ -50,6 +50,7 @@ from planner.actions import get_action_spec
 from planner.exceptions import InvalidTaskError
 from planner.models import PlanStep
 from planner.planner import Planner
+from planner.progress import prune_satisfied_steps
 from planner.rule_based import GOAL_HANDLERS, generic_goal
 from planner.state import WorldState
 from schemas.task import SingleTask
@@ -254,12 +255,19 @@ def build_tree_for_task(task: SingleTask, state: Optional[WorldState] = None) ->
         )
 
     handler = GOAL_HANDLERS.get(goal, generic_goal)
-    template_steps = handler(task, state if state is not None else WorldState(), None)
+    current_state = state if state is not None else WorldState()
+    template_steps = handler(task, current_state, None)
+    # Skip steps the state already satisfies (replan after partial
+    # progress) -- otherwise ticking would fail on e.g. `pickup` while
+    # the robot already holds the object. See `planner/progress.py`.
+    template_steps, skipped = prune_satisfied_steps(template_steps, current_state)
     children: List[BTNode] = [
         _action_node(step.action, step.target, step.parameters)
         for step in template_steps
     ]
-    return Sequence(f"{goal}({task.object or task.target or ''})", children)
+    tree = Sequence(f"{goal}({task.object or task.target or ''})", children)
+    tree.skipped_steps = skipped  # type: ignore[attr-defined]
+    return tree
 
 
 class BehaviorTreePlanner(Planner):
@@ -295,4 +303,7 @@ class BehaviorTreePlanner(Planner):
         result = super()._finalize(task, state, steps, started_at, memory_context)
         if result.plan is not None and getattr(self, "_last_tree", None) is not None:
             result.plan.metadata["behavior_tree"] = self._last_tree.to_dict()
+            skipped = getattr(self._last_tree, "skipped_steps", None)
+            if skipped:
+                result.plan.metadata["skipped_steps"] = skipped
         return result

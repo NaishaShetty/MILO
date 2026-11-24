@@ -95,7 +95,7 @@ former's continued existence.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Sequence
 
 from planner.state import WorldState
 from scene.relationship import RelationshipType
@@ -150,6 +150,7 @@ def ground_world_state(
     *,
     near_robot_depth_m: float = NEAR_ROBOT_DEPTH_METERS,
     held_object_max_depth_m: float = HELD_OBJECT_MAX_DEPTH_M,
+    held_objects: Optional[Sequence[str]] = None,
 ) -> WorldState:
     """Folds `scene`'s detections/relationships into a `WorldState`.
 
@@ -167,6 +168,12 @@ def ground_world_state(
         held_object_max_depth_m: Depth threshold (meters) below which
             a detection is considered a held-object candidate. See
             `HELD_OBJECT_MAX_DEPTH_M` and `_ground_held_object()`.
+        held_objects: The simulator's own `inventoryObjects`, reduced to
+            object-type names (e.g. `["Apple"]`), or `None` when the
+            simulator did not report that field at all. When given
+            (even as an empty list) it is ground truth and is used
+            instead of the depth-only guess; `None` falls back to the
+            depth heuristic. See `_ground_held_from_inventory()`.
 
     Returns:
         `state`, mutated: every detected object's `is_located` is set
@@ -202,9 +209,42 @@ def ground_world_state(
         container = scene.detections[rel.object_id]
         state.object(contained.label).location = container.label
 
-    _ground_held_object(scene, state, held_object_max_depth_m)
+    if held_objects is not None:
+        _ground_held_from_inventory(state, held_objects)
+    else:
+        _ground_held_object(scene, state, held_object_max_depth_m)
 
     return state
+
+
+def _ground_held_from_inventory(state: WorldState, held_objects: Sequence[str]) -> None:
+    """Sets `state.robot_holding` from the simulator's `inventoryObjects`.
+
+    Unlike the depth heuristic this is authoritative in *both*
+    directions: an empty inventory clears `robot_holding` (the robot
+    really is holding nothing), and a non-empty one names exactly what
+    is held. The simulator reports AI2-THOR object types
+    (`"ButterKnife"`); a name already known to `state` that matches it
+    ignoring case/spaces/underscores (`"butter knife"`) is preferred so
+    the planner's own spelling is kept.
+    """
+    for obj in state.objects.values():
+        obj.is_held = False
+    if not held_objects:
+        state.robot_holding = None
+        return
+
+    def squash(name: str) -> str:
+        return name.strip().lower().replace(" ", "").replace("_", "")
+
+    raw = held_objects[0].strip().lower()
+    held_name = next(
+        (known for known in state.objects if squash(known) == squash(raw)), raw
+    )
+    state.robot_holding = held_name
+    held_state = state.object(held_name)
+    held_state.is_held = True
+    held_state.location = "robot"
 
 
 def _ground_held_object(scene: Scene, state: WorldState, max_depth_m: float) -> None:

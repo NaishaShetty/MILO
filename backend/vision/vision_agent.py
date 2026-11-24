@@ -169,7 +169,7 @@ class VisionAgent:
     # Avoid breaking changes unless absolutely necessary.
     # --------------------------------------------------------------------
 
-    def perceive(self, prompt):
+    def perceive(self, prompt, *, include_masks=True):
         """Runs the full perception pipeline on the current frame.
 
         Acquires the simulator's current RGB frame, seeds a fresh
@@ -183,6 +183,9 @@ class VisionAgent:
                 e.g. `"chair. table. mug. refrigerator."`. Stored at
                 `scene.metadata[SceneMetadata.DETECTION_PROMPT]` for
                 the configured detector to read.
+            include_masks: `False` skips the segmenter (SAM2) -- the
+                cheap path the planning loop uses. Defaults to `True`
+                so every existing caller is unchanged.
 
         Returns:
             The `Scene` produced for this frame, enriched by every
@@ -205,4 +208,4 @@ class VisionAgent:
 
         scene.metadata[SceneMetadata.DETECTION_PROMPT] = prompt
 
-        return self.pipeline.process(image, scene)
+        return self.pipeline.process(image, scene, include_masks=include_masks)

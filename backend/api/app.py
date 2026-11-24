@@ -273,6 +273,48 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # `backend/tests/test_api_vision.py`).
     app.state.simulator = None
     app.state.vision_system = None
+    # Owned here for the whole lifespan and stopped in the `finally`
+    # at the bottom, whichever way this function exits. It is also kept
+    # as a local so a simulator that started but then failed to be
+    # wired up (and so never reached `app.state`) is still stopped --
+    # previously the startup `except` below dropped it on the floor and
+    # leaked a Unity subprocess.
+    simulator = None
+    try:
+        simulator = _start_vision_and_tasks(app)
+        yield
+    finally:
+        _stop_simulator(app.state.simulator or simulator)
+        app.state.simulator = None
+
+
+def _stop_simulator(simulator) -> None:
+    """
+    Stops `simulator` if there is one. Never raises: it runs during
+    teardown and error handling, where a second exception must not mask
+    the first or stop the app from shutting down. `Simulator.stop()` is
+    idempotent (see `AI2ThorEnv`), so calling it for a simulator that
+    never fully started is safe.
+    """
+    if simulator is None:
+        return
+    try:
+        simulator.stop()
+    except Exception:
+        logger.warning("api.simulator_stop_failed", exc_info=True)
+
+
+def _start_vision_and_tasks(app: FastAPI):
+    """
+    Starts the opt-in simulator and everything that needs it, filling
+    `app.state.simulator`/`vision_system`. Returns the started
+    simulator (or `None`) -- *including* when a later step failed and
+    the simulator was already stopped here, so the caller can always
+    call `_stop_simulator()` on whatever this returns. Never raises:
+    any failure degrades to "vision unavailable" (see this module's
+    docstring).
+    """
+    simulator = None
     if os.environ.get("VISION_ENABLE_SIMULATOR", "false").strip().lower() in (
         "1",
         "true",
@@ -335,26 +377,18 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                 "api.vision_system_unavailable",
                 extra={"exception_type": type(exc).__name__},
             )
+            # The simulator may already be running (the failure came
+            # after `start()`): stop it now rather than leaking a Unity
+            # subprocess that nothing will ever reference again.
+            _stop_simulator(simulator)
+            simulator = None
             app.state.simulator = None
             app.state.vision_system = None
-
-    yield
     # `LanguageAgent`'s collaborators hold no network connections or
     # file handles that outlive a single call, so no teardown is needed
-    # for it. The simulator is different: `Simulator.start()` (via
-    # `AI2ThorEnv.start()`) launches a real Unity subprocess, and the OS
-    # does NOT reliably reclaim it the moment this process exits --
-    # under `uvicorn --reload`, the *same* process keeps running across
-    # reloads, so skipping this call is exactly what let old Unity
-    # instances pile up (see the startup comment above). The FastAPI
-    # lifespan is this simulator's owner for its entire lifetime, so it
-    # is also responsible for explicitly releasing it here, every time,
-    # regardless of how shutdown was triggered.
-    if app.state.simulator is not None:
-        try:
-            app.state.simulator.stop()
-        finally:
-            app.state.simulator = None
+    # for it. The simulator is different -- `_lifespan`'s `finally`
+    # stops it on every exit path (see there).
+    return simulator
 
 
 app = FastAPI(

@@ -412,8 +412,18 @@ class RetrievalEngine:
         indexed.
         """
         memories = self._manager.list()
-        for memory in memories:
-            self.index_memory(memory)
+        texts = [canonical_text(memory) for memory in memories]
+        vectors = self._embedder.embed_batch(texts) if texts else []
+        items = [
+            (memory.memory_id, vector, {"memory_type": memory.memory_type.value})
+            for memory, vector in zip(memories, vectors)
+        ]
+        upsert_many = getattr(self._vector_store, "upsert_many", None)
+        if upsert_many is not None:
+            upsert_many(items)
+        else:
+            for memory_id, vector, metadata in items:
+                self._vector_store.upsert(memory_id, vector, metadata=metadata)
         return len(memories)
 
     # -- retrieval --------------------------------------------------
@@ -445,11 +455,16 @@ class RetrievalEngine:
         )
         raw_candidates = self._vector_store.search(query_vector, top_k=pool_size)
 
+        # One batched read for the whole candidate pool, not one `get`
+        # (and one SQLite connection) per candidate.
+        qualifying = [
+            c for c in raw_candidates if c.score >= self._weights.similarity_threshold
+        ]
+        fetched = self._manager.get_many([c.memory_id for c in qualifying])
+
         results: List[MemoryResult] = []
-        for candidate in raw_candidates:
-            if candidate.score < self._weights.similarity_threshold:
-                continue
-            memory = self._manager.get(candidate.memory_id)
+        for candidate in qualifying:
+            memory = fetched.get(candidate.memory_id)
             if memory is None:
                 # Vector store and structured store have drifted (e.g.
                 # a memory was deleted via the structured store

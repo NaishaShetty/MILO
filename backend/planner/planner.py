@@ -61,6 +61,7 @@ from typing import TYPE_CHECKING, ClassVar, List, Optional
 
 from planner.exceptions import PlanningError
 from planner.models import Plan, PlanningResult, PlanStep
+from planner.progress import prune_satisfied_steps
 from planner.state import WorldState
 from planner.validator import PlanValidator
 from schemas.task import SingleTask
@@ -132,7 +133,14 @@ class Planner(ABC):
                 planner_type=self.planner_type,
                 latency_ms=elapsed_ms,
             )
-        return self._finalize(task, state, steps, started_at, memory_context)
+        # Resumable planning: a replan after partial progress (or a goal
+        # that is already half-true) must not re-emit work the state
+        # already satisfies -- see `planner/progress.py`.
+        steps, skipped = prune_satisfied_steps(steps, state)
+        result = self._finalize(task, state, steps, started_at, memory_context)
+        if skipped and result.plan is not None:
+            result.plan.metadata["skipped_steps"] = skipped
+        return result
 
     @abstractmethod
     def _generate_steps(

@@ -220,6 +220,16 @@ class Orchestrator:
         task_state.current_plan = planning_result.plan
         self._publish(task_state, EventType.PLAN_CREATED)
 
+        if not planning_result.plan.steps:
+            # Every step was already satisfied by the current world state
+            # (see `planner.progress`): nothing to execute.
+            task_state.latencies_ms["total_ms"] = (
+                time.perf_counter() - run_started_at
+            ) * 1000.0
+            return self._finish_succeeded(
+                task, task_state, episode_id, None, world_state
+            )
+
         attempt = 0
         while True:
             if self._cancel_event.is_set():
@@ -330,6 +340,14 @@ class Orchestrator:
                 )
             task_state.current_plan = planning_result.plan
             self._publish(task_state, EventType.PLAN_CREATED)
+            if not planning_result.plan.steps:
+                # The failed attempt had in fact finished the job.
+                task_state.latencies_ms["total_ms"] = (
+                    time.perf_counter() - run_started_at
+                ) * 1000.0
+                return self._finish_succeeded(
+                    task, task_state, episode_id, record, world_state
+                )
 
     # -- memory -----------------------------------------------------------
 
@@ -391,8 +409,18 @@ class Orchestrator:
             return
         prompt = f"{task.object or task.target or 'object'}."
         started = time.perf_counter()
+        # The planning loop only needs labels, depth and open/closed
+        # state, so it takes the cheap path (no SAM2 masks). The Vision
+        # panel's own route keeps calling the full `perceive()`. A
+        # wrapper without `observe()` (older test doubles) just gets
+        # the full call.
+        observe = getattr(self._vision, "observe", None)
         try:
-            scene = self._vision.perceive(prompt)
+            scene = (
+                observe(prompt)
+                if observe is not None
+                else self._vision.perceive(prompt)
+            )
         except Exception:
             logger.warning("orchestrator.observe_failed", exc_info=True)
             return
@@ -410,9 +438,27 @@ class Orchestrator:
             for d in scene.detections
         ]
         if world_state is not None:
-            ground_world_state(scene, world_state)
+            ground_world_state(
+                scene, world_state, held_objects=self._read_held_objects()
+            )
         self._sync_agent_states(task_state)
         self._publish(task_state, EventType.OBSERVATION_RECEIVED)
+
+    def _read_held_objects(self) -> Optional[List[str]]:
+        """
+        The simulator's `inventoryObjects` (via the vision wrapper), or
+        `None` when unavailable -- `ground_world_state` then falls back
+        to its depth-only held-object guess.
+        """
+        reader = getattr(self._vision, "held_objects", None)
+        if reader is None:
+            return None
+        try:
+            held = reader()
+        except Exception:
+            logger.warning("orchestrator.held_objects_failed", exc_info=True)
+            return None
+        return list(held) if isinstance(held, (list, tuple)) else None
 
     def _remember_terminal(
         self,
@@ -498,7 +544,7 @@ class Orchestrator:
         task: SingleTask,
         task_state: TaskState,
         episode_id: str,
-        record: ExecutionRecord,
+        record: Optional[ExecutionRecord],
         world_state: WorldState,
     ) -> TaskState:
         # Memory is written *before* `status` flips to its terminal

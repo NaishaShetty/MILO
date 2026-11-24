@@ -103,16 +103,25 @@ def detect_relationship(existing: Memory, candidate: Memory) -> Optional[str]:
 
 def find_related_memories(manager: MemoryManager, candidate: Memory) -> List[dict]:
     """
-    Scans existing `ACTIVE` memories of `candidate.memory_type` and
-    returns `{"memory_id": ..., "relation": ...}` entries for every one
-    `detect_relationship()` links to `candidate`. Linear scan over
-    same-type memories -- acceptable at this project's research scale
-    (matching `sqlite_vector_store.py`'s brute-force-is-fine rationale);
-    a future milestone could index by `(subject, predicate)` if this
-    ever becomes a bottleneck.
+    Looks up the existing `ACTIVE` memories sharing `candidate`'s
+    `(subject, predicate)` -- an indexed query, not a scan of every
+    memory of the type -- and returns `{"memory_id": ..., "relation":
+    ...}` entries for every one `detect_relationship()` links to
+    `candidate`.
     """
-    existing_memories = manager.list(
-        memory_type=candidate.memory_type, status=MemoryStatus.ACTIVE
+    triple = _triple_of(candidate)
+    if triple is None:
+        # Not a subject/predicate/object memory -- `detect_relationship`
+        # would return `None` for every existing memory anyway.
+        return []
+    # Only memories sharing this subject *and* predicate can be a
+    # duplicate/conflict, so ask the store for exactly those (indexed)
+    # instead of listing every memory of the type on each write.
+    existing_memories = manager.find_by_triple(
+        candidate.memory_type,
+        triple.subject,
+        triple.predicate,
+        status=MemoryStatus.ACTIVE,
     )
     related = []
     for existing in existing_memories:

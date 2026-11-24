@@ -152,6 +152,7 @@ class PerceptionPipeline:
         # are skipped in `process`, so `PerceptionPipeline(detector=...)`
         # alone remains valid, exactly as `VisionAgent` did before this
         # existed.
+        self.segmenter = segmenter
         self.stages = [
             detector,
             segmenter,
@@ -174,12 +175,19 @@ class PerceptionPipeline:
     # Avoid breaking changes unless absolutely necessary.
     # --------------------------------------------------------------------
 
-    def process(self, image, scene):
+    def process(self, image, scene, *, include_masks=True):
         """Runs every configured stage, in order, against one frame.
 
         Args:
             image: RGB `numpy.ndarray` for the current frame.
             scene: The `Scene` being built for this frame.
+            include_masks: When `False`, the segmenter (SAM2, by far
+                the most expensive stage) is skipped. Later stages fall
+                back to bounding boxes -- depth sampling and the
+                scene graph both already handle a detection with no
+                mask. The planning loop only needs labels, depth and
+                open/closed state, so it passes `False`; the Vision
+                panel, which draws masks, keeps the default.
 
         Returns:
             The same `Scene`, enriched by every configured stage.
@@ -187,6 +195,9 @@ class PerceptionPipeline:
         """
 
         for stage in self.stages:
+
+            if stage is not None and stage is self.segmenter and not include_masks:
+                continue
 
             if stage is not None:
 

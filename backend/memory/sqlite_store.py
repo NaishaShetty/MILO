@@ -42,7 +42,7 @@ import json
 import sqlite3
 from contextlib import closing
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from memory.exceptions import (
     DuplicateMemoryError,
@@ -76,6 +76,18 @@ CREATE INDEX IF NOT EXISTS idx_memories_task_id ON memories(task_id);
 CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at);
 """
 
+# `subject`/`predicate` mirror the semantic triple kept in `metadata`
+# (`semantics.SemanticTriple`) as real, indexed columns, so
+# `find_by_triple()` answers "what do I already know about this
+# subject/predicate" without scanning or JSON-parsing every memory. Added
+# by `_migrate()` for databases created before they existed; plain
+# columns (not a JSON expression index) so a row whose `metadata` is
+# corrupt can never make an unrelated write fail.
+_TRIPLE_COLUMNS = ("subject", "predicate")
+
+#: SQLite's default host-parameter limit is 999 on older builds.
+_IN_CLAUSE_CHUNK = 500
+
 
 def _memory_to_row(memory: Memory) -> Dict[str, Any]:
     return {
@@ -91,7 +103,14 @@ def _memory_to_row(memory: Memory) -> Dict[str, Any]:
         "episode_id": memory.episode_id,
         "task_id": memory.task_id,
         "metadata": json.dumps(memory.metadata, sort_keys=True),
+        "subject": _triple_part(memory.metadata, "subject"),
+        "predicate": _triple_part(memory.metadata, "predicate"),
     }
+
+
+def _triple_part(metadata: Any, key: str) -> Optional[str]:
+    value = metadata.get(key) if isinstance(metadata, dict) else None
+    return value if isinstance(value, str) else None
 
 
 def _row_to_memory(row: sqlite3.Row) -> Memory:
@@ -138,11 +157,44 @@ class SQLiteMemoryStore(MemoryStore):
             self._database_path.parent.mkdir(parents=True, exist_ok=True)
             with closing(self._connect()) as conn:
                 conn.executescript(_SCHEMA)
+                self._migrate(conn)
                 conn.commit()
         except (OSError, sqlite3.Error) as exc:
             raise MemoryStoreError(
                 f"Failed to initialize memory database at {self._database_path}: {exc}"
             ) from exc
+
+    @staticmethod
+    def _migrate(conn: sqlite3.Connection) -> None:
+        """
+        Adds (and backfills) the `subject`/`predicate` columns and their
+        index on a database created before they existed. Idempotent: a
+        current database is left untouched.
+        """
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(memories)")}
+        if not set(_TRIPLE_COLUMNS) <= columns:
+            for column in _TRIPLE_COLUMNS:
+                if column not in columns:
+                    conn.execute(f"ALTER TABLE memories ADD COLUMN {column} TEXT")
+            for row in conn.execute(
+                "SELECT memory_id, metadata FROM memories"
+            ).fetchall():
+                try:
+                    metadata = json.loads(row["metadata"])
+                except (TypeError, ValueError):
+                    continue  # corrupt row: leave NULL, surfaced on read as before
+                conn.execute(
+                    "UPDATE memories SET subject = ?, predicate = ? WHERE memory_id = ?",
+                    (
+                        _triple_part(metadata, "subject"),
+                        _triple_part(metadata, "predicate"),
+                        row["memory_id"],
+                    ),
+                )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memories_triple "
+            "ON memories(memory_type, subject, predicate)"
+        )
 
     def _connect(self) -> sqlite3.Connection:
         # A fresh connection per call (see this module's docstring) --
@@ -163,11 +215,11 @@ class SQLiteMemoryStore(MemoryStore):
                     INSERT INTO memories (
                         memory_id, memory_type, content, provenance, status,
                         confidence, created_at, observed_at, updated_at,
-                        episode_id, task_id, metadata
+                        episode_id, task_id, metadata, subject, predicate
                     ) VALUES (
                         :memory_id, :memory_type, :content, :provenance, :status,
                         :confidence, :created_at, :observed_at, :updated_at,
-                        :episode_id, :task_id, :metadata
+                        :episode_id, :task_id, :metadata, :subject, :predicate
                     )
                     """,
                     row,
@@ -193,6 +245,47 @@ class SQLiteMemoryStore(MemoryStore):
             return None
         return _row_to_memory(row)
 
+    def get_many(self, memory_ids: Sequence[str]) -> Dict[str, Memory]:
+        ids = list(dict.fromkeys(memory_ids))
+        found: Dict[str, Memory] = {}
+        with closing(self._connect()) as conn:
+            for start in range(0, len(ids), _IN_CLAUSE_CHUNK):
+                chunk = ids[start : start + _IN_CLAUSE_CHUNK]
+                placeholders = ",".join("?" * len(chunk))
+                rows = conn.execute(
+                    f"SELECT * FROM memories WHERE memory_id IN ({placeholders})",
+                    chunk,
+                ).fetchall()
+                for row in rows:
+                    memory = _row_to_memory(row)
+                    found[memory.memory_id] = memory
+        return found
+
+    def find_by_triple(
+        self,
+        memory_type: MemoryType,
+        subject: str,
+        predicate: str,
+        *,
+        status: Optional[MemoryStatus] = None,
+    ) -> List[Memory]:
+        query = (
+            "SELECT * FROM memories WHERE memory_type = :memory_type "
+            "AND subject = :subject AND predicate = :predicate"
+        )
+        params: Dict[str, Any] = {
+            "memory_type": memory_type.value,
+            "subject": subject,
+            "predicate": predicate,
+        }
+        if status is not None:
+            query += " AND status = :status"
+            params["status"] = status.value
+        query += " ORDER BY created_at DESC"
+        with closing(self._connect()) as conn:
+            rows = conn.execute(query, params).fetchall()
+        return [_row_to_memory(row) for row in rows]
+
     def update(self, memory: Memory) -> None:
         row = _memory_to_row(memory)
         with closing(self._connect()) as conn:
@@ -210,7 +303,9 @@ class SQLiteMemoryStore(MemoryStore):
                         updated_at = :updated_at,
                         episode_id = :episode_id,
                         task_id = :task_id,
-                        metadata = :metadata
+                        metadata = :metadata,
+                        subject = :subject,
+                        predicate = :predicate
                     WHERE memory_id = :memory_id
                     """,
                     row,

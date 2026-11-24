@@ -46,6 +46,23 @@ Iteration loop
    already satisfied (checked via `validator.GOAL_CHECKS`), or
    `max_iterations` is reached (-> `PlanningTimeoutError`).
 
+Several steps per call, and a cached memory block
+------------------------------------------------------
+By default one LLM call may return *several* steps
+(`{"steps": [{...}, {...}], "done": bool}`), cutting a typical 8-step
+plan from ~8 round trips to 1-2. Every step in the batch is still
+validated, in order, against a working state that each accepted step
+advances -- the first invalid step ends the batch (the valid prefix is
+kept and the loop simply asks again from the new state); only an
+invalid *first* step goes through the repair path. A reply in the
+original one-object shape is still accepted. Pass
+`one_step_per_call=True` for the previous behaviour exactly (one
+action per call, original prompt `planner-react-v1`).
+
+The retrieved-memory hints are rendered into prompt text once per
+`plan()` call and reused for every iteration, instead of being rebuilt
+and re-serialised on each one.
+
 Graceful degradation
 -----------------------
 `ReActPlanner.__init__` takes `llm_client: Optional[LLMClient] = None`
@@ -143,6 +160,33 @@ takes precedence over these if they disagree): {memory_hints}
 Steps taken so far: {history}
 """
 
+_MULTI_STEP_PROMPT_TEMPLATE = """You are the Task Planner of an embodied household robot. You plan \
+which actions to take to accomplish a goal, given the robot's current symbolic world state. You \
+NEVER execute anything yourself -- you only propose actions as JSON, which a separate validator \
+checks, in order, before they are accepted.
+
+Available actions: {actions}
+
+Respond with ONLY one JSON object, no prose, no markdown fences. Propose as many of the next \
+actions as you are confident about, in execution order (each one must be valid after the ones \
+before it), up to {max_steps}:
+{{"steps": [{{"action": "<one of the available actions>", "target": "<object name or null>", \
+"parameters": {{}}, "reasoning": "<one short sentence>"}}], "done": <true if these steps fully \
+achieve the goal, else false>}}
+
+Goal: {goal}
+Object: {object}
+Target: {target}
+Current world state: {state}
+Retrieved memory (hints only -- may be stale or wrong; the current world state above always \
+takes precedence over these if they disagree): {memory_hints}
+Steps taken so far: {history}
+"""
+
+#: Upper bound on how many steps one LLM reply may contribute -- keeps a
+#: runaway reply from flooding the plan; the loop just asks again.
+_MAX_STEPS_PER_CALL = 12
+
 _MAX_MEMORY_HINTS_IN_PROMPT = 5
 
 
@@ -217,12 +261,14 @@ class ReActPlanner(Planner):
         max_iterations: int = 12,
         repair_attempts: int = 2,
         validator=None,
+        one_step_per_call: bool = False,
     ) -> None:
         super().__init__(validator=validator)
         self._llm_client = llm_client
         self._fallback_planner = fallback_planner
         self._max_iterations = max_iterations
         self._repair_attempts = repair_attempts
+        self._one_step_per_call = one_step_per_call
 
     def plan(
         self, task: SingleTask, state: WorldState, memory_context=None
@@ -325,6 +371,8 @@ class ReActPlanner(Planner):
         working_state = state.clone()
         steps: List[PlanStep] = []
         goal_check = GOAL_CHECKS.get((task.goal or "").strip().lower())
+        # Rendered once for the whole plan() call, not per iteration.
+        memory_hints = json.dumps(_describe_memory_context(memory_context))
 
         for iteration in range(1, self._max_iterations + 1):
             logger.info(
@@ -334,26 +382,28 @@ class ReActPlanner(Planner):
             if goal_check is not None and goal_check(task, working_state):
                 break
 
-            proposal = self._propose_with_repair(
-                task, working_state, steps, memory_context
+            proposals = self._propose_with_repair(
+                task, working_state, steps, memory_hints
             )
-            if not proposal.get("action"):
-                # "done" with no action: the model reports the goal is
-                # already achieved and there is nothing left to do.
-                logger.info(
-                    "planner.react.done",
-                    extra={"task_id": task.task_id, "iteration": iteration},
-                )
-                break
+            finished = False
+            for proposal in proposals:
+                if not proposal.get("action"):
+                    # "done" with no action: the model reports the goal
+                    # is already achieved and there is nothing left to do.
+                    finished = True
+                    break
 
-            step = self._accept_proposal(proposal, working_state, len(steps) + 1)
-            spec = get_action_spec(step.action)
-            assert spec is not None  # guaranteed by _accept_proposal
-            spec.apply_effect(working_state, step.target, step.parameters)
-            steps.append(step)
-            if proposal.get("done"):
-                # "done" alongside an action: this action is the final
-                # one needed -- apply it (above), then stop iterating.
+                step = self._accept_proposal(proposal, working_state, len(steps) + 1)
+                spec = get_action_spec(step.action)
+                assert spec is not None  # guaranteed by _accept_proposal
+                spec.apply_effect(working_state, step.target, step.parameters)
+                steps.append(step)
+                if proposal.get("done"):
+                    # "done" alongside an action: this action is the
+                    # final one needed -- applied (above), then stop.
+                    finished = True
+                    break
+            if finished:
                 logger.info(
                     "planner.react.done",
                     extra={"task_id": task.task_id, "iteration": iteration},
@@ -371,13 +421,16 @@ class ReActPlanner(Planner):
         task: SingleTask,
         state: WorldState,
         steps: List[PlanStep],
-        memory_context=None,
-    ) -> Dict[str, Any]:
+        memory_hints: str = "[]",
+    ) -> List[Dict[str, Any]]:
+        """
+        One LLM call (with repair retries) -> the validated proposals it
+        contributes, in order. Always at least one element. See this
+        module's docstring for the batch-validation rule.
+        """
         last_error: Optional[str] = None
         for attempt in range(self._repair_attempts + 1):
-            request = self._build_request(
-                task, state, steps, last_error, memory_context
-            )
+            request = self._build_request(task, state, steps, last_error, memory_hints)
             try:
                 response = self._llm_client.complete(request)  # type: ignore[union-attr]
             except LanguageRuntimeError as exc:
@@ -387,18 +440,8 @@ class ReActPlanner(Planner):
             # completion logging" section): the full, unparsed LLM
             # response text, for every call this method makes,
             # regardless of whether it turns out to be accepted or
-            # rejected below. Deliberately at DEBUG (silent at this
-            # package's/production's default WARNING level -- see
-            # `planner.react.malformed_output` just below, which stays
-            # the short, always-visible summary) and deliberately
-            # interpolated into the message string itself (`%s`, not
-            # `extra=`) so it survives regardless of the configured
-            # formatter -- `extra=` dict values are invisible under the
-            # default `logging.Formatter`, which is exactly the gap
-            # that made an earlier real failure investigation
-            # (`phase_e_milo_benchmark_report.md`'s Addendum 8) have to
-            # re-run episodes with a one-off diagnostic client wrapper
-            # just to see what the model had actually proposed.
+            # rejected below. Deliberately at DEBUG and interpolated into
+            # the message string itself (`%s`, not `extra=`).
             logger.debug(
                 "planner.react.raw_completion task_id=%s attempt=%s content=%r",
                 task.task_id,
@@ -407,9 +450,8 @@ class ReActPlanner(Planner):
             )
 
             try:
-                proposal = _extract_json(response.content)
-                self._validate_proposal_shape(proposal, state)
-                return proposal
+                parsed = _extract_json(response.content)
+                return self._validated_batch(parsed, state)
             except MalformedLLMOutputError as exc:
                 last_error = str(exc)
                 logger.warning(
@@ -423,6 +465,55 @@ class ReActPlanner(Planner):
         raise MalformedLLMOutputError(
             f"LLM produced malformed output after {self._repair_attempts + 1} attempt(s): {last_error}"
         )
+
+    def _validated_batch(
+        self, parsed: Dict[str, Any], state: WorldState
+    ) -> List[Dict[str, Any]]:
+        """
+        Normalises a reply (`{"steps": [...]}` or the original single
+        object) into a list of proposals and validates them in order
+        against a working state each accepted step advances. The first
+        invalid step ends the batch: the valid prefix is returned, and
+        only an invalid *first* step raises (-> repair).
+        """
+        raw = parsed.get("steps") if isinstance(parsed.get("steps"), list) else None
+        if raw is None:
+            proposals = [parsed]
+        else:
+            if not raw:
+                raise MalformedLLMOutputError("'steps' must not be empty.")
+            if not all(isinstance(item, dict) for item in raw):
+                raise MalformedLLMOutputError(
+                    "every entry of 'steps' must be an object."
+                )
+            proposals = [dict(item) for item in raw]
+            if parsed.get("done"):
+                proposals[-1]["done"] = True
+        limit = 1 if self._one_step_per_call else _MAX_STEPS_PER_CALL
+        if len(proposals) > limit:
+            proposals = proposals[:limit]
+            proposals[-1].pop("done", None)  # truncated: not necessarily done
+
+        accepted: List[Dict[str, Any]] = []
+        working = state.clone()
+        for index, proposal in enumerate(proposals):
+            try:
+                self._validate_proposal_shape(proposal, working)
+            except MalformedLLMOutputError:
+                if index == 0:
+                    raise
+                # Keep the valid prefix; the loop asks again from there.
+                accepted[-1].pop("done", None)
+                break
+            accepted.append(proposal)
+            action = proposal.get("action")
+            if action:
+                spec = get_action_spec(action)
+                assert spec is not None
+                spec.apply_effect(
+                    working, proposal.get("target"), proposal.get("parameters") or {}
+                )
+        return accepted
 
     def _validate_proposal_shape(
         self, proposal: Dict[str, Any], state: WorldState
@@ -478,20 +569,31 @@ class ReActPlanner(Planner):
         state: WorldState,
         steps: List[PlanStep],
         last_error: Optional[str],
-        memory_context=None,
+        memory_hints: str = "[]",
     ) -> LLMRequest:
         actions = ", ".join(sorted(_all_action_names()))
         history = [f"{s.action}({s.target or ''})" for s in steps]
-        system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
+        fields = dict(
             actions=actions,
             goal=task.goal,
             object=task.object,
             target=task.target,
             state=json.dumps(_describe_state(state)),
-            memory_hints=json.dumps(_describe_memory_context(memory_context)),
+            memory_hints=memory_hints,
             history=json.dumps(history),
         )
-        user_message = "Propose the next action."
+        if self._one_step_per_call:
+            system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(**fields)
+            user_message = "Propose the next action."
+            version = "planner-react-v1"
+            max_tokens = 300
+        else:
+            system_prompt = _MULTI_STEP_PROMPT_TEMPLATE.format(
+                max_steps=_MAX_STEPS_PER_CALL, **fields
+            )
+            user_message = "Propose the next actions."
+            version = "planner-react-v2"
+            max_tokens = 900
         if last_error:
             user_message += (
                 f" Your previous proposal was rejected: {last_error} Try again."
@@ -501,12 +603,12 @@ class ReActPlanner(Planner):
             user_message=user_message,
             temperature=0.0,
             top_p=1.0,
-            max_tokens=300,
+            max_tokens=max_tokens,
             frequency_penalty=0.0,
             presence_penalty=0.0,
             strict_json_mode=True,
-            prompt_version="planner-react-v1",
-            schema_version="planner-react-v1",
+            prompt_version=version,
+            schema_version=version,
         )
 
 

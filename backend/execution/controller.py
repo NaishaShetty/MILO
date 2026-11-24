@@ -255,6 +255,18 @@ class ExecutionController:
                 self._emit(record, step, "skipped")
                 continue
 
+            if step.status == StepStatus.COMPLETED:
+                # A retry (`Orchestrator`'s "retry" verdict) re-executes
+                # the *same* `Plan` object, whose steps were mutated in
+                # place by the previous attempt. A step that already
+                # succeeded must not run again: its effect is already
+                # on `state` (and in the simulator), and re-running e.g.
+                # `pickup` while holding the object would be rejected
+                # and turn a one-step hiccup into a whole-plan failure.
+                step_result.status = StepStatus.COMPLETED
+                self._emit(record, step, "already_done")
+                continue
+
             result = self.execute_step(plan, step, state, record)
             if not result.success:
                 halted = True
@@ -523,9 +535,22 @@ class ExecutionController:
         if self._step_timeout_s is None:
             return self._dispatcher.dispatch(action)
 
-        with ThreadPoolExecutor(max_workers=1) as pool:
+        # Deliberately NOT `with ThreadPoolExecutor(...) as pool:` --
+        # that context manager's `__exit__` calls `shutdown(wait=True)`,
+        # which blocks until the worker finishes, so a hung simulator
+        # call would keep this method (and the whole step) stuck long
+        # after `future.result(timeout=...)` had already raised. Shut
+        # the pool down without waiting instead: the timeout error
+        # propagates immediately, queued-but-unstarted work is cancelled,
+        # and the one hung worker thread is simply abandoned (a Python
+        # thread cannot be killed; it ends whenever the simulator call
+        # finally returns).
+        pool = ThreadPoolExecutor(max_workers=1)
+        try:
             future = pool.submit(self._dispatcher.dispatch, action)
             return future.result(timeout=self._step_timeout_s)
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
 
     def _emit(
         self,

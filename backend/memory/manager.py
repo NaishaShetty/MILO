@@ -28,7 +28,7 @@ milestone built *on top of* this manager, not inside it.
 from __future__ import annotations
 
 import time
-from typing import List, Optional
+from typing import Dict, List, Optional, Sequence
 
 from memory.config import MemoryConfig
 from memory.models import Memory, MemoryProvenance, MemoryStatus, MemoryType
@@ -69,6 +69,23 @@ class MemoryManager:
     def get(self, memory_id: str) -> Optional[Memory]:
         """Returns the `Memory` for `memory_id`, or `None` if absent."""
         return self._store.get(memory_id)
+
+    def get_many(self, memory_ids: Sequence[str]) -> Dict[str, Memory]:
+        """Batched `get()` -- see `MemoryStore.get_many`."""
+        return self._store.get_many(memory_ids)
+
+    def find_by_triple(
+        self,
+        memory_type: MemoryType,
+        subject: str,
+        predicate: str,
+        *,
+        status: Optional[MemoryStatus] = None,
+    ) -> List[Memory]:
+        """Indexed subject/predicate lookup -- see `MemoryStore.find_by_triple`."""
+        return self._store.find_by_triple(
+            memory_type, subject, predicate, status=status
+        )
 
     def update(self, memory: Memory) -> Memory:
         """
