@@ -65,6 +65,7 @@ from __future__ import annotations
 import os
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -354,7 +355,11 @@ class RetrievalEngine:
         vector_store: VectorStore,
         embedder: Embedder,
         weights: Optional[RankingWeights] = None,
+        reranker=None,
     ) -> None:
+        #: Optional learned reranker (`learning.retrieval.reranker`) applied to the
+        #: top candidates; any failure leaves the weighted-score order untouched.
+        self._reranker = reranker
         self._manager = manager
         self._vector_store = vector_store
         self._embedder = embedder
@@ -496,6 +501,8 @@ class RetrievalEngine:
         results.sort(
             key=lambda r: (-r.final_score, -r.memory.created_at, r.memory.memory_id)
         )
+        if self._reranker is not None and len(results) > 1:
+            results = self._reranker.rescore(query, results[: max(top_k * 3, 20)])
         top_results = results[:top_k]
         for rank, result in enumerate(top_results):
             result.retrieval_metadata["rank"] = rank
@@ -583,4 +590,27 @@ def build_retrieval_engine(
         memory_config.vector_store_path / "vectors.db",
         dimension=embedder.dimension,
     )
-    return RetrievalEngine(manager, vector_store, embedder, weights=weights)
+    reranker = None
+    if os.environ.get("MEMORY_LEARNED_RERANKER", "0").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        from learning.retrieval.reranker import RetrievalReranker
+
+        reranker = RetrievalReranker.load(
+            Path(
+                os.environ.get(
+                    "MEMORY_RERANKER_PATH", "artifacts/memory_embedder/reranker.pkl"
+                )
+            )
+        )
+    engine = RetrievalEngine(
+        manager, vector_store, embedder, weights=weights, reranker=reranker
+    )
+    # A different embedder (provider switched, e.g. hashing -> learned) leaves old
+    # vectors of the wrong size behind: re-embed once so retrieval is not empty.
+    if vector_store.size == 0 and manager.list(limit=1):
+        engine.reindex_all()
+    return engine

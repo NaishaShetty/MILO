@@ -40,3 +40,15 @@ eval-detector:
 ## Real-simulator missions: Grounding DINO vs fast detector (both fallback policies)
 eval-detector-missions:
 	cd backend && $(PY) -m learning.detector.eval_missions --model artifacts/detector --episodes 30
+
+## Contrastively fine-tune the memory embedder (from the Phase A logs)
+train-embedder:
+	cd backend && $(PY) -m learning.retrieval.train_embedder --db-dir data/episodes --out artifacts/memory_embedder
+
+## Held-out recall@k/MRR + latency: hashing vs BGE vs fine-tuned (+ reranker)
+eval-retrieval:
+	cd backend && $(PY) -m learning.retrieval.eval_retrieval --db-dir data/episodes --model artifacts/memory_embedder
+
+## Missions with memory in the loop: hashing vs learned embedder
+eval-retrieval-missions:
+	cd backend && MEMORY_LEARNED_EMBEDDER_DIR=artifacts/memory_embedder $(PY) -m learning.retrieval.eval_missions --episodes 200

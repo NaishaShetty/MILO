@@ -273,6 +273,50 @@ class SentenceTransformerEmbedder(Embedder):
         return normalized.cpu().tolist()
 
 
+class LearnedEmbedder(Embedder):
+    """
+    The contrastively fine-tuned sentence embedder (`learning/retrieval/
+    train_embedder.py`): a small transformer saved with `save_pretrained`,
+    mean-pooled and L2-normalised. Runs on the GPU when there is one.
+    Same `Embedder` interface as every other provider, so the retrieval
+    engine and vector store are untouched.
+    """
+
+    def __init__(self, model_dir: str, device: str = "") -> None:
+        import torch
+        from transformers import AutoModel, AutoTokenizer
+
+        self._torch = torch
+        self._device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self._tokenizer = AutoTokenizer.from_pretrained(model_dir)
+        self._model = AutoModel.from_pretrained(model_dir).to(self._device).eval()
+        self._dim = int(self._model.config.hidden_size)
+
+    @property
+    def dimension(self) -> int:
+        return self._dim
+
+    def embed(self, text: str) -> List[float]:
+        return self.embed_batch([text])[0]
+
+    def embed_batch(self, texts: Sequence[str]) -> List[List[float]]:
+        torch = self._torch
+        if not texts:
+            return []
+        out: List[List[float]] = []
+        for start in range(0, len(texts), 256):
+            chunk = list(texts[start : start + 256])
+            enc = self._tokenizer(
+                chunk, padding=True, truncation=True, max_length=64, return_tensors="pt"
+            ).to(self._device)
+            with torch.no_grad():
+                hidden = self._model(**enc).last_hidden_state
+            mask = enc["attention_mask"].unsqueeze(-1).float()
+            pooled = (hidden * mask).sum(1) / mask.sum(1).clamp(min=1e-9)
+            out += torch.nn.functional.normalize(pooled, p=2, dim=1).cpu().tolist()
+        return out
+
+
 @dataclass(frozen=True)
 class EmbeddingConfig:
     """
@@ -315,7 +359,7 @@ class EmbeddingConfig:
         )
 
 
-_SUPPORTED_PROVIDERS = ("hashing", "sentence_transformer")
+_SUPPORTED_PROVIDERS = ("hashing", "sentence_transformer", "learned")
 
 
 def get_embedder(config: EmbeddingConfig) -> Embedder:
@@ -330,6 +374,24 @@ def get_embedder(config: EmbeddingConfig) -> Embedder:
     """
     if config.provider == "hashing":
         return HashingEmbedder(dimension=config.dimension)
+    if config.provider == "learned":
+        # Safe fallback: a missing/broken fine-tuned model must never take
+        # memory down -- use the hashing embedder (and say so).
+        try:
+            return LearnedEmbedder(
+                os.environ.get(
+                    "MEMORY_LEARNED_EMBEDDER_DIR", "artifacts/memory_embedder"
+                ),
+                device=config.device if config.device != "cpu" else "",
+            )
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "memory.learned_embedder_unavailable -- falling back to hashing",
+                exc_info=True,
+            )
+            return HashingEmbedder(dimension=config.dimension)
     if config.provider == "sentence_transformer":
         return SentenceTransformerEmbedder(
             model_name=config.model_name, device=config.device
