@@ -56,3 +56,7 @@ eval-retrieval-missions:
 ## Small instruction parser: train, then held-out-phrasing evaluation vs the rule phrasebook
 eval-parser:
 	cd backend && $(PY) -m learning.parser.eval_parser --out artifacts/parser
+
+## World model: transition accuracy vs "nothing changes", rollout plan scoring, missions
+eval-worldmodel:
+	cd backend && $(PY) -m learning.eval_worldmodel --data data/dataset --model artifacts/outcome --out artifacts/worldmodel --episodes 400

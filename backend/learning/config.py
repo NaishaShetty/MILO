@@ -6,6 +6,9 @@ back to today's rule-based behaviour if its model is missing or fails.
 
     MILO_LEARNED_REFLECTOR = off | shadow | on     (default off)
     MILO_PLAN_RANKING      = 0 | 1                  (default 0)
+    MILO_WORLD_MODEL       = 0 | 1                  (default 0; needs MILO_PLAN_RANKING=1:
+                             score plans by rolling a learned transition model forward)
+    MILO_WORLD_MODEL_PATH  = artifacts/worldmodel/world.pkl
     MILO_MODEL_DIR         = directory of trained outcome-predictor versions
                              (default: artifacts/outcome)
 
@@ -62,7 +65,23 @@ def learning_kwargs(env: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
             ReflectionAgent(), predictor, mode=mode
         )
     if ranking:
-        kwargs["plan_ranker"] = PlanRanker(predictor)
+        world = None
+        if os.environ.get("MILO_WORLD_MODEL", "0").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        ):
+            from learning.worldmodel import WorldModel
+
+            world = WorldModel.load(
+                Path(
+                    os.environ.get(
+                        "MILO_WORLD_MODEL_PATH", "artifacts/worldmodel/world.pkl"
+                    )
+                )
+            )
+        kwargs["plan_ranker"] = PlanRanker(predictor, world_model=world)
     return kwargs
 
 
