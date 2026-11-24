@@ -93,11 +93,17 @@ class VisionAgentWrapper(BaseAgent):
         if not isinstance(metadata, dict) or "inventoryObjects" not in metadata:
             return None
         inventory = metadata.get("inventoryObjects") or []
-        return [
-            str(item["objectType"])
-            for item in inventory
-            if isinstance(item, dict) and item.get("objectType")
-        ]
+        held: List[str] = []
+        for item in inventory:
+            if not isinstance(item, dict):
+                continue
+            # AI2-THOR ids look like "Apple|+01.2|+00.9|-02.1".
+            name = (
+                item.get("objectType") or str(item.get("objectId") or "").split("|")[0]
+            )
+            if name:
+                held.append(str(name))
+        return held
 
     def locate(self, label: str, *, prompt: Optional[str] = None) -> Dict[str, Any]:
         """

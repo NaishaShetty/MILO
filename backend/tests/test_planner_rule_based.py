@@ -171,7 +171,7 @@ def test_store_goal_does_not_reopen_an_already_open_container():
 
 
 def test_generic_fallback_goal_still_produces_a_plan():
-    result = _plan(goal="turn_on", object="lamp")
+    result = _plan(goal="clean", object="lamp")
     assert result.success
     assert result.plan.steps[-1].action == "act"
 

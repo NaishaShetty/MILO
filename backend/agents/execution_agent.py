@@ -64,6 +64,16 @@ class ExecutionAgentWrapper(BaseAgent):
             self._active_controller = None
             self._state = AgentState.IDLE
 
+    def get_metadata(self) -> Optional[dict]:
+        """The simulator's current metadata, or `None` if there is none --
+        used to expand composite tasks and to answer where something is."""
+        if self._simulator is None:
+            return None
+        try:
+            return self._simulator.get_metadata()
+        except Exception:
+            return None
+
     def cancel_current(self) -> None:
         """
         Requests cancellation of whatever `execute_plan()` call is

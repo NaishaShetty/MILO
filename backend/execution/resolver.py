@@ -55,7 +55,31 @@ from typing import Any, Dict, List, Optional
 # directions so either spelling resolves.
 _ALIASES: Dict[str, str] = {
     "refrigerator": "fridge",
+    # Everyday words for AI2-THOR's toggleable objects.
+    "tap": "faucet",
+    "light": "lightswitch",
+    "lights": "lightswitch",
+    "light switch": "lightswitch",
+    "tv": "television",
+    "counter": "countertop",
 }
+
+#: Pseudo-object ids for "where the user is". There is no user entity in
+#: the simulator, so "bring it to me"/"back to the user" means "return to
+#: where the robot started" -- the dispatcher resolves this id to
+#: `Simulator.navigate_home()`.
+HOME_OBJECT_ID = "@home"
+_HOME_NAMES = {"home", "user", "me", "the user", "start", "start position"}
+
+
+def spellings_of(object_type: str) -> set:
+    """Every everyday word for an AI2-THOR `objectType`: the type itself
+    plus each alias that names it (`"faucet"` -> `{"faucet", "tap"}`;
+    `"fridge"` -> `{"fridge", "refrigerator"}`)."""
+    name = object_type.strip().lower()
+    names = {name, _ALIASES.get(name, name)}
+    names.update(alias for alias, real in _ALIASES.items() if real == name)
+    return names
 
 
 class ObjectResolver:
@@ -77,6 +101,8 @@ class ObjectResolver:
         """
         if not name:
             return None
+        if name.strip().lower() in _HOME_NAMES:
+            return HOME_OBJECT_ID
         if "|" in name:
             return name
 
@@ -102,9 +128,20 @@ class ObjectResolver:
         for alias_name, ai2thor_name in _ALIASES.items():
             if ai2thor_name == target:
                 accepted.add(alias_name)
-        return [
+        exact = [
             obj
             for obj in objects
             if isinstance(obj.get("objectType"), str)
             and obj["objectType"].strip().lower() in accepted
+        ]
+        if exact or len(target) < 3:
+            return exact
+        # No exact match: accept a more specific kind of the same thing --
+        # "table" -> `DiningTable`/`SideTable`/`CoffeeTable`.
+        compact = {a.replace(" ", "") for a in accepted}
+        return [
+            obj
+            for obj in objects
+            if isinstance(obj.get("objectType"), str)
+            and any(obj["objectType"].strip().lower().endswith(a) for a in compact)
         ]

@@ -143,6 +143,16 @@ class ResultValidator:
             obj = _find_object(metadata, object_id)
             if obj is not None and obj.get("isOpen") is not False:
                 return f"CloseObject reported success but {object_id!r} is still open."
+        elif action.action_type == ActionType.TURN_ON:
+            obj = _find_object(metadata, object_id)
+            if obj is not None and obj.get("isToggled") is False:
+                return f"ToggleObjectOn reported success but {object_id!r} is not on."
+        elif action.action_type == ActionType.TURN_OFF:
+            obj = _find_object(metadata, object_id)
+            if obj is not None and obj.get("isToggled") is True:
+                return (
+                    f"ToggleObjectOff reported success but {object_id!r} is still on."
+                )
         elif action.action_type == ActionType.PUT:
             # AI2-THOR's PutObject targets the receptacle by id and infers
             # the held object itself; the only ground-truth postcondition

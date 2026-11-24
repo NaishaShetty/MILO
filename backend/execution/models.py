@@ -72,6 +72,8 @@ class ActionType(str, Enum):
     PUT = "put"
     OPEN = "open"
     CLOSE = "close"
+    TURN_ON = "turn_on"
+    TURN_OFF = "turn_off"
     # `locate` has no simulator-side effect (Phase 4's symbolic
     # "perceive this object" step) -- `ActionDispatcher` handles it as
     # a documented no-op rather than refusing to dispatch it, so a

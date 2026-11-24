@@ -176,8 +176,13 @@ def test_successful_task_records_latencies_metrics_and_created_memories(tmp_path
     assert metrics["success"] is True
     assert metrics["actions"] > 0
     assert metrics["replans"] == 0
-    assert len(task_state.created_memories) == 1
-    assert task_state.created_memories[0]["memory_type"] == "episodic"
+    # The episode, plus what this mission learned (where the mug was found).
+    assert {m["memory_type"] for m in task_state.created_memories} == {
+        "episodic",
+        "semantic",
+    }
+    assert task_state.learned == ["The mug is on the table."]
+    assert task_state.answer == "The mug is on the table."
 
 
 def test_on_created_callback_receives_the_live_mutating_task_state(tmp_path):

@@ -77,6 +77,9 @@ class ObjectState:
     is_held: bool = False
     is_open: Optional[bool] = None
     is_openable: Optional[bool] = None
+    #: Switched on/off state for toggleable objects (lights, tap, toaster).
+    #: `None` = unknown, exactly like `is_open`.
+    is_on: Optional[bool] = None
 
 
 @dataclass

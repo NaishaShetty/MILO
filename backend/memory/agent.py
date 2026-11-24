@@ -79,6 +79,7 @@ from memory.semantics import (
     build_episodic_memory,
     build_failure_memory,
     build_semantic_memory,
+    build_user_memory,
 )
 
 logger = logging.getLogger(__name__)
@@ -432,6 +433,34 @@ class MemoryAgent:
                 "task_id": task_id,
             },
         )
+        return stored
+
+    def remember_preference(
+        self,
+        subject: str,
+        predicate: str,
+        object_: str,
+        *,
+        confidence: float = 1.0,
+    ) -> Optional[Memory]:
+        """
+        Stores something the user *told* MILO ("the mug goes on the
+        shelf") as a `USER` memory -- trusted above anything MILO merely
+        observed (see `memory.habits`). Goes through the same conflict
+        tagging as an observation, and degrades the same way: returns
+        `None` when memory is unavailable or the write fails.
+        """
+        if self._engine is None:
+            return None
+        memory = build_user_memory(
+            predicate, object_, subject=subject, confidence=confidence
+        )
+        try:
+            stored = store_semantic_observation(self._engine.manager, memory)
+            self._engine.index_memory(stored)
+        except Exception:
+            logger.warning("memory_agent.preference_write_failed", exc_info=True)
+            return None
         return stored
 
     def link_recovery(

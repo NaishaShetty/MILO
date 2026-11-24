@@ -60,9 +60,9 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from agents.execution_agent import ExecutionAgentWrapper
 from agents.memory_agent import MemoryAgentWrapper
@@ -73,8 +73,13 @@ from agents.vision_agent import VisionAgentWrapper
 from api.models.tasks import CreateTaskRequest
 from language.agent import LanguageAgent
 from language.exceptions import LanguageRuntimeError
+from language.interpreter import InstructionInterpreter
+from memory.habits import usual_place_of
+from memory.models import MemoryType
+from orchestration.answerer import QuestionAnswerer
 from orchestration.orchestrator import Orchestrator
 from planner.factory import PlannerType, create_planner
+from planner.task_library import library_as_dicts
 from schemas.task import MultiTask, SingleTask
 from simulator.simulator import Simulator
 
@@ -109,7 +114,9 @@ class _TaskStore:
     def registry(self) -> Optional[AgentRegistry]:
         return self._orchestrator.registry if self._orchestrator is not None else None
 
-    def start(self, task: SingleTask, input_source: InputSource) -> TaskState:
+    def start(
+        self, task: Union[SingleTask, MultiTask], input_source: InputSource
+    ) -> TaskState:
         if self._orchestrator is None:
             raise RuntimeError("_TaskStore.set_orchestrator() was never called")
 
@@ -239,44 +246,111 @@ def _require_task_state(task_id: str) -> TaskState:
     },
 )
 def create_task(
+    request: Request,
+    response: Response,
     body: CreateTaskRequest,
     language_agent: LanguageAgent = Depends(get_language_agent),
     simulator: Simulator = Depends(get_simulator),
 ) -> dict:
-    try:
-        parsed = language_agent.parse(body.instruction)
-    except LanguageRuntimeError as exc:
-        logger.warning(
-            "tasks_api.parse_failed", extra={"exception_type": type(exc).__name__}
-        )
-        raise HTTPException(
-            status_code=502,
-            detail={"category": "language_runtime_error", "message": str(exc)},
-        ) from None
+    memory_agent = getattr(request.app.state, "memory_agent", None)
 
-    if isinstance(parsed, MultiTask):
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "category": "multi_task_not_supported",
-                "message": "Orchestrator does not yet support MultiTask "
-                "instructions -- this instruction requires multiple "
-                "subtasks.",
-            },
-        )
+    def _memories():
+        if memory_agent is None:
+            return []
+        return memory_agent.list_memories(
+            memory_type=MemoryType.USER
+        ) + memory_agent.list_memories(memory_type=MemoryType.SEMANTIC)
 
-    try:
-        task_state = _store.start(parsed, InputSource(body.input_source))
-    except _TaskAlreadyRunningError as exc:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "category": "task_in_progress",
-                "message": f"Task {exc.task_id!r} is already running. Cancel it "
-                "or wait for it to finish before starting another.",
-            },
-        ) from None
-    return task_state.to_dict()
+    def _usual_place(name: str):
+        return usual_place_of(_memories(), name)
+
+    def _parse_with_model(text: str):
+        try:
+            return language_agent.parse(text)
+        except LanguageRuntimeError as exc:
+            logger.warning(
+                "tasks_api.parse_failed", extra={"exception_type": type(exc).__name__}
+            )
+            return None
+
+    interpreter = InstructionInterpreter(
+        fallback=_parse_with_model, usual_place=_usual_place
+    )
+    interpretation = interpreter.interpret(body.instruction)
+
+    if interpretation.kind == "task":
+        assert interpretation.task is not None
+        try:
+            task_state = _store.start(
+                interpretation.task, InputSource(body.input_source)
+            )
+        except _TaskAlreadyRunningError:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "category": "task_in_progress",
+                    "message": "I'm still working on another job. Stop it or wait "
+                    "for it to finish, then ask me again.",
+                },
+            ) from None
+        return {
+            **task_state.to_dict(),
+            "kind": "task",
+            "understood_as": interpretation.understood_as,
+        }
+
+    # Everything below is a reply, not a started job: 200, not 202.
+    response.status_code = 200
+
+    if interpretation.kind == "question":
+        assert interpretation.question is not None
+
+        def _recall(name: str):
+            return _usual_place(name)
+
+        answer = QuestionAnswerer(simulator.get_metadata, _recall).answer(
+            interpretation.question
+        )
+        return {
+            "kind": "answer",
+            "answer": answer,
+            "understood_as": interpretation.understood_as,
+        }
+
+    if interpretation.kind == "preference":
+        assert interpretation.preference is not None
+        pref = interpretation.preference
+        remembered = False
+        if memory_agent is not None:
+            remembered = (
+                memory_agent.remember_preference(pref.object, pref.relation, pref.place)
+                is not None
+            )
+        message = interpretation.message
+        if not remembered:
+            message = (
+                "I understood, but my memory isn't available right now, so I "
+                "can't keep that. Try again once memory is on."
+            )
+        return {
+            "kind": "remembered" if remembered else "not_remembered",
+            "message": message,
+            "understood_as": interpretation.understood_as,
+        }
+
+    if interpretation.kind == "help":
+        return {
+            "kind": "answer",
+            "answer": interpretation.message,
+            "library": library_as_dicts(),
+        }
+
+    # "clarify" / "unsupported": a plain question or reason, shown as-is.
+    return {
+        "kind": interpretation.kind,
+        "message": interpretation.message,
+        "details": interpretation.details,
+    }
 
 
 @router.get(
@@ -293,6 +367,20 @@ def create_task(
 )
 def list_tasks() -> List[dict]:
     return [task_state.to_dict() for task_state in _store.list_all()]
+
+
+@router.get(
+    "/library",
+    summary="Everything MILO knows how to do",
+    description=(
+        "The task library: one entry per kind of job (fetch, deliver, put, "
+        "open/close, turn on/off, find, clear a table, tidy up, answer a "
+        "question), each with a plain-language title, summary and example "
+        'phrasings. Drives the UI\'s "What can MILO do?" list.'
+    ),
+)
+def get_task_library() -> List[dict]:
+    return library_as_dicts()
 
 
 @router.get(

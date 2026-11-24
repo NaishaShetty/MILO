@@ -51,6 +51,8 @@ PUT_OBJECT = "PutObject"
 OPEN_OBJECT = "OpenObject"
 
 CLOSE_OBJECT = "CloseObject"
+TOGGLE_OBJECT_ON = "ToggleObjectOn"
+TOGGLE_OBJECT_OFF = "ToggleObjectOff"
 
 GET_INTERACTABLE_POSES = "GetInteractablePoses"
 

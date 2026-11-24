@@ -57,6 +57,8 @@ from planner.actions import (
     OPEN,
     PICKUP,
     PLACE,
+    TURN_OFF,
+    TURN_ON,
     get_action_spec,
 )
 from planner.models import PlanStep
@@ -86,6 +88,12 @@ def _satisfied_reason(step: PlanStep, state: WorldState) -> Optional[str]:
     elif step.action == CLOSE:
         if obj.is_open is False:
             return f"the {target} is already closed"
+    elif step.action == TURN_ON:
+        if obj.is_on is True:
+            return f"the {target} is already on"
+    elif step.action == TURN_OFF:
+        if obj.is_on is False:
+            return f"the {target} is already off"
     elif step.action == PLACE:
         container = step.parameters.get("container")
         if (
@@ -149,7 +157,7 @@ def prune_satisfied_steps(
             _drop_acquire_prefix(steps, drop, index)
         elif step.action == PLACE:
             _drop_deposit_bracket(steps, drop, index)
-        elif step.action in (OPEN, CLOSE):
+        elif step.action in (OPEN, CLOSE, TURN_ON, TURN_OFF):
             _drop_approach_if_unused(steps, drop, index)
 
     kept = [s for i, s in enumerate(steps) if not drop[i]]

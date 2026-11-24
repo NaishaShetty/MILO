@@ -124,6 +124,8 @@ _ACTION_NAME_TO_TYPE = {
     "pickup": ActionType.PICKUP,
     "open": ActionType.OPEN,
     "close": ActionType.CLOSE,
+    "turn_on": ActionType.TURN_ON,
+    "turn_off": ActionType.TURN_OFF,
     "place": ActionType.PUT,
 }
 

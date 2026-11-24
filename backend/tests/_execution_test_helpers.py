@@ -123,7 +123,13 @@ class FakeSimulator:
         obj = self._object(object_id)
         success = obj is not None and "pickup" not in self._fail_actions
         if success:
-            self.inventory_objects.append({"objectId": object_id})
+            self.inventory_objects.append(
+                {"objectId": object_id, "objectType": (obj or {}).get("objectType")}
+            )
+            if obj is not None:
+                obj["isPickedUp"] = True
+                obj["parentReceptacles"] = None
+                obj.pop("parentReceptacle", None)
         return FakeEvent(
             {
                 "lastActionSuccess": success,
@@ -137,6 +143,11 @@ class FakeSimulator:
         self._record_and_maybe_hook("put", object_id=object_id)
         success = "put" not in self._fail_actions
         if success:
+            for held in self.inventory_objects:
+                held_obj = self._object(held["objectId"])
+                if held_obj is not None:
+                    held_obj["isPickedUp"] = False
+                    held_obj["parentReceptacles"] = [object_id]
             self.inventory_objects = []
         return FakeEvent(
             {
@@ -157,6 +168,37 @@ class FakeSimulator:
             {
                 "lastActionSuccess": success,
                 "errorMessage": "" if success else "cannot open object",
+                "objects": self.objects,
+            }
+        )
+
+    def _toggle(self, name: str, object_id: str, on: bool) -> FakeEvent:
+        self._record_and_maybe_hook(name, object_id=object_id)
+        obj = self._object(object_id)
+        success = obj is not None and name not in self._fail_actions
+        if success and obj is not None:
+            obj["isToggled"] = on
+        return FakeEvent(
+            {
+                "lastActionSuccess": success,
+                "errorMessage": "" if success else f"cannot {name} object",
+                "objects": self.objects,
+            }
+        )
+
+    def toggle_object_on(self, object_id: str) -> FakeEvent:
+        return self._toggle("turn_on", object_id, True)
+
+    def toggle_object_off(self, object_id: str) -> FakeEvent:
+        return self._toggle("turn_off", object_id, False)
+
+    def navigate_home(self) -> FakeEvent:
+        self._record_and_maybe_hook("navigate", object_id="@home")
+        success = "navigate" not in self._fail_actions
+        return FakeEvent(
+            {
+                "lastActionSuccess": success,
+                "errorMessage": "" if success else "cannot navigate home",
                 "objects": self.objects,
             }
         )

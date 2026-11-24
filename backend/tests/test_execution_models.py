@@ -37,6 +37,8 @@ def test_action_type_covers_every_dispatchable_action():
         "put",
         "open",
         "close",
+        "turn_on",
+        "turn_off",
         "locate",
     }
 

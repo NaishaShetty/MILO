@@ -89,7 +89,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
-from planner.actions import CLOSE, GENERIC_ACT, LOCATE, NAVIGATE, OPEN, PICKUP, PLACE
+from planner.actions import (
+    CLOSE,
+    GENERIC_ACT,
+    LOCATE,
+    NAVIGATE,
+    OPEN,
+    PICKUP,
+    PLACE,
+    TURN_OFF,
+    TURN_ON,
+)
 from planner.exceptions import InvalidTaskError, UnsupportedGoalError
 from planner.models import PlanStep
 from planner.planner import Planner
@@ -99,6 +109,10 @@ from schemas.task import SingleTask
 if TYPE_CHECKING:  # pragma: no cover
     from memory.agent import PlannerMemoryContext
     from memory.retrieval import MemoryResult
+
+#: Where "bring it back to me" ends up -- resolved to the robot's starting
+#: pose at execution time.
+USER_LOCATION = "user"
 
 GoalHandler = Callable[
     [SingleTask, WorldState, "Optional[PlannerMemoryContext]"], List[PlanStep]
@@ -367,10 +381,11 @@ def _goal_fetch(
     obj = _require(task.object, task.goal or "fetch", "object")
     builder = _StepBuilder()
     _acquire(builder, obj, state, memory_context)
-    destination = task.target or task.target_location
-    if destination:
-        builder.add(LOCATE, destination)
-        builder.add(NAVIGATE, destination)
+    # "Fetch X" with no stated destination means "bring it back to me":
+    # the pseudo-location `user` (see `execution.resolver.HOME_OBJECT_ID`).
+    destination = task.target or task.target_location or USER_LOCATION
+    builder.add(LOCATE, destination)
+    builder.add(NAVIGATE, destination)
     return builder.steps
 
 
@@ -416,6 +431,27 @@ def _goal_close(
     builder.add(NAVIGATE, obj)
     builder.add(CLOSE, obj)
     return builder.steps
+
+
+def _goal_toggle(action: str) -> GoalHandler:
+    """turn_on / turn_off: find the thing, walk up to it, flip the switch."""
+
+    def handler(
+        task: SingleTask,
+        state: WorldState,
+        memory_context: "Optional[PlannerMemoryContext]",
+    ) -> List[PlanStep]:
+        obj = _require(
+            _primary_reference(task), task.goal or action, "object or target"
+        )
+        builder = _StepBuilder()
+        _apply_memory_hint(builder, obj, state, memory_context)
+        builder.add(LOCATE, obj)
+        builder.add(NAVIGATE, obj)
+        builder.add(action, obj)
+        return builder.steps
+
+    return handler
 
 
 def _goal_perceive(
@@ -480,6 +516,8 @@ GOAL_HANDLERS: Dict[str, GoalHandler] = {
     "deliver": _goal_deliver,
     "open": _goal_open,
     "close": _goal_close,
+    "turn_on": _goal_toggle(TURN_ON),
+    "turn_off": _goal_toggle(TURN_OFF),
     "find": _goal_perceive,
     "search_for": _goal_perceive,
     "locate": _goal_perceive,
@@ -495,8 +533,6 @@ GOAL_HANDLERS: Dict[str, GoalHandler] = {
 # `patrol`/`push`/`pull`) that this planner handles via the generic
 # fallback rather than a dedicated physical template.
 _GENERIC_GOALS = {
-    "turn_on",
-    "turn_off",
     "clean",
     "charge",
     "push",

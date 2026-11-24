@@ -201,21 +201,29 @@ def test_create_task_without_simulator_returns_503(client: TestClient) -> None:
     assert response.json()["category"] == "execution_unavailable"
 
 
-def test_create_task_rejects_multi_task_instructions(client: TestClient) -> None:
+def test_create_task_accepts_multi_object_instructions(client: TestClient) -> None:
+    scene = _mug_table_scene() + [
+        {"objectId": "Cup|1", "objectType": "Cup", "distance": 1.5, "isOpen": None}
+    ]
     multi_task = MultiTask(
         subtasks=[
             SingleTask(goal="find", object="mug"),
             SingleTask(goal="find", object="cup"),
         ]
     )
-    _wire(FakeSimulator(objects=_mug_table_scene()), multi_task)
+    _wire(FakeSimulator(objects=scene), multi_task)
 
     response = client.post(
         "/api/v1/tasks", json={"instruction": "find the mug and the cup"}
     )
 
-    assert response.status_code == 422
-    assert response.json()["category"] == "multi_task_not_supported"
+    assert response.status_code == 202
+    body = response.json()
+    assert body["kind"] == "task"
+    assert [g["object"] for g in body["sub_goals"]] == ["mug", "cup"] or body["goal"]
+    final = _wait_for_terminal_status(client, body["task_id"])
+    assert final["status"] == "succeeded"
+    assert [g["object"] for g in final["sub_goals"]] == ["mug", "cup"]
 
 
 def test_get_unknown_task_returns_404(client: TestClient) -> None:
@@ -257,7 +265,9 @@ def test_get_task_memory_reports_created_memory(client: TestClient, tmp_path) ->
     assert memory_response.status_code == 200
     body = memory_response.json()
     assert "retrieved" in body and "created" in body
-    assert len(body["created"]) == 1
+    # The episode itself, plus what the mission learned (where the mug is).
+    kinds = sorted(m["memory_type"] for m in body["created"])
+    assert kinds == ["episodic", "semantic"]
 
 
 def test_get_task_robot_state_reflects_current_simulator_metadata(

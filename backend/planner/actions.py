@@ -60,6 +60,8 @@ OPEN = "open"
 CLOSE = "close"
 PUT_DOWN = "put_down"
 GENERIC_ACT = "act"
+TURN_ON = "turn_on"
+TURN_OFF = "turn_off"
 
 CheckFn = Callable[[WorldState, Optional[str], Dict[str, Any]], bool]
 EffectFn = Callable[[WorldState, Optional[str], Dict[str, Any]], None]
@@ -147,6 +149,24 @@ def _require_open(
     return state.object(target).is_open is True
 
 
+def _require_not_on(
+    state: WorldState, target: Optional[str], _params: Dict[str, Any]
+) -> bool:
+    if target is None:
+        return False
+    return state.object(target).is_on is not True
+
+
+def _require_not_off(
+    state: WorldState, target: Optional[str], _params: Dict[str, Any]
+) -> bool:
+    """`turn_off` is allowed when the state is unknown (`None`): the
+    common case is "turn off the lights" with no prior knowledge."""
+    if target is None:
+        return False
+    return state.object(target).is_on is not False
+
+
 def _require_holding_target(
     state: WorldState, target: Optional[str], _params: Dict[str, Any]
 ) -> bool:
@@ -208,6 +228,20 @@ def _effect_close(
 ) -> None:
     if target:
         state.object(target).is_open = False
+
+
+def _effect_turn_on(
+    state: WorldState, target: Optional[str], _params: Dict[str, Any]
+) -> None:
+    if target:
+        state.object(target).is_on = True
+
+
+def _effect_turn_off(
+    state: WorldState, target: Optional[str], _params: Dict[str, Any]
+) -> None:
+    if target:
+        state.object(target).is_on = False
 
 
 def _effect_place(
@@ -314,6 +348,34 @@ ACTION_REGISTRY: Dict[str, ActionSpec] = {
         ],
         postcondition_descriptions=["{target} is closed"],
         apply_effect=_effect_close,
+    ),
+    TURN_ON: ActionSpec(
+        name=TURN_ON,
+        description_template="Turn on {target}",
+        preconditions=[
+            Precondition(
+                "target_near",
+                "robot must be near target to switch it on",
+                _require_target_near,
+            ),
+            Precondition("not_on", "target must not already be on", _require_not_on),
+        ],
+        postcondition_descriptions=["{target} is on"],
+        apply_effect=_effect_turn_on,
+    ),
+    TURN_OFF: ActionSpec(
+        name=TURN_OFF,
+        description_template="Turn off {target}",
+        preconditions=[
+            Precondition(
+                "target_near",
+                "robot must be near target to switch it off",
+                _require_target_near,
+            ),
+            Precondition("not_off", "target must not already be off", _require_not_off),
+        ],
+        postcondition_descriptions=["{target} is off"],
+        apply_effect=_effect_turn_off,
     ),
     PLACE: ActionSpec(
         name=PLACE,

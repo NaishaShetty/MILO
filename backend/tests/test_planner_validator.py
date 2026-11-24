@@ -137,7 +137,7 @@ def test_duplicate_consecutive_step_flagged_as_warning_not_error():
 
 
 def test_goal_with_no_registered_check_is_unverifiable_not_invalid():
-    task = SingleTask(goal="turn_on", object="lamp")
+    task = SingleTask(goal="clean", object="lamp")
     steps = [
         PlanStep(step_id=1, action="locate", target="lamp", description="Locate lamp"),
         PlanStep(
@@ -147,7 +147,7 @@ def test_goal_with_no_registered_check_is_unverifiable_not_invalid():
             step_id=3,
             action="act",
             target="lamp",
-            parameters={"action": "turn_on"},
+            parameters={"action": "clean"},
             description="Act",
         ),
     ]

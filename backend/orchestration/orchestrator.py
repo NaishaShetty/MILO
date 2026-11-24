@@ -64,7 +64,7 @@ import logging
 import threading
 import time
 import uuid
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from agents.events import Event, EventBus, EventType
 from agents.execution_agent import ExecutionAgentWrapper
@@ -77,12 +77,16 @@ from agents.registry import AgentRegistry
 from agents.task_state import InputSource, TaskState, TaskStatus
 from agents.vision_agent import VisionAgentWrapper
 from execution.models import ExecutionRecord, ExecutionStatus, StepStatus
+from execution.resolver import spellings_of
 from memory.agent import MemoryQueryContext
-from memory.models import Memory
+from memory.models import Memory, MemoryProvenance
 from memory.semantics import EpisodicDetails, FailureDetails
+from orchestration.answerer import where_parts
+from orchestration.composite import expand_composite
 from planner.grounding import ground_world_state
 from planner.state import WorldState
-from schemas.task import SingleTask
+from planner.task_library import COMPOSITE_GOALS
+from schemas.task import MultiTask, SingleTask
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +163,7 @@ class Orchestrator:
 
     def run(
         self,
-        task: SingleTask,
+        task: Union[SingleTask, MultiTask],
         *,
         input_source: InputSource = InputSource.TEXT,
         max_replans: int = DEFAULT_MAX_REPLANS,
@@ -167,6 +171,12 @@ class Orchestrator:
     ) -> TaskState:
         self._cancel_event.clear()
         run_started_at = time.perf_counter()
+        # A `MultiTask` is run as one plan over its sub-goals; the rest of
+        # this method works with a single "header" task describing it.
+        subtasks: Optional[List[SingleTask]] = None
+        if isinstance(task, MultiTask):
+            subtasks = list(task.subtasks)
+            task = SingleTask(goal=task.goal or "multi_step", task_id=task.task_id)
         task_id = task.task_id or str(uuid.uuid4())
         episode_id = str(uuid.uuid4())
         task_state = TaskState(
@@ -192,7 +202,34 @@ class Orchestrator:
 
         memory_context = self._retrieve_memory(task, episode_id, task_state)
 
+        if subtasks is None and (task.goal or "") in COMPOSITE_GOALS:
+            # "Clear the table" / "tidy up": look at the room, decide which
+            # objects, then run them as one multi-object plan.
+            expansion = expand_composite(
+                task, self._execution.get_metadata() or {}, self._usual_places()
+            )
+            if not expansion.subtasks:
+                task_state.answer = expansion.message
+                task_state.latencies_ms["total_ms"] = (
+                    time.perf_counter() - run_started_at
+                ) * 1000.0
+                return self._finish_succeeded(
+                    task, task_state, episode_id, None, WorldState.initial()
+                )
+            subtasks = expansion.subtasks
+        if subtasks:
+            task_state.objects = [s.object for s in subtasks if s.object]
+            task_state.sub_goals = [
+                {
+                    "goal": s.goal,
+                    "object": s.object,
+                    "target": s.target or s.target_location,
+                }
+                for s in subtasks
+            ]
+
         world_state = WorldState.initial()
+        self._seed_from_simulator(world_state)
         # Ground world_state against live vision *before* planning, not
         # only for post-hoc observability -- see `_observe()`'s
         # docstring. Skipped entirely when no vision_agent is
@@ -200,7 +237,9 @@ class Orchestrator:
         self._observe(task, task_state, world_state)
         task_state.status = TaskStatus.PLANNING
         started = time.perf_counter()
-        planning_result = self._planner.plan(task, world_state, memory_context)
+        planning_result = self._plan(
+            task, subtasks, world_state, memory_context, replan=False
+        )
         task_state.latencies_ms["planning_ms"] = (
             task_state.latencies_ms.get("planning_ms", 0.0)
             + (time.perf_counter() - started) * 1000.0
@@ -227,7 +266,7 @@ class Orchestrator:
                 time.perf_counter() - run_started_at
             ) * 1000.0
             return self._finish_succeeded(
-                task, task_state, episode_id, None, world_state
+                task, task_state, episode_id, None, world_state, subtasks
             )
 
         attempt = 0
@@ -293,7 +332,7 @@ class Orchestrator:
                     time.perf_counter() - run_started_at
                 ) * 1000.0
                 return self._finish_succeeded(
-                    task, task_state, episode_id, record, world_state
+                    task, task_state, episode_id, record, world_state, subtasks
                 )
             if reflection.action == "abort":
                 task_state.latencies_ms["total_ms"] = (
@@ -321,7 +360,9 @@ class Orchestrator:
             task_state.status = TaskStatus.REPLANNING
             self._publish(task_state, EventType.REPLAN_TRIGGERED)
             started = time.perf_counter()
-            planning_result = self._planner.replan(task, world_state, memory_context)
+            planning_result = self._plan(
+                task, subtasks, world_state, memory_context, replan=True
+            )
             task_state.latencies_ms["planning_ms"] = (
                 task_state.latencies_ms.get("planning_ms", 0.0)
                 + (time.perf_counter() - started) * 1000.0
@@ -346,8 +387,68 @@ class Orchestrator:
                     time.perf_counter() - run_started_at
                 ) * 1000.0
                 return self._finish_succeeded(
-                    task, task_state, episode_id, record, world_state
+                    task, task_state, episode_id, record, world_state, subtasks
                 )
+
+    # -- planning -----------------------------------------------------------
+
+    def _plan(
+        self,
+        task: SingleTask,
+        subtasks: Optional[List[SingleTask]],
+        world_state: WorldState,
+        memory_context,
+        *,
+        replan: bool,
+    ):
+        """One sub-goal -> `plan`/`replan`; several -> `plan_multi`."""
+        if subtasks:
+            multi = self._planner.replan_multi if replan else self._planner.plan_multi
+            return multi(
+                subtasks,
+                world_state,
+                memory_context,
+                task_id=task.task_id or "",
+                goal=task.goal or "multi_step",
+            )
+        single = self._planner.replan if replan else self._planner.plan
+        return single(task, world_state, memory_context)
+
+    def _seed_from_simulator(self, world_state: WorldState) -> None:
+        """
+        Starts the symbolic state from what the simulator itself reports
+        about each object -- open/closed, openable, switched on/off --
+        so "close the drawer" or "turn off the tap" plan against the real
+        starting state instead of an all-unknown one (a `close` of a
+        thing not known to be open does not validate). Live vision, when
+        configured, then overrides this (`ground_world_state`).
+        Best-effort: a missing/odd metadata snapshot just leaves the
+        state as it was.
+        """
+        metadata = self._execution.get_metadata() or {}
+        # AI2-THOR calls it "Faucet"/"Fridge"; plans (and people) say
+        # "tap"/"refrigerator" -- seed every spelling.
+        for obj in metadata.get("objects") or []:
+            name = str(obj.get("objectType") or "").strip().lower()
+            if not name:
+                continue
+            for key in spellings_of(name):
+                state = world_state.object(key)
+                if obj.get("isOpen") is not None:
+                    state.is_open = bool(obj["isOpen"])
+                if obj.get("openable") is not None:
+                    state.is_openable = bool(obj["openable"])
+                if obj.get("isToggled") is not None:
+                    state.is_on = bool(obj["isToggled"])
+
+    def _usual_places(self) -> Dict[str, Tuple[str, str]]:
+        if self._memory is None:
+            return {}
+        try:
+            return self._memory.usual_places()
+        except Exception:
+            logger.warning("orchestrator.usual_places_failed", exc_info=True)
+            return {}
 
     # -- memory -----------------------------------------------------------
 
@@ -522,6 +623,70 @@ class Orchestrator:
             self._publish(task_state, EventType.MEMORY_UPDATED)
         return memory
 
+    def _remember_learned(
+        self,
+        task: SingleTask,
+        subtasks: Optional[List[SingleTask]],
+        task_state: TaskState,
+        episode_id: str,
+    ) -> None:
+        """
+        "Write what was learned after every mission": where the things
+        MILO just put away now live, and where a `find` found its object.
+        Only facts the mission itself established -- never a guess -- and
+        only on success. Each lesson is also a plain sentence on the
+        `TaskState` for the Missions page.
+        """
+        metadata: Dict = {}
+        for sub in subtasks or [task]:
+            goal = (sub.goal or "").lower()
+            obj = sub.object
+            target = sub.target or sub.target_location
+            relation: Optional[str] = None
+            place: Optional[str] = None
+            sentence: Optional[str] = None
+            if (
+                goal in ("store", "put_away", "place", "pick_and_place")
+                and obj
+                and target
+            ):
+                relation = (
+                    "stored_in" if goal in ("store", "put_away") else "located_on"
+                )
+                place = target
+                sentence = f"The {obj} goes {'in' if relation == 'stored_in' else 'on'} the {target}."
+            elif goal == "find" and obj:
+                if not metadata:
+                    metadata = self._execution.get_metadata() or {}
+                found = where_parts(obj, metadata)
+                if found is None:
+                    continue
+                preposition, place = found
+                relation = "stored_in" if preposition == "in" else "located_on"
+                sentence = f"The {obj} is {preposition} the {place}."
+                task_state.answer = sentence
+            if relation is None or place is None or obj is None:
+                continue
+            task_state.learned.append(sentence or "")
+            if self._memory is None:
+                continue
+            memory = self._memory.remember_observation(
+                obj,
+                relation,
+                place,
+                provenance=MemoryProvenance.OBSERVATION,
+                confidence=0.8,
+                episode_id=episode_id,
+                task_id=task.task_id,
+            )
+            if memory is not None:
+                task_state.created_memories.append(
+                    {
+                        "memory_id": memory.memory_id,
+                        "memory_type": memory.memory_type.value,
+                    }
+                )
+
     # -- diagnosis ----------------------------------------------------------
 
     def _diagnose(
@@ -546,6 +711,7 @@ class Orchestrator:
         episode_id: str,
         record: Optional[ExecutionRecord],
         world_state: WorldState,
+        subtasks: Optional[List[SingleTask]] = None,
     ) -> TaskState:
         # Memory is written *before* `status` flips to its terminal
         # value and *before* `TASK_COMPLETED` publishes -- a caller
@@ -557,6 +723,7 @@ class Orchestrator:
         # created()` ran (see `run()`'s docstring) -- this ordering is
         # what makes that visible progress actually consistent, not
         # just "eventually correct."
+        self._remember_learned(task, subtasks, task_state, episode_id)
         self._remember_terminal(
             task,
             task_state,

@@ -223,7 +223,7 @@ def test_close_goal_produces_locate_navigate_close():
 
 
 def test_unsupported_goal_fails_planning_result_not_raises():
-    task = SingleTask(goal="fetch", object="mug", target="table")
+    task = SingleTask(goal="juggle", object="mug", target="table")
     result = HTNPlanner().plan(task, WorldState.initial())
     assert result.success is False
     assert result.plan is None

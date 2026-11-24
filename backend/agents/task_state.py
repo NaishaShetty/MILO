@@ -105,6 +105,16 @@ class TaskState:
     #: Distinct from `retrieved_memories` (memory read *before*
     #: planning); this is memory written *after* the task concluded.
     created_memories: List[Dict[str, Any]] = field(default_factory=list)
+    #: A plain-language result to show the user, when the task has one
+    #: beyond "it worked" -- where a `find` found the thing, why a
+    #: composite task had nothing to do ("The table is already clear.").
+    answer: Optional[str] = None
+    #: The single-object sub-goals a composite/multi task ran, in order:
+    #: `{"goal", "object", "target"}` each. Empty for a plain task.
+    sub_goals: List[Dict[str, Any]] = field(default_factory=list)
+    #: What MILO learned from this mission, as sentences ("The apple goes
+    #: in the fridge."). Written to memory too; shown in the Missions page.
+    learned: List[str] = field(default_factory=list)
 
     def metrics(self) -> Dict[str, Any]:
         """
@@ -161,5 +171,8 @@ class TaskState:
             "status": self.status.value,
             "latencies_ms": self.latencies_ms,
             "created_memories": self.created_memories,
+            "answer": self.answer,
+            "sub_goals": self.sub_goals,
+            "learned": self.learned,
             "metrics": self.metrics(),
         }

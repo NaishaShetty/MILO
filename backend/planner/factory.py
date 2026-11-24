@@ -52,8 +52,11 @@ def _build_behavior_tree(validator: PlanValidator, **_kwargs) -> Planner:
     return BehaviorTreePlanner(validator=validator)
 
 
-def _build_htn(validator: PlanValidator, **_kwargs) -> Planner:
-    return HTNPlanner(validator=validator)
+def _build_htn(
+    validator: PlanValidator, *, fallback_to_rule_based: bool = True, **_kwargs
+) -> Planner:
+    fallback = RuleBasedPlanner(validator=validator) if fallback_to_rule_based else None
+    return HTNPlanner(validator=validator, fallback_planner=fallback)
 
 
 def _build_react(

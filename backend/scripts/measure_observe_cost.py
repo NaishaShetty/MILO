@@ -22,6 +22,7 @@ import argparse
 import json
 import statistics
 import time
+from typing import Any, Dict, List
 
 from scene.metadata_keys import SceneMetadata
 from scene.scene import Scene
@@ -64,8 +65,8 @@ def main() -> None:
         # Modes alternate within each run so GPU clocks / background load
         # drift hits both equally, and every sample is a full perceive()
         # call timed stage by stage (so totals and breakdown agree).
-        totals = {label: [] for label, _ in modes}
-        stages = {label: {} for label, _ in modes}
+        totals: Dict[str, List[float]] = {label: [] for label, _ in modes}
+        stages: Dict[str, Dict[str, List[float]]] = {label: {} for label, _ in modes}
         for _ in range(args.runs):
             for label, include_masks in modes:
                 per_stage = _time_stages(agent, args.prompt, include_masks)
@@ -73,7 +74,7 @@ def main() -> None:
                 for name, ms in per_stage.items():
                     stages[label].setdefault(name, []).append(ms)
 
-        results = {}
+        results: Dict[str, Any] = {}
         for label, _ in modes:
             results[label] = {
                 "mean_ms": round(statistics.mean(totals[label]), 1),
@@ -82,12 +83,9 @@ def main() -> None:
                     k: round(statistics.mean(v), 1) for k, v in stages[label].items()
                 },
                 "stage_median_ms": {
-                    k: round(statistics.median(v), 1)
-                    for k, v in stages[label].items()
+                    k: round(statistics.median(v), 1) for k, v in stages[label].items()
                 },
-                "stage_min_ms": {
-                    k: round(min(v), 1) for k, v in stages[label].items()
-                },
+                "stage_min_ms": {k: round(min(v), 1) for k, v in stages[label].items()},
             }
         results["saved_ms_per_observe_mean"] = round(
             results["full"]["mean_ms"] - results["no_masks"]["mean_ms"], 1
