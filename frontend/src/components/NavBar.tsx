@@ -1,102 +1,104 @@
-// NavBar.tsx
-//
-// Purpose
-// -------
-// Top navigation for the MILO application -- the seven routes exactly
-// (spec: "The MILO frontend contains SEVEN pages, not eight... There
-// is NO separate Mission Detail page"). Establishes MILO's identity
-// (full name in the header, per spec's branding rule) and highlights
-// the active route via `NavLink`'s built-in `isActive` styling hook,
-// so this needs no manual `useLocation()` bookkeeping.
-//
-// Connection-state derivation (Phase 8.2)
-// ----------------------------------------------------------------------
-// `MiloStatus`'s pill is real, not decorative: `AgentsContext` already
-// polls `GET /api/v1/agents` every 3s (see `AgentsContext.tsx`) -- that
-// is this app's only existing "is the backend up" signal, so it is
-// what drives "MILO is Ready" / "Connecting..." / "MILO is
-// Disconnected" here. A `status === "error"` is NOT automatically
-// "disconnected": `GET /agents` returns a 503 `agents_unavailable`
-// whenever no simulator/orchestrator is wired up (a normal, common dev
-// mode per that route's own docstring), which means the backend is
-// reachable and healthy, just without a running orchestrator -- only a
-// real network failure (no `ApiError`, `fetch` itself rejecting) is
-// shown as "Disconnected". `"busy"` is derived from whether any
-// registered agent is currently ACTIVE/THINKING (real per-agent state).
-import { NavLink } from "react-router-dom";
+// NavBar.tsx -- the top pill (Play / Missions / Memory / Lab), connection status,
+// and the gear menu (Activity drawer, About, Settings). On small screens the
+// pill becomes a bottom tab dock.
+import { useState } from "react";
+import { Link, NavLink } from "react-router-dom";
 
 import { ApiError } from "../api/client";
 import { useAgents } from "../state/AgentsContext";
-import { useMiloState } from "../state/MiloStateContext";
-import { MiloAvatar } from "./MiloAvatar";
-import { MiloStatus, type MiloConnectionState } from "./MiloStatus";
+import { ActivityPage } from "../pages/ActivityPage";
+import { BookIcon, FlagIcon, FlaskIcon, GearIcon, PlayIcon } from "./Icons";
 import { MiloWordmark } from "./MiloWordmark";
 
-const NAV_LINKS: Array<{ to: string; label: string; end?: boolean }> = [
-  { to: "/", label: "Home", end: true },
-  { to: "/mission-control", label: "Mission Control" },
-  { to: "/memory", label: "Memory" },
-  { to: "/activity", label: "Activity" },
-  { to: "/about", label: "About MILO" },
-  { to: "/lab", label: "MILO Lab" },
-  { to: "/settings", label: "Settings" },
+const TABS = [
+  { to: "/", label: "Play", icon: <PlayIcon />, end: true },
+  { to: "/missions", label: "Missions", icon: <FlagIcon /> },
+  { to: "/memory", label: "Memory", icon: <BookIcon /> },
+  { to: "/lab", label: "Lab", icon: <FlaskIcon /> },
 ];
 
-const BUSY_STATES = new Set(["active", "thinking"]);
-
-function deriveConnectionState(
-  status: "idle" | "loading" | "success" | "error",
-  agents: Array<{ state: string }>,
-  error: unknown,
-): MiloConnectionState {
-  if (status === "error") {
-    // A 503 agents_unavailable means "backend reachable, no
-    // orchestrator running yet" -- not a disconnect. Anything else
-    // (a real fetch failure) means the backend truly can't be reached.
-    return error instanceof ApiError && error.category === "agents_unavailable"
-      ? "ready"
-      : "disconnected";
-  }
-  if (status === "loading" || status === "idle") {
-    return "connecting";
-  }
-  return agents.some((agent) => BUSY_STATES.has(agent.state)) ? "busy" : "ready";
+function Tabs({ className }: { className: string }) {
+  return (
+    <nav className={className} aria-label="Main navigation">
+      {TABS.map((tab) => (
+        <NavLink
+          key={tab.to}
+          to={tab.to}
+          end={tab.end}
+          className={({ isActive }) => "tab" + (isActive ? " tab--active" : "")}
+        >
+          {tab.icon}
+          {tab.label}
+        </NavLink>
+      ))}
+    </nav>
+  );
 }
 
 export function NavBar() {
-  const { agents, status, error } = useAgents();
-  const connectionState = deriveConnectionState(status, agents, error);
-  const miloState = useMiloState();
+  const { status, error } = useAgents();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+
+  const down =
+    status === "error" && !(error instanceof ApiError && error.category === "agents_unavailable");
+  const label = down ? "Can't reach MILO" : status === "success" || status === "error" ? "Simulator online" : "Connecting";
 
   return (
-    <header className="milo-navbar">
-      <div className="milo-navbar__brand">
-        <MiloWordmark className="milo-navbar__title" />
-        <span className="milo-navbar__tagline">
-          <span>Memory Integrated</span>
-          <span>Language Oriented Robot</span>
-        </span>
-      </div>
-      <nav className="milo-navbar__links" aria-label="Main navigation">
-        {NAV_LINKS.map((link) => (
-          <NavLink
-            key={link.to}
-            to={link.to}
-            end={link.end}
-            className={({ isActive }) =>
-              "milo-navbar__link" + (isActive ? " milo-navbar__link--active" : "")
-            }
-          >
-            {link.label}
-          </NavLink>
-        ))}
-      </nav>
-      <div className="milo-navbar__meta">
-        <MiloStatus state={connectionState} />
-        <div className="milo-navbar__avatar">
-          <MiloAvatar state={connectionState === "disconnected" ? "offline" : miloState} size="sm" />
+    <>
+      <header className="topbar">
+        <Link to="/" aria-label="MILO home" style={{ textDecoration: "none" }}>
+          <MiloWordmark />
+        </Link>
+        <Tabs className="tabs" />
+        <div className="topbar__right">
+          <span className={"status" + (down ? " status--down" : "")} role="status">
+            <span className="status__dot" aria-hidden="true" />
+            {label}
+          </span>
+          <div className="menu">
+            <button
+              type="button"
+              className="btn btn--icon"
+              aria-label="Settings and more"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              <GearIcon />
+            </button>
+            {menuOpen && (
+              <div className="card menu__panel" role="menu">
+                <button
+                  type="button"
+                  className="menu__item"
+                  role="menuitem"
+                  onClick={() => {
+                    setActivityOpen(true);
+                    setMenuOpen(false);
+                  }}
+                >
+                  Recent activity
+                </button>
+                <Link className="menu__item" role="menuitem" to="/settings" onClick={() => setMenuOpen(false)}>
+                  Settings
+                </Link>
+                <Link className="menu__item" role="menuitem" to="/about" onClick={() => setMenuOpen(false)}>
+                  About MILO
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+      <Tabs className="dock" />
+      {activityOpen && (
+        <aside className="drawer" aria-label="Recent activity">
+          <button type="button" className="btn" onClick={() => setActivityOpen(false)}>
+            Close
+          </button>
+          <ActivityPage />
+        </aside>
+      )}
+    </>
   );
 }

@@ -1,0 +1,56 @@
+/* tokens.css -- the single source of MILO's design tokens.
+ * Warm, light and playful: cream ground, ink borders, tangerine accent.
+ * Warm hues only; MILO's glow is amber. */
+:root {
+  color-scheme: light;
+
+  --cream: #fff6e5;
+  --cream-dots: #f6ddae;
+  --ink: #2a1810;
+  --ink-soft: #6b5a4e; /* body-muted text, 6:1 on cream */
+  --tangerine: #ff8a2b;
+  --tangerine-ink: #b34a00; /* orange text on cream, >4.5:1 */
+  --butter: #ffe9a8;
+  --apricot: #ffe0b8;
+  --peach: #ffdcc2;
+  --coral: #ffd2c9;
+  --mint: #d9faee;
+  --green: #16a36f;
+  --green-ink: #0b6b47;
+  --amber: #ffb347;
+  --sun: #ffd25a;
+  --danger-ink: #b3361b;
+
+  --font-heading: "Fredoka", "Nunito", system-ui, sans-serif;
+  --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --border: 2px solid var(--ink);
+  --radius-sm: 12px;
+  --radius: 20px;
+  --radius-lg: 28px;
+  --shadow: 4px 4px 0 var(--ink);
+  --shadow-sm: 2px 2px 0 var(--ink);
+  --focus-ring: 0 0 0 3px var(--cream), 0 0 0 6px var(--ink);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Legacy variable names (Lab/Activity/About/Settings) mapped onto the warm palette. */
+  --milo-bg: var(--cream);
+  --milo-bg-elevated: var(--butter);
+  --milo-bg-radial: none;
+  --milo-surface: #fffaf0;
+  --milo-surface-hover: var(--butter);
+  --milo-border: var(--ink);
+  --milo-border-strong: var(--ink);
+  --milo-accent: var(--tangerine);
+  --milo-accent-soft: var(--apricot);
+  --milo-accent-glow: rgba(255, 179, 71, 0.45);
+  --milo-accent-text: var(--tangerine-ink);
+  --milo-info: var(--amber);
+  --milo-info-soft: var(--butter);
+}

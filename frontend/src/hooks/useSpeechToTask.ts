@@ -35,7 +35,7 @@ export function useSpeechToTask() {
         await submitInstruction(speech.transcript as string, "speech");
         if (!cancelled) {
           speech.markTaskCreated();
-          navigate("/mission-control");
+          navigate("/missions");
         }
       } catch {
         // `TaskContext.submitError` already carries a safe message for
