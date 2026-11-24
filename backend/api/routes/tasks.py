@@ -58,11 +58,15 @@ task_in_progress`, the same explicit safety boundary
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import threading
-from typing import Any, Dict, List, Optional, Union
+import time
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
 
 from agents.execution_agent import ExecutionAgentWrapper
 from agents.memory_agent import MemoryAgentWrapper
@@ -74,6 +78,7 @@ from api.models.tasks import CreateTaskRequest
 from language.agent import LanguageAgent
 from language.exceptions import LanguageRuntimeError
 from language.interpreter import InstructionInterpreter
+from language.llm_client import LLMClient
 from memory.habits import usual_place_of
 from memory.models import MemoryType
 from orchestration.answerer import QuestionAnswerer
@@ -115,7 +120,10 @@ class _TaskStore:
         return self._orchestrator.registry if self._orchestrator is not None else None
 
     def start(
-        self, task: Union[SingleTask, MultiTask], input_source: InputSource
+        self,
+        task: Union[SingleTask, MultiTask],
+        input_source: InputSource,
+        planner_type: Optional[str] = None,
     ) -> TaskState:
         if self._orchestrator is None:
             raise RuntimeError("_TaskStore.set_orchestrator() was never called")
@@ -137,7 +145,10 @@ class _TaskStore:
         def _run() -> None:
             try:
                 self._orchestrator.run(  # type: ignore[union-attr]
-                    task, input_source=input_source, on_created=_on_created
+                    task,
+                    input_source=input_source,
+                    on_created=_on_created,
+                    planner_type=planner_type,
                 )
             except Exception:
                 logger.exception(
@@ -205,9 +216,9 @@ def get_simulator(request: Request) -> Simulator:
             status_code=503,
             detail={
                 "category": "execution_unavailable",
-                "message": "No simulator is running. Start the API with "
-                "VISION_ENABLE_SIMULATOR=true and a reachable AI2-THOR "
-                "binary to run tasks.",
+                "message": "MILO's practice room (the simulator) isn't running, "
+                "so I can't do jobs right now. Start the server with "
+                "VISION_ENABLE_SIMULATOR=true and try again.",
             },
         )
     return simulator
@@ -220,7 +231,8 @@ def _require_task_state(task_id: str) -> TaskState:
             status_code=404,
             detail={
                 "category": "task_not_found",
-                "message": f"No task with id {task_id!r}.",
+                "message": "I don't have a job with that id. It may be from "
+                "before I last restarted.",
             },
         )
     return task_state
@@ -282,7 +294,7 @@ def create_task(
         assert interpretation.task is not None
         try:
             task_state = _store.start(
-                interpretation.task, InputSource(body.input_source)
+                interpretation.task, InputSource(body.input_source), body.planner
             )
         except _TaskAlreadyRunningError:
             raise HTTPException(
@@ -369,6 +381,82 @@ def list_tasks() -> List[dict]:
     return [task_state.to_dict() for task_state in _store.list_all()]
 
 
+_TERMINAL = ("succeeded", "failed", "cancelled")
+#: How often a stream re-checks the task. This is the *server* watching
+#: in-process state (cheap); the browser just receives pushes.
+_STREAM_TICK_S = 0.2
+_STREAM_KEEPALIVE_S = 15.0
+
+
+def _sse(event: str, data: Any) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+
+
+def _task_summary(task_state: TaskState) -> dict:
+    return {
+        "task_id": task_state.task_id,
+        "user_request": task_state.user_request,
+        "goal": task_state.goal,
+        "status": task_state.status.value,
+        "planner": task_state.planner,
+        "current_step": task_state.current_step,
+        "answer": task_state.answer,
+        "cancel_requested": task_state.cancel_requested,
+        "success": task_state.metrics()["success"],
+        "created_at": task_state.created_at,
+        "steps": len(task_state.current_plan.steps) if task_state.current_plan else 0,
+        "completed_steps": len(task_state.completed_steps),
+        "memories_used": len(task_state.retrieved_memories),
+        "replans": task_state.metrics()["replans"],
+        "total_ms": task_state.latencies_ms.get("total_ms"),
+    }
+
+
+@router.get(
+    "/stream",
+    summary="Live feed of every task (server-sent events)",
+    description=(
+        "A `text/event-stream`. Sends a `snapshot` event (a newest-first "
+        "list of task summaries) immediately and again whenever any task "
+        "changes. Powers the Play page's recent missions and helper "
+        "status without polling. Clients should fall back to "
+        "`GET /api/v1/tasks` if the stream fails. `?once=true` sends one "
+        "snapshot and closes (handy for a quick check)."
+    ),
+)
+def stream_all_tasks(once: bool = False) -> StreamingResponse:
+    def generate() -> Iterator[str]:
+        yield "retry: 3000\n\n"
+        last: Optional[str] = None
+        quiet = 0.0
+        while True:
+            snapshot = [_task_summary(s) for s in _store.list_all()]
+            payload = json.dumps(snapshot, default=str)
+            if payload != last:
+                last = payload
+                quiet = 0.0
+                yield _sse("snapshot", snapshot)
+                if once:
+                    return
+            elif quiet >= _STREAM_KEEPALIVE_S:
+                quiet = 0.0
+                yield ": keepalive\n\n"
+            time.sleep(_STREAM_TICK_S)
+            quiet += _STREAM_TICK_S
+
+    return StreamingResponse(
+        generate(), media_type="text/event-stream", headers=_SSE_HEADERS
+    )
+
+
+_SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    # Tell nginx-style proxies not to buffer the stream.
+    "X-Accel-Buffering": "no",
+}
+
+
 @router.get(
     "/library",
     summary="Everything MILO knows how to do",
@@ -389,6 +477,57 @@ def get_task_library() -> List[dict]:
 )
 def get_task(task_id: str) -> dict:
     return _require_task_state(task_id).to_dict()
+
+
+@router.get(
+    "/{task_id}/stream",
+    summary="Live feed of one task's state and events (server-sent events)",
+    description=(
+        "A `text/event-stream` for one task: a `state` event (the full "
+        "TaskState) immediately and whenever it changes, a `task_event` "
+        "for each new orchestrator event, and a final `end` event once "
+        "the task has succeeded, failed or been cancelled. Replaces "
+        "polling `GET /tasks/{id}`; clients should fall back to polling "
+        "if the stream fails."
+    ),
+    responses={404: {"description": "No task with that id."}},
+)
+def stream_task(task_id: str) -> StreamingResponse:
+    _require_task_state(task_id)  # 404 before the stream opens
+
+    def generate() -> Iterator[str]:
+        yield "retry: 3000\n\n"
+        last_state: Optional[str] = None
+        sent_events = 0
+        quiet = 0.0
+        while True:
+            task_state = _store.get(task_id)
+            if task_state is None:
+                yield _sse("end", {"reason": "gone"})
+                return
+            changed = False
+            payload = json.dumps(task_state.to_dict(), default=str)
+            if payload != last_state:
+                last_state = payload
+                changed = True
+                yield f"event: state\ndata: {payload}\n\n"
+            events = _store.get_events(task_id)
+            for event in events[sent_events:]:
+                changed = True
+                yield _sse("task_event", event.model_dump(mode="json"))
+            sent_events = len(events)
+            if task_state.status.value in _TERMINAL:
+                yield _sse("end", {"status": task_state.status.value})
+                return
+            quiet = 0.0 if changed else quiet + _STREAM_TICK_S
+            if quiet >= _STREAM_KEEPALIVE_S:
+                quiet = 0.0
+                yield ": keepalive\n\n"
+            time.sleep(_STREAM_TICK_S)
+
+    return StreamingResponse(
+        generate(), media_type="text/event-stream", headers=_SSE_HEADERS
+    )
 
 
 @router.get(
@@ -482,12 +621,15 @@ def get_task_events(task_id: str) -> List[dict]:
 
 @router.post(
     "/{task_id}/cancel",
-    summary="Request cancellation of a running task",
+    summary="Stop a running task",
     description=(
-        "Requests cancellation; takes effect at the next safe boundary "
-        "(an in-flight simulator action is not interrupted mid-call). "
-        "Safe to call on a task that has already finished -- a no-op "
-        "then. Never writes a memory for the cancelled attempt."
+        "Stops the task between steps (an in-flight simulator action is "
+        "not interrupted mid-call) and leaves a clean state: whatever the "
+        "robot was holding is put down. `cancel_requested` is true on the "
+        "task immediately; once it stops, `status` is `cancelled` and "
+        "`cancel_summary` says what was tidied up. Safe to call on a task "
+        "that has already finished -- a no-op then. Never writes a memory "
+        "for the cancelled attempt."
     ),
 )
 def cancel_task(task_id: str) -> dict:
@@ -498,16 +640,27 @@ def cancel_task(task_id: str) -> dict:
             status_code=404,
             detail={
                 "category": "task_not_found",
-                "message": f"No task with id {task_id!r}.",
+                "message": "I don't have a job with that id. It may be from "
+                "before I last restarted.",
             },
         ) from None
     return task_state.to_dict()
+
+
+def _step_timeout_from_env() -> Optional[float]:
+    raw = os.environ.get("EXECUTION_STEP_TIMEOUT_S", "").strip()
+    try:
+        value = float(raw) if raw else 0.0
+    except ValueError:
+        return None
+    return value if value > 0 else None
 
 
 def build_orchestrator(
     simulator: Simulator,
     memory_agent: Optional[MemoryAgentWrapper] = None,
     vision_agent: Optional[VisionAgentWrapper] = None,
+    llm_client: Optional[LLMClient] = None,
 ) -> Orchestrator:
     """
     Called once from `api/app.py`'s lifespan to wire this route's
@@ -519,12 +672,20 @@ def build_orchestrator(
     supplied it -- `GET /agents` needs a real one to read from).
     """
     registry = AgentRegistry()
+
+    def planner_for(name: str) -> PlannerAgentWrapper:
+        # `react` uses the configured language model when there is one and
+        # falls back to the rule-based planner when there isn't (it says
+        # so on the task as `planner_note`).
+        return PlannerAgentWrapper(create_planner(name, llm_client=llm_client))
+
     orchestrator = Orchestrator(
         PlannerAgentWrapper(create_planner(PlannerType.RULE_BASED)),
-        ExecutionAgentWrapper(simulator),
+        ExecutionAgentWrapper(simulator, step_timeout_s=_step_timeout_from_env()),
         memory_agent=memory_agent,
         vision_agent=vision_agent,
         registry=registry,
+        planner_factory=planner_for,
     )
     _store.set_orchestrator(orchestrator)
     return orchestrator

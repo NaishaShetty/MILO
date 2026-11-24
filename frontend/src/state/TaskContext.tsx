@@ -3,18 +3,27 @@
 // Purpose
 // -------
 // Global "current mission" state: which task the user is actively
-// watching, its live `TaskState` (polled), its event log (polled), and
-// the single shared path both text and speech input use to create a
-// task (`submitInstruction`) -- see `tasks.ts`'s module docstring on
-// why there must be exactly one task-creation call site. Also exposes
-// `history` (every task this backend has run, via `useTaskHistory`) so
-// Home/Mission Control don't each open a second, redundant polling
-// loop for the same data.
+// watching, its live `TaskState` and event log, and the single shared path
+// both text and speech input use to create a task (`submitInstruction`) --
+// see `tasks.ts`'s module docstring on why there must be exactly one
+// task-creation call site. Also exposes `history` (every task this backend
+// has run, via `useTaskHistory`) so pages don't each open a second,
+// redundant request loop for the same data.
+//
+// Live updates are pushed, not polled: `useLiveTask` opens a server-sent
+// event stream for the active task (state + events in ONE connection) and
+// only falls back to polling if the stream cannot be used. That replaced
+// the separate 1 s task poll and 1.5 s events poll this context used to
+// run.
+//
+// Not every request becomes a task: MILO may answer a question, remember a
+// preference, ask for a missing detail, or say it can't do something. Those
+// replies arrive as `lastReply` (and `submitInstruction` resolves with
+// them) so the UI can show them in MILO's speech bubble without a task.
 //
 // On mount, if nothing has been explicitly selected yet and the most
-// recently created task in `history` is still in flight, this adopts
-// it as the active task -- so reloading Mission Control mid-task keeps
-// showing live progress instead of a blank "no active mission" state.
+// recently created task in `history` is still in flight, this adopts it as
+// the active task -- so reloading mid-task keeps showing live progress.
 import {
   createContext,
   useCallback,
@@ -27,30 +36,52 @@ import {
 import type { ReactNode } from "react";
 
 import { ApiError } from "../api/client";
-import { cancelTask, createTask, getTask, getTaskEvents, getTaskRobotState } from "../api/tasks";
-import type { InputSource, RobotState, TaskEvent, TaskState } from "../api/tasksTypes";
+import { cancelTask, createTask, getTaskRobotState } from "../api/tasks";
+import type {
+  CreateTaskResult,
+  InputSource,
+  PlannerChoice,
+  RobotState,
+  TaskEvent,
+  TaskState,
+} from "../api/tasksTypes";
 import { TERMINAL_TASK_STATUSES } from "../api/tasksTypes";
-import { useTaskHistory } from "../hooks/useTaskHistory";
+import type { LiveTransport } from "../hooks/useLiveTask";
+import { useLiveTask } from "../hooks/useLiveTask";
 import type { PollingStatus } from "../hooks/usePolling";
 import { usePolling } from "../hooks/usePolling";
+import { useTaskHistory } from "../hooks/useTaskHistory";
 
-const TASK_POLL_INTERVAL_MS = 1000;
-const EVENTS_POLL_INTERVAL_MS = 1500;
 const ROBOT_POLL_INTERVAL_MS = 2000;
+
+/** A reply from MILO that did not start a task: shown in the speech bubble. */
+export interface MiloReply {
+  kind: "answer" | "remembered" | "not_remembered" | "clarify" | "unsupported";
+  text: string;
+}
 
 export interface TaskContextValue {
   activeTaskId: string | null;
   activeTask: TaskState | null;
   activeTaskStatus: PollingStatus;
   activeTaskError: unknown;
+  /** `sse` while pushed by the backend, `polling` if the stream could not be used. */
+  transport: LiveTransport;
   events: TaskEvent[];
   history: TaskState[];
   historyStatus: PollingStatus;
   refreshHistory: () => void;
   setActiveTaskId: (taskId: string | null) => void;
-  submitInstruction: (instruction: string, inputSource?: InputSource) => Promise<TaskState>;
+  submitInstruction: (
+    instruction: string,
+    inputSource?: InputSource,
+    planner?: PlannerChoice,
+  ) => Promise<CreateTaskResult>;
   submitting: boolean;
   submitError: string | null;
+  /** MILO's latest non-task reply (an answer, a question back, ...), until the next request. */
+  lastReply: MiloReply | null;
+  clearReply: () => void;
   cancelActive: () => Promise<void>;
   cancelling: boolean;
   /** `null` while loading or once the simulator reports unavailable -- see `robotStateStatus`/`robotStateError`. */
@@ -61,10 +92,22 @@ export interface TaskContextValue {
 
 const TaskContext = createContext<TaskContextValue | null>(null);
 
+function replyFrom(result: CreateTaskResult): MiloReply | null {
+  switch (result.kind) {
+    case "task":
+      return null;
+    case "answer":
+      return { kind: "answer", text: result.answer };
+    default:
+      return { kind: result.kind, text: result.message };
+  }
+}
+
 export function TaskProvider({ children }: { children: ReactNode }) {
   const [activeTaskId, setActiveTaskIdState] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [lastReply, setLastReply] = useState<MiloReply | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const hasBootstrapped = useRef(false);
 
@@ -80,41 +123,30 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     }
   }, [history, historyStatus]);
 
-  const taskFetcher = useCallback(() => {
-    if (!activeTaskId) return Promise.reject(new Error("no active task"));
-    return getTask(activeTaskId);
-  }, [activeTaskId]);
+  const live = useLiveTask(activeTaskId);
 
-  const taskPoll = usePolling(taskFetcher, {
-    intervalMs: TASK_POLL_INTERVAL_MS,
-    enabled: activeTaskId !== null,
-    isTerminal: (state) => TERMINAL_TASK_STATUSES.includes(state.status),
-  });
-
-  const isActiveTerminal =
-    taskPoll.data !== null && TERMINAL_TASK_STATUSES.includes(taskPoll.data.status);
-
-  const eventsFetcher = useCallback(() => {
-    if (!activeTaskId) return Promise.reject(new Error("no active task"));
-    return getTaskEvents(activeTaskId);
-  }, [activeTaskId]);
-
-  const eventsPoll = usePolling(eventsFetcher, {
-    intervalMs: EVENTS_POLL_INTERVAL_MS,
-    enabled: activeTaskId !== null && !isActiveTerminal,
-  });
+  // The history list (Recent missions) must show a finished task's final
+  // state: refresh it once when the active task reaches a terminal status.
+  const activeStatus = live.task?.status ?? null;
+  const refreshedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeTaskId === null || activeStatus === null) return;
+    if (!TERMINAL_TASK_STATUSES.includes(activeStatus)) return;
+    const key = `${activeTaskId}:${activeStatus}`;
+    if (refreshedFor.current === key) return;
+    refreshedFor.current = key;
+    refreshHistory();
+  }, [activeTaskId, activeStatus, refreshHistory]);
 
   const robotStateFetcher = useCallback(() => {
     if (!activeTaskId) return Promise.reject(new Error("no active task"));
     return getTaskRobotState(activeTaskId);
   }, [activeTaskId]);
 
-  // Kept polling through terminal status too (unlike `eventsPoll`) --
-  // the simulator's live pose is still meaningful to show right after a
-  // task finishes, not just while one is running. A 503 here (no
-  // simulator) surfaces as `robotStateStatus === "error"`; callers
-  // should render "simulator not connected," matching `AgentsContext`'s
-  // `agents_unavailable` convention -- never fabricate a pose.
+  // Kept polling through terminal status too -- the simulator's live pose
+  // is still meaningful to show right after a task finishes. A 503 here (no
+  // simulator) surfaces as `robotStateStatus === "error"`; callers should
+  // render "simulator not connected" -- never fabricate a pose.
   const robotStatePoll = usePolling(robotStateFetcher, {
     intervalMs: ROBOT_POLL_INTERVAL_MS,
     enabled: activeTaskId !== null,
@@ -128,27 +160,32 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   async function submitInstruction(
     instruction: string,
     inputSource: InputSource = "text",
-  ): Promise<TaskState> {
-    // Context-level re-entrancy guard -- `TalkToMilo.tsx` already
-    // disables its submit/mic controls while `submitting` is true, but
-    // that's a UI-level courtesy, not a guarantee every caller
-    // replicates. This closes the gap so two overlapping
-    // `submitInstruction()` calls can never both reach the backend.
+    planner?: PlannerChoice,
+  ): Promise<CreateTaskResult> {
+    // Context-level re-entrancy guard: two overlapping calls must never
+    // both reach the backend, whatever the UI does.
     if (submitting) {
       throw new Error("A task submission is already in progress.");
     }
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const state = await createTask(instruction, inputSource);
-      setActiveTaskId(state.task_id);
-      refreshHistory();
-      return state;
+      const result = planner
+        ? await createTask(instruction, inputSource, planner)
+        : await createTask(instruction, inputSource);
+      if (result.kind === "task") {
+        setLastReply(null);
+        setActiveTaskId(result.task_id);
+        refreshHistory();
+      } else {
+        setLastReply(replyFrom(result));
+      }
+      return result;
     } catch (error) {
       setSubmitError(
         error instanceof ApiError
           ? error.message
-          : "Could not reach MILO's backend. Please try again.",
+          : "I couldn't reach MILO's server. Check that it's running and try again.",
       );
       throw error;
     } finally {
@@ -162,21 +199,22 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     try {
       await cancelTask(activeTaskId);
     } catch {
-      // Best-effort from the UI's perspective -- the next poll tick
-      // reflects whatever the backend actually did.
+      // Best-effort from the UI's perspective -- the live stream reflects
+      // whatever the backend actually did.
     } finally {
       setCancelling(false);
-      taskPoll.refresh();
+      live.refresh();
     }
   }
 
   const value = useMemo<TaskContextValue>(
     () => ({
       activeTaskId,
-      activeTask: taskPoll.data,
-      activeTaskStatus: taskPoll.status,
-      activeTaskError: taskPoll.error,
-      events: eventsPoll.data ?? [],
+      activeTask: live.task,
+      activeTaskStatus: live.status,
+      activeTaskError: live.error,
+      transport: live.transport,
+      events: live.events,
       history,
       historyStatus,
       refreshHistory,
@@ -184,6 +222,8 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       submitInstruction,
       submitting,
       submitError,
+      lastReply,
+      clearReply: () => setLastReply(null),
       cancelActive,
       cancelling,
       robotState: robotStatePoll.data,
@@ -193,14 +233,16 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       activeTaskId,
-      taskPoll.data,
-      taskPoll.status,
-      taskPoll.error,
-      eventsPoll.data,
+      live.task,
+      live.status,
+      live.error,
+      live.transport,
+      live.events,
       history,
       historyStatus,
       submitting,
       submitError,
+      lastReply,
       cancelling,
       robotStatePoll.data,
       robotStatePoll.status,

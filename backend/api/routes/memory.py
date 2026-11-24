@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from api.models.memory import (
     MemoryListResponse,
@@ -36,7 +36,7 @@ from api.models.memory import (
     MemorySearchResult,
 )
 from memory.agent import MemoryAgent, MemoryQueryContext
-from memory.models import MemoryType
+from memory.models import Memory, MemoryType
 
 router = APIRouter()
 
@@ -126,3 +126,29 @@ def list_memory(
         else all_memories
     )
     return MemoryListResponse(memories=filtered[:limit], counts_by_type=counts_by_type)
+
+
+@router.post(
+    "/{memory_id}/forget",
+    response_model=Memory,
+    summary="Forget a memory",
+    description=(
+        "Archives the memory so MILO stops using it -- in planning, "
+        "retrieval and tidy-up -- without deleting it. Safe to call twice. "
+        'Backs the "Forget this" button on each memory card.'
+    ),
+    responses={404: {"description": "No memory with that id."}},
+)
+def forget_memory(
+    memory_id: str, memory_agent: MemoryAgent = Depends(get_memory_agent)
+) -> Memory:
+    forgotten = memory_agent.forget(memory_id)
+    if forgotten is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "category": "memory_not_found",
+                "message": "I don't have a memory like that. It may already be gone.",
+            },
+        )
+    return forgotten

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { TaskProvider, useTask } from "./TaskContext";
 import * as tasksApi from "../api/tasks";
-import type { TaskState } from "../api/tasksTypes";
+import type { CreateTaskResult, TaskState } from "../api/tasksTypes";
 
 vi.mock("../api/tasks", async () => {
   const actual = await vi.importActual<typeof import("../api/tasks")>("../api/tasks");
@@ -77,7 +77,11 @@ describe("TaskContext", () => {
 
   it("submitInstruction creates a task and makes it active", async () => {
     vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
-    vi.mocked(tasksApi.createTask).mockResolvedValue(baseTask({ task_id: "t2", status: "created" }));
+    vi.mocked(tasksApi.createTask).mockResolvedValue({
+      ...baseTask({ task_id: "t2", status: "created" }),
+      kind: "task",
+      understood_as: "Find the mug",
+    });
     vi.mocked(tasksApi.getTask).mockResolvedValue(baseTask({ task_id: "t2", status: "created" }));
     vi.mocked(tasksApi.getTaskEvents).mockResolvedValue([]);
 
@@ -112,11 +116,11 @@ describe("TaskContext", () => {
 
   it("rejects a second submitInstruction() while the first is still in flight", async () => {
     vi.mocked(tasksApi.listTasks).mockReset().mockResolvedValue([]);
-    let resolveCreateTask!: (value: TaskState) => void;
+    let resolveCreateTask!: (value: CreateTaskResult) => void;
     vi.mocked(tasksApi.createTask)
       .mockReset()
       .mockReturnValue(
-        new Promise<TaskState>((resolve) => {
+        new Promise<CreateTaskResult>((resolve) => {
           resolveCreateTask = resolve;
         }),
       );
@@ -126,7 +130,7 @@ describe("TaskContext", () => {
     const { result } = renderHook(() => useTask(), { wrapper: TaskProvider });
     await waitFor(() => expect(result.current.historyStatus).toBe("success"));
 
-    let firstCall: Promise<TaskState>;
+    let firstCall: Promise<CreateTaskResult>;
     act(() => {
       firstCall = result.current.submitInstruction("find the mug", "text");
     });
@@ -141,7 +145,11 @@ describe("TaskContext", () => {
     expect(tasksApi.createTask).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      resolveCreateTask(baseTask({ task_id: "t2", status: "created" }));
+      resolveCreateTask({
+        ...baseTask({ task_id: "t2", status: "created" }),
+        kind: "task",
+        understood_as: "Find the mug",
+      });
       await firstCall;
     });
     expect(result.current.activeTaskId).toBe("t2");

@@ -25,6 +25,7 @@ anywhere in this file).
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from pydantic import BaseModel, ConfigDict
@@ -111,6 +112,46 @@ def get_speech_agent(request: Request) -> SpeechAgent:
     return speech_agent
 
 
+#: Default cap on an uploaded recording. A few seconds of spoken
+#: instruction is well under 1 MB; 10 MB leaves room for a long take
+#: without letting one request hold an arbitrary amount of memory.
+DEFAULT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+
+def _max_upload_bytes() -> int:
+    raw = os.environ.get("SPEECH_MAX_UPLOAD_BYTES", "").strip()
+    try:
+        value = int(raw) if raw else DEFAULT_MAX_UPLOAD_BYTES
+    except ValueError:
+        value = DEFAULT_MAX_UPLOAD_BYTES
+    return value if value > 0 else DEFAULT_MAX_UPLOAD_BYTES
+
+
+async def _read_capped(file: UploadFile, limit: int) -> bytes:
+    """Reads the upload in chunks and refuses it (413) as soon as it goes
+    over `limit` -- never buffers more than `limit` + one chunk."""
+    chunks = []
+    total = 0
+    while True:
+        chunk = await file.read(64 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > limit:
+            megabytes = max(limit // (1024 * 1024), 1)
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "category": "audio_too_large",
+                    "message": f"That recording is too long to send. Please keep "
+                    f"it under about {megabytes} MB (a short sentence is "
+                    "plenty) and try again.",
+                },
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 @router.post(
     "/transcribe",
     summary="Transcribe an audio recording to text",
@@ -129,7 +170,8 @@ async def transcribe(
     file: UploadFile,
     speech_agent: SpeechAgent = Depends(get_speech_agent),
 ) -> dict:
-    audio_bytes = await file.read()
+    limit = _max_upload_bytes()
+    audio_bytes = await _read_capped(file, limit)
     try:
         result = speech_agent.transcribe(audio_bytes)
     except SpeechRuntimeError as exc:

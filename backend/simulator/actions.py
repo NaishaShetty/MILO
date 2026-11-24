@@ -52,6 +52,7 @@ OPEN_OBJECT = "OpenObject"
 
 CLOSE_OBJECT = "CloseObject"
 TOGGLE_OBJECT_ON = "ToggleObjectOn"
+DROP_HAND_OBJECT = "DropHandObject"
 TOGGLE_OBJECT_OFF = "ToggleObjectOff"
 
 GET_INTERACTABLE_POSES = "GetInteractablePoses"

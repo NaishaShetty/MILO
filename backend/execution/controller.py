@@ -73,7 +73,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from execution.dispatcher import ActionDispatcher
 from execution.errors import ExecutionError, ExecutionErrorCode
@@ -146,6 +146,7 @@ class ExecutionController:
         *,
         max_step_retries: int = 0,
         step_timeout_s: Optional[float] = None,
+        step_listener: Optional[Callable[[PlanStep, str], None]] = None,
     ) -> None:
         self._simulator = simulator
         self._dispatcher = (
@@ -156,6 +157,11 @@ class ExecutionController:
         self._result_validator = ResultValidator()
         self._max_step_retries = max_step_retries
         self._step_timeout_s = step_timeout_s
+        # Called as `listener(step, status)` for every step event
+        # ("started", "success", "failed", "blocked", "skipped",
+        # "cancelled", "already_done") so a caller can narrate progress
+        # live. Exceptions in it never affect execution.
+        self._step_listener = step_listener
         self._cancelled = threading.Event()
 
     def load_plan(self, plan: Plan) -> ExecutionRecord:
@@ -575,3 +581,8 @@ class ExecutionController:
             message=error.message if error is not None else None,
         )
         record.events.append(event)
+        if self._step_listener is not None:
+            try:
+                self._step_listener(step, status)
+            except Exception:
+                logger.warning("execution.step_listener_failed", exc_info=True)

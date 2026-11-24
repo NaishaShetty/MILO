@@ -192,6 +192,17 @@ class FakeSimulator:
     def toggle_object_off(self, object_id: str) -> FakeEvent:
         return self._toggle("turn_off", object_id, False)
 
+    def drop_held_object(self) -> FakeEvent:
+        self._record_and_maybe_hook("drop")
+        for held in self.inventory_objects:
+            held_obj = self._object(held["objectId"])
+            if held_obj is not None:
+                held_obj["isPickedUp"] = False
+        self.inventory_objects = []
+        return FakeEvent(
+            {"lastActionSuccess": True, "errorMessage": "", "objects": self.objects}
+        )
+
     def navigate_home(self) -> FakeEvent:
         self._record_and_maybe_hook("navigate", object_id="@home")
         success = "navigate" not in self._fail_actions

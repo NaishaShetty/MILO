@@ -309,6 +309,13 @@ class AI2ThorEnv:
 
     ####################################################
 
+    def drop_held_object(self):
+        """Drops whatever the agent is holding (used to leave a clean state
+        after a cancelled task)."""
+        return self._step(DROP_HAND_OBJECT, forceAction=True)
+
+    ####################################################
+
     def toggle_object_on(self, object_id):
         """Switches the object with the given `objectId` on (lights, tap,
         toaster, ...). `forceAction=True` for the same reason as

@@ -154,6 +154,13 @@ class PlanStep(BaseModel):
         description="Human-readable facts this step guarantees to be "
         "true in the WorldState immediately after it executes.",
     )
+    explanation: Optional[str] = Field(
+        default=None,
+        description="A plain-language sentence about what MILO is doing in, "
+        "or just did with, this step ('Walking to the fridge.', 'I couldn't "
+        "reach the fridge, so I'm trying another route.'). Set by the "
+        "Orchestrator while the plan runs; never produced by a planner.",
+    )
     status: StepStatus = Field(
         default=StepStatus.PENDING,
         description="Execution lifecycle status. Always PENDING as "

@@ -20,14 +20,14 @@ same idea -- one structured, categorized result, not a raw exception).
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from agents.base import BaseAgent
 from agents.contracts import AgentError, AgentRequest, AgentResponse, AgentState
 from agents.failures import AgentFailure, from_execution_error
 from execution.controller import ExecutionController
 from execution.models import ExecutionRecord, StepStatus
-from planner.models import Plan
+from planner.models import Plan, PlanStep
 from planner.state import WorldState
 from simulator.simulator import Simulator
 
@@ -38,9 +38,17 @@ class ExecutionAgentWrapper(BaseAgent):
 
     name = "execution"
 
-    def __init__(self, simulator: Optional[Simulator]) -> None:
+    def __init__(
+        self,
+        simulator: Optional[Simulator],
+        *,
+        step_timeout_s: Optional[float] = None,
+    ) -> None:
         super().__init__()
         self._simulator = simulator
+        #: Passed to every `ExecutionController`: a hung simulator call
+        #: fails its step after this many seconds (`None` = no limit).
+        self._step_timeout_s = step_timeout_s
         # Set for the duration of one `execute_plan()` call so
         # `cancel_current()` (called from a *different* thread -- see
         # that method's docstring) has a live `ExecutionController` to
@@ -53,9 +61,18 @@ class ExecutionAgentWrapper(BaseAgent):
         # cancel, the run already finished) -- both are safe outcomes.
         self._active_controller: Optional[ExecutionController] = None
 
-    def execute_plan(self, plan: Plan, state: WorldState) -> ExecutionRecord:
+    def execute_plan(
+        self,
+        plan: Plan,
+        state: WorldState,
+        listener: Optional[Callable[[PlanStep, str], None]] = None,
+    ) -> ExecutionRecord:
         self._state = AgentState.ACTIVE
-        controller = ExecutionController(self._simulator)
+        controller = ExecutionController(
+            self._simulator,
+            step_timeout_s=self._step_timeout_s,
+            step_listener=listener,
+        )
         self._active_controller = controller
         try:
             record = controller.load_plan(plan)
@@ -63,6 +80,34 @@ class ExecutionAgentWrapper(BaseAgent):
         finally:
             self._active_controller = None
             self._state = AgentState.IDLE
+
+    def restore_clean_state(self) -> Optional[str]:
+        """
+        After a cancel: leave the robot with empty hands if it can.
+        Returns a plain-language sentence about what it did ("I put down
+        the apple.") or `None` if there was nothing to restore. Never
+        raises -- best effort, and honest when it could not.
+        """
+        if self._simulator is None:
+            return None
+        try:
+            held = (self._simulator.get_metadata() or {}).get("inventoryObjects") or []
+        except Exception:
+            return None
+        if not held:
+            return None
+        first = held[0]
+        name = str(
+            first.get("objectType") or str(first.get("objectId", "")).split("|")[0]
+        ).lower()
+        drop = getattr(self._simulator, "drop_held_object", None)
+        if drop is None:
+            return f"I'm still holding the {name}."
+        try:
+            drop()
+        except Exception:
+            return f"I'm still holding the {name}."
+        return f"I put down the {name}."
 
     def get_metadata(self) -> Optional[dict]:
         """The simulator's current metadata, or `None` if there is none --

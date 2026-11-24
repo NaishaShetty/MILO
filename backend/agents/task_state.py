@@ -39,6 +39,7 @@ file to exist, per this phase's "reuse, don't duplicate" rule.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -115,6 +116,24 @@ class TaskState:
     #: What MILO learned from this mission, as sentences ("The apple goes
     #: in the fridge."). Written to memory too; shown in the Missions page.
     learned: List[str] = field(default_factory=list)
+    #: Which planning strategy this task used ("rule_based", "react",
+    #: "behavior_tree", "htn") -- the one actually requested.
+    planner: Optional[str] = None
+    #: A plain-language note when the planner did not do exactly what was
+    #: asked (e.g. HTN handed an unknown goal to the rule-based planner).
+    planner_note: Optional[str] = None
+    #: True from the moment a cancel is requested until the task stops --
+    #: lets a UI show "Stopping..." while the current step finishes.
+    cancel_requested: bool = False
+    #: What MILO did to leave things tidy after a cancel ("I put down the
+    #: apple.").
+    cancel_summary: Optional[str] = None
+    #: MILO's running commentary, oldest first: `{"kind", "text", "at",
+    #: "step_id"}` where kind is memory | planner | eyes | hands | reflect.
+    thoughts: List[Dict[str, Any]] = field(default_factory=list)
+    #: When the task was created (epoch seconds) -- for "yesterday"-style
+    #: labels on recent missions.
+    created_at: float = field(default_factory=time.time)
 
     def metrics(self) -> Dict[str, Any]:
         """
@@ -174,5 +193,11 @@ class TaskState:
             "answer": self.answer,
             "sub_goals": self.sub_goals,
             "learned": self.learned,
+            "planner": self.planner,
+            "planner_note": self.planner_note,
+            "cancel_requested": self.cancel_requested,
+            "cancel_summary": self.cancel_summary,
+            "thoughts": self.thoughts,
+            "created_at": self.created_at,
             "metrics": self.metrics(),
         }

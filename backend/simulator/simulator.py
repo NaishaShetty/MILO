@@ -124,6 +124,9 @@ class Simulator:
     def close_object(self, object_id):
         return self.env.close_object(object_id)
 
+    def drop_held_object(self):
+        return self.env.drop_held_object()
+
     def toggle_object_on(self, object_id):
         return self.env.toggle_object_on(object_id)
 

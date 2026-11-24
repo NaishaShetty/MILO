@@ -44,6 +44,14 @@ class CreateTaskRequest(BaseModel):
         "instruction is parsed or planned.",
     )
 
+    planner: Literal["rule_based", "react", "behavior_tree", "htn"] = Field(
+        default="rule_based",
+        description="Which planning strategy to use for this task: "
+        "'rule_based' (fast and predictable), 'react' (asks a language "
+        "model, falls back to rule-based if none is configured), "
+        "'behavior_tree', or 'htn'. Reported back on the task as `planner`.",
+    )
+
     @field_validator("instruction", mode="after")
     @classmethod
     def _reject_whitespace_only(cls, value: str) -> str:

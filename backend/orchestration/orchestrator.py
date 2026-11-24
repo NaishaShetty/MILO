@@ -83,7 +83,13 @@ from memory.models import Memory, MemoryProvenance
 from memory.semantics import EpisodicDetails, FailureDetails
 from orchestration.answerer import where_parts
 from orchestration.composite import expand_composite
+from orchestration.explain import (
+    explain_plan,
+    explain_step,
+    explain_verdict,
+)
 from planner.grounding import ground_world_state
+from planner.models import PlanStep
 from planner.state import WorldState
 from planner.task_library import COMPOSITE_GOALS
 from schemas.task import MultiTask, SingleTask
@@ -110,8 +116,14 @@ class Orchestrator:
         reflection_agent: Optional[ReflectionAgent] = None,
         event_bus: Optional[EventBus] = None,
         registry: Optional[AgentRegistry] = None,
+        planner_factory: Optional[Callable[[str], PlannerAgentWrapper]] = None,
     ) -> None:
         self._planner = planner_agent
+        #: Builds a planner wrapper for a requested strategy name; without
+        #: one, every task uses `planner_agent`.
+        self._planner_factory = planner_factory
+        self._default_planner = planner_agent
+        self._current_state: Optional[TaskState] = None
         self._execution = execution_agent
         self._memory = memory_agent
         self._vision = vision_agent
@@ -159,6 +171,8 @@ class Orchestrator:
         no-op if nothing is running.
         """
         self._cancel_event.set()
+        if self._current_state is not None:
+            self._current_state.cancel_requested = True
         self._execution.cancel_current()
 
     def run(
@@ -168,9 +182,11 @@ class Orchestrator:
         input_source: InputSource = InputSource.TEXT,
         max_replans: int = DEFAULT_MAX_REPLANS,
         on_created: Optional[Callable[[TaskState], None]] = None,
+        planner_type: Optional[str] = None,
     ) -> TaskState:
         self._cancel_event.clear()
         run_started_at = time.perf_counter()
+        self._planner = self._select_planner(planner_type)
         # A `MultiTask` is run as one plan over its sub-goals; the rest of
         # this method works with a single "header" task describing it.
         subtasks: Optional[List[SingleTask]] = None
@@ -187,7 +203,9 @@ class Orchestrator:
             objects=[o for o in (task.object,) if o],
             target=task.target or task.target_location,
             status=TaskStatus.CREATED,
+            planner=self._planner.planner_type,
         )
+        self._current_state = task_state
         if on_created is not None:
             # Hands the caller a reference to *this exact* mutable
             # object, immediately -- lets `api/routes/tasks.py`'s
@@ -201,6 +219,7 @@ class Orchestrator:
         self._publish(task_state, EventType.TASK_PARSED)
 
         memory_context = self._retrieve_memory(task, episode_id, task_state)
+        self._think_about_memory(task_state, memory_context)
 
         if subtasks is None and (task.goal or "") in COMPOSITE_GOALS:
             # "Clear the table" / "tidy up": look at the room, decide which
@@ -257,6 +276,15 @@ class Orchestrator:
                 reason="; ".join(planning_result.errors) or "planning failed",
             )
         task_state.current_plan = planning_result.plan
+        self._note_planner(task_state, planning_result.plan)
+        self._think(
+            task_state,
+            "planner",
+            explain_plan(
+                len(planning_result.plan.steps),
+                planning_result.plan.metadata.get("skipped_steps"),
+            ),
+        )
         self._publish(task_state, EventType.PLAN_CREATED)
 
         if not planning_result.plan.steps:
@@ -282,7 +310,11 @@ class Orchestrator:
             task_state.status = TaskStatus.EXECUTING
             self._publish(task_state, EventType.ACTION_STARTED)
             started = time.perf_counter()
-            record = self._execution.execute_plan(task_state.current_plan, world_state)
+            record = self._execution.execute_plan(
+                task_state.current_plan,
+                world_state,
+                listener=self._step_listener(task_state),
+            )
             task_state.latencies_ms["execution_ms"] = (
                 task_state.latencies_ms.get("execution_ms", 0.0)
                 + (time.perf_counter() - started) * 1000.0
@@ -321,6 +353,7 @@ class Orchestrator:
                 task_state.latencies_ms.get("reflection_ms", 0.0)
                 + (time.perf_counter() - started) * 1000.0
             )
+            self._explain_reflection(task_state, record, failures, reflection.action)
             self._publish(
                 task_state,
                 EventType.REFLECTION_COMPLETED,
@@ -380,6 +413,15 @@ class Orchestrator:
                     reason="; ".join(planning_result.errors) or "replanning failed",
                 )
             task_state.current_plan = planning_result.plan
+            self._note_planner(task_state, planning_result.plan)
+            self._think(
+                task_state,
+                "planner",
+                explain_plan(
+                    len(planning_result.plan.steps),
+                    planning_result.plan.metadata.get("skipped_steps"),
+                ),
+            )
             self._publish(task_state, EventType.PLAN_CREATED)
             if not planning_result.plan.steps:
                 # The failed attempt had in fact finished the job.
@@ -413,6 +455,103 @@ class Orchestrator:
             )
         single = self._planner.replan if replan else self._planner.plan
         return single(task, world_state, memory_context)
+
+    def _select_planner(self, planner_type: Optional[str]) -> PlannerAgentWrapper:
+        """The planner for this run: the requested strategy, else the default."""
+        if not planner_type or self._planner_factory is None:
+            return self._default_planner
+        if planner_type == self._default_planner.planner_type:
+            return self._default_planner
+        planner = self._planner_factory(planner_type)
+        if self._registry is not None:
+            self._registry.register(planner)  # so agent states show the live one
+        return planner
+
+    # -- narration ---------------------------------------------------------
+
+    def _think(
+        self,
+        task_state: TaskState,
+        kind: str,
+        text: str,
+        step_id: Optional[int] = None,
+    ) -> None:
+        """Appends one line to MILO's running commentary."""
+        if not text:
+            return
+        task_state.thoughts.append(
+            {"kind": kind, "text": text, "at": time.time(), "step_id": step_id}
+        )
+
+    def _think_about_memory(self, task_state: TaskState, memory_context) -> None:
+        results = getattr(memory_context, "results", None) or []
+        if results:
+            top = results[0].memory
+            self._think(task_state, "memory", f"I remember: {top.content}.")
+
+    def _note_planner(self, task_state: TaskState, plan) -> None:
+        """Surfaces a planner fallback ("HTN has no method for that, so the
+        rule-based planner planned it") as a plain note on the task."""
+        fallback = plan.metadata.get("planner_fallback")
+        if isinstance(fallback, dict):
+            task_state.planner_note = fallback.get("reason")
+        elif plan.metadata.get("react_fallback"):
+            task_state.planner_note = (
+                "The thinking planner wasn't available, so the rule-based "
+                "planner made this plan."
+            )
+
+    def _step_listener(self, task_state: TaskState) -> Callable[[PlanStep, str], None]:
+        """Narrates execution live: sets each step's `explanation`, the
+        task's `current_step`, and adds a thought when a step finishes."""
+
+        def listen(step: PlanStep, status: str) -> None:
+            if status == "started":
+                task_state.current_step = step.step_id
+                step.explanation = explain_step(step, "doing")
+            elif status in ("success", "already_done"):
+                step.explanation = explain_step(step, "done")
+                if status == "success":
+                    kind = "eyes" if step.action == "locate" else "hands"
+                    self._think(task_state, kind, step.explanation, step.step_id)
+            elif status == "cancelled":
+                step.explanation = "I stopped before this one."
+
+        return listen
+
+    def _explain_reflection(
+        self,
+        task_state: TaskState,
+        record: ExecutionRecord,
+        failures: List[AgentFailure],
+        verdict: str,
+    ) -> None:
+        """Turns a reflection verdict into a sentence on the failed step
+        and a thought -- "I couldn't reach the fridge, so I'm trying
+        another route."""
+        plan = task_state.current_plan
+        failed_step = None
+        if plan is not None:
+            failed_id = next(
+                (
+                    s.step_id
+                    for s in record.step_results
+                    if s.status in (StepStatus.FAILED, StepStatus.BLOCKED)
+                ),
+                None,
+            )
+            failed_step = next((s for s in plan.steps if s.step_id == failed_id), None)
+        sentence = explain_verdict(
+            verdict, failed_step, failures[0] if failures else None
+        )
+        if failed_step is not None and verdict != "continue":
+            failed_step.explanation = sentence
+        self._think(
+            task_state,
+            "reflect",
+            sentence,
+            failed_step.step_id if failed_step is not None else None,
+        )
 
     def _seed_from_simulator(self, world_state: WorldState) -> None:
         """
@@ -772,6 +911,14 @@ class Orchestrator:
         (nothing here mutates or removes them) -- "must not corrupt...
         event history" satisfied by simply never touching it.
         """
+        summary = self._execution.restore_clean_state()
+        task_state.cancel_summary = summary
+        task_state.cancel_requested = True
+        self._think(
+            task_state,
+            "reflect",
+            "Okay, I stopped." + (f" {summary}" if summary else ""),
+        )
         task_state.status = TaskStatus.CANCELLED
         self._publish(task_state, EventType.TASK_CANCELLED)
         return task_state

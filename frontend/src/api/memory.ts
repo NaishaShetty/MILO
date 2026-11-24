@@ -10,7 +10,12 @@
 // backend route did not exist before Phase 8.2.
 
 import { ApiError, request } from "./client";
-import type { MemoryListResponse, MemorySearchResponse, MemoryType } from "./memoryTypes";
+import type {
+  Memory,
+  MemoryListResponse,
+  MemorySearchResponse,
+  MemoryType,
+} from "./memoryTypes";
 
 export { ApiError as MemoryApiError };
 
@@ -27,4 +32,11 @@ export async function listMemory(memoryType?: MemoryType, limit = 200): Promise<
     params.set("memory_type", memoryType);
   }
   return request<MemoryListResponse>(`/api/v1/memory?${params.toString()}`);
+}
+
+/** `POST /api/v1/memory/{id}/forget` -- archives the memory so MILO stops using it. */
+export async function forgetMemory(memoryId: string): Promise<Memory> {
+  return request<Memory>(`/api/v1/memory/${encodeURIComponent(memoryId)}/forget`, {
+    method: "POST",
+  });
 }

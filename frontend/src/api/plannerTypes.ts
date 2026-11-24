@@ -46,6 +46,8 @@ export interface PlanStep {
   description: string;
   preconditions: string[];
   postconditions: string[];
+  /** MILO's plain-language note on this step ("Walking to the fridge."), set while the task runs. */
+  explanation?: string | null;
   status: StepStatus;
 }
 

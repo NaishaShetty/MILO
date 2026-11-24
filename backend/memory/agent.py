@@ -65,7 +65,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from memory.config import MemoryConfig
 from memory.conflicts import store_semantic_observation
 from memory.embeddings import EmbeddingConfig
-from memory.models import Memory, MemoryProvenance, MemoryType
+from memory.models import Memory, MemoryProvenance, MemoryStatus, MemoryType
 from memory.retrieval import (
     MemoryResult,
     RankingWeights,
@@ -434,6 +434,28 @@ class MemoryAgent:
             },
         )
         return stored
+
+    def forget(self, memory_id: str) -> Optional[Memory]:
+        """
+        "Forget this": archives the memory (`MemoryStatus.ARCHIVED`) so
+        retrieval, the planner and "tidy up" stop using it, without
+        deleting the record -- reversible, and history stays honest.
+        Idempotent. Returns the updated memory, or `None` if there is no
+        such memory (or memory is unavailable).
+        """
+        if self._engine is None:
+            return None
+        try:
+            memory = self._engine.manager.get(memory_id)
+            if memory is None:
+                return None
+            if memory.status != MemoryStatus.ARCHIVED:
+                memory.status = MemoryStatus.ARCHIVED
+                self._engine.manager.update(memory)
+            return memory
+        except Exception:
+            logger.warning("memory_agent.forget_failed", exc_info=True)
+            return None
 
     def remember_preference(
         self,

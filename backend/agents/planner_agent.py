@@ -37,6 +37,10 @@ class PlannerAgentWrapper(BaseAgent):
         super().__init__()
         self._planner = planner
 
+    @property
+    def planner_type(self) -> str:
+        return self._planner.planner_type
+
     def plan(
         self,
         task: SingleTask,

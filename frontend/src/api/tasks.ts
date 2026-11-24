@@ -14,8 +14,11 @@
 import { ApiError, request } from "./client";
 import type {
   CreateTaskRequestBody,
+  CreateTaskResult,
+  PlannerChoice,
   RobotState,
   TaskEvent,
+  TaskKind,
   TaskMemoryResponse,
   TaskState,
 } from "./tasksTypes";
@@ -33,11 +36,19 @@ export { ApiError as TasksApiError };
 export async function createTask(
   instruction: string,
   inputSource: CreateTaskRequestBody["input_source"] = "text",
-): Promise<TaskState> {
-  return request<TaskState>("/api/v1/tasks", {
+  planner?: PlannerChoice,
+): Promise<CreateTaskResult> {
+  const body: CreateTaskRequestBody = { instruction, input_source: inputSource };
+  if (planner) body.planner = planner;
+  return request<CreateTaskResult>("/api/v1/tasks", {
     method: "POST",
-    body: JSON.stringify({ instruction, input_source: inputSource }),
+    body: JSON.stringify(body),
   });
+}
+
+/** `GET /api/v1/tasks/library` -- everything MILO knows how to do, with examples. */
+export async function getTaskLibrary(): Promise<TaskKind[]> {
+  return request<TaskKind[]>("/api/v1/tasks/library");
 }
 
 /** `GET /api/v1/tasks` -- every task this backend process has run, newest first. */
