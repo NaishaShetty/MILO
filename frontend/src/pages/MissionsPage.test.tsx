@@ -86,3 +86,31 @@ describe("MissionsPage for tasks MILO works out itself", () => {
     expect(submit).toHaveBeenCalledWith("chill the apple", "text", undefined);
   });
 });
+
+describe("Save as skill", () => {
+  it("is offered after a mission that worked and saves with the chosen name", async () => {
+    const skillsApi = await import("../api/skills");
+    const save = vi.spyOn(skillsApi, "saveTaskAsSkill").mockResolvedValue({
+      skill_id: "s1",
+      name: "chill",
+      wording: "chill the {o0}",
+      status: "candidate",
+      successes: 1,
+      failures: 0,
+      success_rate: 1,
+      last_used: null,
+      steps: [],
+    });
+    renderWith(task("htn", null, "succeeded"));
+    fireEvent.click(screen.getByRole("button", { name: "Save as skill" }));
+    fireEvent.change(screen.getByLabelText("Skill name"), { target: { value: "chill" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save skill" }));
+    expect(await screen.findByRole("status")).toHaveTextContent('Say "chill the …"');
+    expect(save).toHaveBeenCalledWith("t1", "chill");
+  });
+
+  it("is not offered while the mission is running", () => {
+    renderWith(task("htn", null, "executing"));
+    expect(screen.queryByRole("button", { name: "Save as skill" })).not.toBeInTheDocument();
+  });
+});

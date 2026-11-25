@@ -11,6 +11,8 @@ import { MiloRobot } from "../components/MiloRobot";
 import { directMilo } from "../state/miloDirector";
 import { useTask } from "../state/TaskContext";
 import { confidenceWord, stepTitle } from "../utils/friendly";
+import { ApiError } from "../api/client";
+import { readableWording, saveTaskAsSkill } from "../api/skills";
 
 const WHO: Record<string, string> = { memory: "M", planner: "P", eyes: "E", hands: "H", reflect: "R" };
 const TERMINAL = ["succeeded", "failed", "cancelled"];
@@ -65,6 +67,44 @@ function SeesPanel({ prompt, refreshKey }: { prompt: string; refreshKey: unknown
         )}
       </div>
     </section>
+  );
+}
+
+function SaveAsSkill({ taskId, wording }: { taskId: string; wording: string }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(wording);
+  const [said, setSaid] = useState<{ text: string; bad: boolean } | null>(null);
+  const save = async () => {
+    try {
+      const skill = await saveTaskAsSkill(taskId, name.trim() || wording);
+      setSaid({ text: `Saved. Say "${readableWording(skill.wording)}" and I'll do it again with whatever you name.`, bad: false });
+      setOpen(false);
+    } catch (error) {
+      setSaid({ text: error instanceof ApiError ? error.message : "I couldn't save that. Is MILO's server running?", bad: true });
+    }
+  };
+  return (
+    <div className="save-skill">
+      {open ? (
+        <span className="ask__row">
+          <input className="input" aria-label="Skill name" value={name} onChange={(e) => setName(e.target.value)} />
+          <button type="button" className="btn btn--go" onClick={() => void save()}>
+            Save skill
+          </button>
+        </span>
+      ) : (
+        !said && (
+          <button type="button" className="chip" onClick={() => setOpen(true)}>
+            Save as skill
+          </button>
+        )
+      )}
+      {said && (
+        <p className={`notice${said.bad ? " notice--error" : ""}`} role={said.bad ? "alert" : "status"}>
+          {said.text}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -149,6 +189,7 @@ export function MissionsPage() {
               {novel.note ? ` ${novel.note}` : ""}
             </p>
           )}
+          {activeTask.status === "succeeded" && <SaveAsSkill taskId={activeTask.task_id} wording={activeTask.user_request} />}
           {activeTask.planner_note && <div className="notice">{activeTask.planner_note}</div>}
           {activeTask.cancel_summary && <div className="notice">{activeTask.cancel_summary}</div>}
           {activeTask.answer && <div className="notice">{activeTask.answer}</div>}

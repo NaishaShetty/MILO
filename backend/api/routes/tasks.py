@@ -306,7 +306,7 @@ def create_task(
     )
     interpretation = interpreter.interpret(body.instruction)
     planner_name: str = body.planner
-    if _is_novel(interpretation):
+    if _is_novel(interpretation, body.instruction, _safe_metadata(simulator)):
         # Something MILO has no recipe for: work it out (novel/), instead of
         # "I don't know how to X yet".
         interpretation = Interpretation(
@@ -392,7 +392,28 @@ def create_task(
     }
 
 
-def _is_novel(interpretation: Any) -> bool:
+def _safe_metadata(simulator: Any) -> Any:
+    try:
+        return simulator.get_metadata()
+    except Exception:
+        return None
+
+
+def _skill_matches(instruction: str, metadata: Any) -> bool:
+    """True when the instruction has the wording of a saved (not disabled) skill."""
+    from novel.factory import shared_library
+
+    names = [
+        str(o.get("objectType", "")).lower()
+        for o in (metadata or {}).get("objects") or []
+    ]
+    try:
+        return shared_library().find(instruction, names) is not None
+    except Exception:
+        return False
+
+
+def _is_novel(interpretation: Any, instruction: str = "", metadata: Any = None) -> bool:
     """An unknown verb, or a model-parsed goal no planner has a recipe for -- and a
     language model is available to work it out (offline, the plain "I can't do that
     yet" reply stays, since a novel run could only fail)."""
@@ -403,6 +424,8 @@ def _is_novel(interpretation: Any) -> bool:
 
     if not enabled():
         return False
+    if instruction and _skill_matches(instruction, metadata):
+        return True  # something the user taught MILO (works without a model)
     task = interpretation.task if interpretation.kind == "task" else None
     unknown_goal = isinstance(task, SingleTask) and (task.goal or "") not in (
         set(GOAL_HANDLERS) | set(COMPOSITE_GOALS)

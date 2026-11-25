@@ -12,6 +12,7 @@ import { AboutPage } from "./pages/AboutPage";
 import { ModelsPanel } from "./components/ModelsPanel";
 import { LabPage } from "./pages/LabPage";
 import { MemoryPage } from "./pages/MemoryPage";
+import { SkillsPage } from "./pages/SkillsPage";
 import { MissionsPage } from "./pages/MissionsPage";
 import { PlayPage } from "./pages/PlayPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -35,6 +36,7 @@ export default function App() {
                         <Route path="/missions" element={<MissionsPage />} />
                         <Route path="/mission-control" element={<Navigate to="/missions" replace />} />
                         <Route path="/memory" element={<MemoryPage />} />
+                        <Route path="/skills" element={<SkillsPage />} />
                         <Route path="/lab" element={<div className="legacy-page"><ModelsPanel /><LabPage /></div>} />
                         <Route path="/about" element={<div className="legacy-page"><AboutPage /></div>} />
                         <Route path="/settings" element={<div className="legacy-page"><SettingsPage /></div>} />

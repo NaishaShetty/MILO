@@ -68,6 +68,16 @@ def make_probe(execution: Any) -> Callable[[str, str], Optional[Dict[str, Any]]]
     return probe
 
 
+_LIBRARIES: Dict[str, SkillLibrary] = {}
+
+
+def shared_library(memory_agent: Any = None) -> SkillLibrary:
+    path = os.environ.get("MILO_SKILLS_DB", "data/skills.db")
+    if path not in _LIBRARIES:
+        _LIBRARIES[path] = SkillLibrary(Path(path), memory_agent)
+    return _LIBRARIES[path]
+
+
 def build_novel_planner(
     execution: Any,
     *,
@@ -89,10 +99,7 @@ def build_novel_planner(
         provider or build_provider(),
         execution.get_metadata,
         constraints=Constraints.load(),
-        skills=skills
-        or SkillLibrary(
-            Path(os.environ.get("MILO_SKILLS_DB", "data/skills.db")), memory_agent
-        ),
+        skills=skills or shared_library(memory_agent),
         memory_source=memories,
         failure_source=failure_source,
         probe=make_probe(execution),

@@ -34,7 +34,7 @@ from novel.plan import (
 )
 from novel.providers import PlanRequest, Provider, ProviderError
 from novel.safety import Constraints
-from novel.skills import SkillLibrary
+from novel.skills import SkillChainError, SkillLibrary
 from novel.validate import check
 from planner.models import PlanningResult, PlanStep, ValidationResult
 
@@ -164,7 +164,7 @@ class NovelPlanner:
             if found is not None:
                 skill, binding = found
                 try:
-                    proposal = skill.instantiate(binding)
+                    proposal = skill.instantiate(binding, self.skills)
                     result = check(proposal, metadata, self.constraints)
                     if result.ok:
                         log.source, log.skill_template = "skill", skill.template
@@ -208,9 +208,11 @@ class NovelPlanner:
             try:
                 raw = self.provider.propose(request)
                 proposal = parse_proposal(raw)
+                if self.skills is not None:
+                    proposal = self.skills.expand(proposal)
             except ProviderError as exc:
                 raise _Stop(f"{exc}.") from exc
-            except ProposalError as exc:
+            except (ProposalError, SkillChainError) as exc:
                 log.feedback.append(f"your last answer was unusable: {exc}")
                 continue
             if proposal.question:

@@ -32,6 +32,21 @@ from novel.plan import NovelStep, Proposal
 from verification.predicates import Predicate
 
 PROMOTE_AFTER = 3
+#: How deep skills may call skills ("tidy up" -> "put away X" -> ...).
+MAX_DEPTH = 3
+SKILL_PREFIX = "skill:"
+
+
+class SkillChainError(ValueError):
+    """A skill calls an unknown skill, calls itself (a cycle), or nests too deeply."""
+
+
+def skill_id(template: str) -> str:
+    import hashlib
+
+    return hashlib.sha1(template.encode()).hexdigest()[:10]
+
+
 _SQL = """
 CREATE TABLE IF NOT EXISTS skills (
     template TEXT PRIMARY KEY, name TEXT, steps TEXT, success TEXT, status TEXT,
@@ -83,15 +98,46 @@ class Skill:
     object_sets: List[List[str]] = field(default_factory=list)
     last_used: Optional[float] = None
 
-    def instantiate(self, binding: List[str]) -> Proposal:
-        steps = [
-            NovelStep(
-                s["action"],
-                _concrete(s.get("target"), binding),
-                _concrete(s.get("container"), binding),
+    @property
+    def skill_id(self) -> str:
+        return skill_id(self.template)
+
+    def instantiate(
+        self,
+        binding: List[str],
+        library: Optional["SkillLibrary"] = None,
+        _depth: int = 0,
+        _seen: Optional[List[str]] = None,
+    ) -> Proposal:
+        """Concrete steps for `binding`. A step `{"action": "skill:<name>", "target": a,
+        "container": b}` calls another skill with (a, b) as its objects and is expanded
+        in place -- at most `MAX_DEPTH` deep, never into a skill already on the stack.
+        """
+        seen = (_seen or []) + [self.template]
+        if _depth > MAX_DEPTH:
+            raise SkillChainError(
+                f"'{self.name}' calls skills more than {MAX_DEPTH} levels deep"
             )
-            for s in self.steps
-        ]
+        steps: List[NovelStep] = []
+        for s in self.steps:
+            target = _concrete(s.get("target"), binding)
+            container = _concrete(s.get("container"), binding)
+            action = str(s["action"])
+            if not action.startswith(SKILL_PREFIX):
+                steps.append(NovelStep(action, target, container))
+                continue
+            name = action[len(SKILL_PREFIX) :]
+            inner = library.by_name(name) if library is not None else None
+            if inner is None:
+                raise SkillChainError(
+                    f"'{self.name}' uses a skill I don't know: '{name}'"
+                )
+            if inner.template in seen:
+                raise SkillChainError(
+                    f"'{self.name}' and '{inner.name}' call each other in a loop"
+                )
+            args = [a for a in (target, container) if a]
+            steps.extend(inner.instantiate(args, library, _depth + 1, seen).steps)
         success = [
             Predicate(
                 p["kind"],
@@ -102,9 +148,25 @@ class Skill:
         ]
         return Proposal(goal=self.name, success=success, steps=steps)
 
+    def to_dict(self) -> Dict[str, Any]:
+        runs = self.successes + self.failures
+        return {
+            "skill_id": self.skill_id,
+            "name": self.name,
+            "wording": self.template,
+            "status": self.status,
+            "successes": self.successes,
+            "failures": self.failures,
+            "success_rate": (self.successes / runs) if runs else None,
+            "last_used": self.last_used,
+            "steps": self.steps,
+            "success": self.success,
+            "objects_seen": self.object_sets,
+        }
+
     def describe(self) -> str:
         return (
-            f"{self.name} [{self.status}, {self.successes} ok / {self.failures} failed]: "
+            f"{SKILL_PREFIX}{self.name} [{self.status}, {self.successes} ok / {self.failures} failed]: "
             + ", ".join(
                 f"{s['action']} {s.get('target') or ''}".strip() for s in self.steps
             )
@@ -133,6 +195,121 @@ class SkillLibrary:
         if skill is None or skill.status == "disabled":
             return None
         return skill, binding
+
+    def by_id(self, sid: str) -> Optional[Skill]:
+        return next((s for s in self.all() if s.skill_id == sid), None)
+
+    def by_name(self, name: str) -> Optional[Skill]:
+        name = name.strip().lower()
+        return next(
+            (
+                s
+                for s in self.all()
+                if s.status != "disabled" and name in (s.name.lower(), s.template)
+            ),
+            None,
+        )
+
+    def expand(self, proposal: Proposal) -> Proposal:
+        """Replaces `skill:<name>` steps in a proposal (e.g. from the planner) by the
+        named skill's steps; raises `SkillChainError` if one can't be expanded."""
+        if not any(s.action.startswith(SKILL_PREFIX) for s in proposal.steps):
+            return proposal
+        wrapper = Skill(
+            template="(plan)",
+            name=proposal.goal or "plan",
+            steps=[s.to_dict() for s in proposal.steps],
+            success=[],
+        )
+        steps = wrapper.instantiate([], self).steps
+        return Proposal(proposal.goal, proposal.success, steps)
+
+    def save(
+        self,
+        name: str,
+        wording: str,
+        proposal: Proposal,
+        scene_objects: Sequence[str],
+        *,
+        status: str = "candidate",
+    ) -> Skill:
+        """Stores a skill from explicit wording ("set the mug on the table") and a plan
+        that worked; objects named in the wording become placeholders everywhere."""
+        template, bound = templatize(wording, scene_objects)
+        skill = Skill(
+            template=template,
+            name=name.strip() or wording,
+            steps=[
+                {
+                    "action": s.action,
+                    "target": _abstract(s.target, bound),
+                    "container": _abstract(s.container, bound),
+                }
+                for s in proposal.steps
+            ],
+            success=[
+                {
+                    "kind": p.kind,
+                    "object": _abstract(p.object, bound),
+                    "receptacle": _abstract(p.receptacle, bound),
+                }
+                for p in proposal.success
+            ],
+            status=status,
+            successes=1,
+            object_sets=[bound],
+            last_used=time.time(),
+        )
+        self.check_chain(skill)
+        with self._lock:
+            self._save(skill)
+        self._mirror(f"skill: {skill.describe()}", "skill")
+        return skill
+
+    def check_chain(self, skill: Skill) -> None:
+        """Dry-run expansion with placeholder objects (catches cycles/unknown skills)."""
+        n = 1 + max(
+            [
+                int(m)
+                for s in skill.steps
+                for v in (s.get("target"), s.get("container"))
+                for m in re.findall(r"\{o(\d+)\}", v or "")
+            ]
+            or [0]
+        )
+        skill.instantiate([f"thing{i}" for i in range(n)], self)
+
+    def rename(self, sid: str, name: str) -> Optional[Skill]:
+        skill = self.by_id(sid)
+        if skill is None:
+            return None
+        skill.name = name.strip() or skill.name
+        self._save(skill)
+        return skill
+
+    def update_steps(self, sid: str, steps: List[Dict[str, Any]]) -> Optional[Skill]:
+        skill = self.by_id(sid)
+        if skill is None:
+            return None
+        skill.steps = [
+            {
+                "action": str(s["action"]).strip().lower(),
+                "target": s.get("target") or None,
+                "container": s.get("container") or None,
+            }
+            for s in steps
+        ]
+        self.check_chain(skill)
+        self._save(skill)
+        return skill
+
+    def delete(self, sid: str) -> bool:
+        skill = self.by_id(sid)
+        if skill is None:
+            return False
+        with closing(self._db()) as db, db:
+            db.execute("DELETE FROM skills WHERE template=?", (skill.template,))
+        return True
 
     def get(self, template: str) -> Optional[Skill]:
         with closing(self._db()) as db:
@@ -186,6 +363,8 @@ class SkillLibrary:
                 ],
             )
             skill.successes += 1
+            if skill.status == "teaching":
+                skill.status = "candidate"  # the run-back worked: it's a real skill now
             if bound not in skill.object_sets:
                 skill.object_sets.append(bound)
             if (

@@ -1,4 +1,4 @@
-// NavBar.tsx -- the top pill (Play / Missions / Memory / Lab), connection status,
+// NavBar.tsx -- the top pill (Play / Missions / Memory / Skills / Lab), connection status,
 // and the gear menu (Activity drawer, About, Settings). On small screens the
 // pill becomes a bottom tab dock.
 import { useState } from "react";
@@ -7,13 +7,14 @@ import { Link, NavLink } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { useAgents } from "../state/AgentsContext";
 import { ActivityPage } from "../pages/ActivityPage";
-import { BookIcon, FlagIcon, FlaskIcon, GearIcon, PlayIcon } from "./Icons";
+import { BookIcon, FlagIcon, FlaskIcon, GearIcon, PlayIcon, SparkIcon } from "./Icons";
 import { MiloWordmark } from "./MiloWordmark";
 
 const TABS = [
   { to: "/", label: "Play", icon: <PlayIcon />, end: true },
   { to: "/missions", label: "Missions", icon: <FlagIcon /> },
   { to: "/memory", label: "Memory", icon: <BookIcon /> },
+  { to: "/skills", label: "Skills", icon: <SparkIcon /> },
   { to: "/lab", label: "Lab", icon: <FlaskIcon /> },
 ];
 

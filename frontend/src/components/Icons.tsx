@@ -17,3 +17,4 @@ export const MicIcon = () => (<Svg><rect x="9" y="3" width="6" height="11" rx="3
 export const GearIcon = () => (<Svg><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" /></Svg>);
 export const ArrowIcon = () => (<Svg><path d="M5 12h14M13 6l6 6-6 6" /></Svg>);
 export const CheckIcon = () => (<Svg><path d="M5 12l5 5 9-10" /></Svg>);
+export const SparkIcon = () => (<Svg><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18" /></Svg>);
