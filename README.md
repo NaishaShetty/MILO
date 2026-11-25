@@ -50,32 +50,6 @@ flowchart LR
 
 Backend: Python 3.9, FastAPI, Pydantic, SQLite, AI2-THOR, Grounding DINO, SAM2, PyTorch (CUDA), scikit-learn. Frontend: React and TypeScript on Vite, with live updates over SSE and polling as a fallback. Tests: pytest, Vitest and Playwright. Deployment: Docker Compose with nginx. CI: GitHub Actions (backend, frontend, browser end-to-end, Docker build, and a benchmark regression gate).
 
-## Screenshots
-
-All captured on 2026-11-25 from the real app, after real missions on AI2-THOR. Regenerate them with `make screenshots`.
-
-| Missions: a finished "find the mug" mission, MILO's camera view with the detection, and the room map | Replay: step through what MILO saw, planned and thought |
-|---|---|
-| ![Missions page showing a completed find-the-mug mission, the AI2-THOR camera frame with the mug detected, and the scene map](docs/images/missions-desktop.png) | ![Replay page for the find-the-mug mission: camera frame, four-step plan and MILO's thoughts](docs/images/replay-desktop.png) |
-
-| Memory: what MILO remembers, where it came from and how sure it is | Skills: a mission saved as a skill, and the teach form |
-|---|---|
-| ![Memory scrapbook with moments and facts, each showing its source and confidence, with pin, fix, set aside, forget and delete](docs/images/memory-desktop.png) | ![Skills page listing the saved "chill it" skill and the Teach MILO form](docs/images/skills-desktop.png) |
-
-| Leaderboard: every planner on the fixed benchmark | Lab: model switches and where the time goes |
-|---|---|
-| ![Leaderboard with known-task, new-task and under-fault success for each planner, recovery by fault kind and the ablations](docs/images/leaderboard-desktop.png) | ![Lab page with the learned-model switches and per-stage p50 and p95 timings](docs/images/lab-desktop.png) |
-
-In the Lab screenshot, every model reads "not trained yet". That's because trained model files aren't stored in git; train them with the `make` targets in [models](docs/models/README.md).
-
-| Phone | Demo mode (no backend) |
-|---|---|
-| ![Play page on a phone, with MILO and the bottom tab dock](docs/images/play-mobile.png) | ![Demo mode home page listing the recorded missions to replay](docs/images/demo-home-desktop.png) |
-
-![Demo mode replaying a recorded mission](docs/demo.gif)
-
-*Demo mode replays recorded missions with no simulator or GPU. Its "camera" panel shows a schematic sketch, not a real frame.*
-
 ## Results
 
 Unless a row says otherwise, everything was measured on 2026-11-25 in the fixed synthetic home with fixed seeds. Each table names the command that reproduces it.
@@ -201,16 +175,32 @@ Never commit `backend/.env` or any key.
 - Docker and deployment: [docker/README.md](docker/README.md) · [deployment/README.md](deployment/README.md)
 - Older design notes and phase history: [docs/](docs/)
 
-## What's left
-
-1. Measure new tasks with a real language model. Claude needs API credits; a free local model (Ollama) is the next option.
-2. Run the outcome predictor on real AI2-THOR before switching it on by default.
-3. Defend against spoofed "user" memories: assign each memory's source on the server and log who changed it.
-4. Recover "find" tasks under a wrong detection within the mission, by taking a second look.
-5. Add benchmark tasks that genuinely need memory, so the memory ablation means something.
-6. Deploy demo mode as a free static site, and add the link here.
-7. Move off Python 3.9, which is nearing end of life.
-
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Screenshots
+
+All captured on 2026-11-25 from the real app, after real missions on AI2-THOR. Regenerate them with `make screenshots`.
+
+| Missions: a finished "find the mug" mission, MILO's camera view with the detection, and the room map | Replay: step through what MILO saw, planned and thought |
+|---|---|
+| ![Missions page showing a completed find-the-mug mission, the AI2-THOR camera frame with the mug detected, and the scene map](docs/images/missions-desktop.png) | ![Replay page for the find-the-mug mission: camera frame, four-step plan and MILO's thoughts](docs/images/replay-desktop.png) |
+
+| Memory: what MILO remembers, where it came from and how sure it is | Skills: a mission saved as a skill, and the teach form |
+|---|---|
+| ![Memory scrapbook with moments and facts, each showing its source and confidence, with pin, fix, set aside, forget and delete](docs/images/memory-desktop.png) | ![Skills page listing the saved "chill it" skill and the Teach MILO form](docs/images/skills-desktop.png) |
+
+| Leaderboard: every planner on the fixed benchmark | Lab: model switches and where the time goes |
+|---|---|
+| ![Leaderboard with known-task, new-task and under-fault success for each planner, recovery by fault kind and the ablations](docs/images/leaderboard-desktop.png) | ![Lab page with the learned-model switches and per-stage p50 and p95 timings](docs/images/lab-desktop.png) |
+
+In the Lab screenshot, every model reads "not trained yet". That's because trained model files aren't stored in git; train them with the `make` targets in [models](docs/models/README.md).
+
+| Phone | Demo mode (no backend) |
+|---|---|
+| ![Play page on a phone, with MILO and the bottom tab dock](docs/images/play-mobile.png) | ![Demo mode home page listing the recorded missions to replay](docs/images/demo-home-desktop.png) |
+
+![Demo mode replaying a recorded mission](docs/demo.gif)
+
+*Demo mode replays recorded missions with no simulator or GPU. Its "camera" panel shows a schematic sketch, not a real frame.*
