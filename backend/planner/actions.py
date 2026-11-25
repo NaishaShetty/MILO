@@ -198,6 +198,17 @@ def _require_container_ready(
     return state.object(container).is_open is not False
 
 
+def _require_at_container(
+    state: WorldState, _target: Optional[str], params: Dict[str, Any]
+) -> bool:
+    """`place` needs the robot at the destination: it must have navigated there
+    (an unknown robot location -- no navigation planned yet -- is not "there")."""
+    container = params.get("container")
+    if not container:
+        return False
+    return state.robot_location == str(container).strip().lower()
+
+
 def _effect_locate(
     state: WorldState, target: Optional[str], _params: Dict[str, Any]
 ) -> None:
@@ -402,6 +413,11 @@ ACTION_REGISTRY: Dict[str, ActionSpec] = {
         description_template="Place {target} inside destination",
         required_parameters=["container"],
         preconditions=[
+            Precondition(
+                "at_container",
+                "robot must be at the place it is putting things",
+                _require_at_container,
+            ),
             Precondition(
                 "holding_target",
                 "robot must be holding target",

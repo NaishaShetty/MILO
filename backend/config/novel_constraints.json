@@ -1,0 +1,10 @@
+{
+  "_comment": "Safety rules for plans MILO works out for itself (novel tasks). Edit to taste; see docs/novel_tasks.md.",
+  "allowed_actions": ["locate", "navigate", "pickup", "place", "put_down", "open", "close", "turn_on", "turn_off", "push", "look_around"],
+  "forbidden_actions": [],
+  "risky_actions": ["push", "put_down"],
+  "fragile_objects": ["egg", "glass", "vase", "plate", "bowl", "cup", "mug", "winebottle", "bottle", "laptop", "television"],
+  "dangerous_objects": ["knife", "butterknife", "stoveburner", "stoveknob", "toaster", "microwave"],
+  "forbidden_objects": [],
+  "budgets": {"max_steps": 20, "max_model_calls": 4, "max_wall_s": 90, "max_probes": 3}
+}

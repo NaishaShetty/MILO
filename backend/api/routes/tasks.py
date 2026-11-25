@@ -77,7 +77,7 @@ from agents.vision_agent import VisionAgentWrapper
 from api.models.tasks import CreateTaskRequest
 from language.agent import LanguageAgent
 from language.exceptions import LanguageRuntimeError
-from language.interpreter import InstructionInterpreter
+from language.interpreter import InstructionInterpreter, Interpretation
 from language.llm_client import LLMClient
 from learning.config import learning_kwargs
 from memory.habits import usual_place_of
@@ -130,8 +130,19 @@ class _TaskStore:
             raise RuntimeError("_TaskStore.set_orchestrator() was never called")
 
         with self._lock:
-            if self._active_task_id is not None:
-                raise _TaskAlreadyRunningError(self._active_task_id)
+            active = self._active_task_id
+            # A task whose state is already final is done even if its thread is
+            # still writing its trace: don't turn the next request away.
+            done = (
+                active is not None
+                and self._states.get(active) is not None
+                and (
+                    self._states[active].status.value
+                    in ("succeeded", "failed", "cancelled")
+                )
+            )
+            if active is not None and not done:
+                raise _TaskAlreadyRunningError(active)
             self._active_task_id = task.task_id
 
         created = threading.Event()
@@ -294,12 +305,23 @@ def create_task(
         learned=build_learned_parser(),
     )
     interpretation = interpreter.interpret(body.instruction)
+    planner_name: str = body.planner
+    if _is_novel(interpretation):
+        # Something MILO has no recipe for: work it out (novel/), instead of
+        # "I don't know how to X yet".
+        interpretation = Interpretation(
+            kind="task",
+            task=SingleTask(goal="novel", estimated_goal=body.instruction.strip()),
+            understood_as="I don't know this yet, let me work it out",
+            source="novel",
+        )
+        planner_name = "novel"
 
     if interpretation.kind == "task":
         assert interpretation.task is not None
         try:
             task_state = _store.start(
-                interpretation.task, InputSource(body.input_source), body.planner
+                interpretation.task, InputSource(body.input_source), planner_name
             )
         except _TaskAlreadyRunningError:
             raise HTTPException(
@@ -368,6 +390,26 @@ def create_task(
         "message": interpretation.message,
         "details": interpretation.details,
     }
+
+
+def _is_novel(interpretation: Any) -> bool:
+    """An unknown verb, or a model-parsed goal no planner has a recipe for -- and a
+    language model is available to work it out (offline, the plain "I can't do that
+    yet" reply stays, since a novel run could only fail)."""
+    from novel.factory import enabled
+    from novel.providers import OfflineProvider, build_provider
+    from planner.rule_based import GOAL_HANDLERS
+    from planner.task_library import COMPOSITE_GOALS
+
+    if not enabled():
+        return False
+    task = interpretation.task if interpretation.kind == "task" else None
+    unknown_goal = isinstance(task, SingleTask) and (task.goal or "") not in (
+        set(GOAL_HANDLERS) | set(COMPOSITE_GOALS)
+    )
+    if interpretation.kind != "unsupported" and not unknown_goal:
+        return False
+    return not isinstance(build_provider(), OfflineProvider)
 
 
 @router.get(
@@ -683,7 +725,27 @@ def build_orchestrator(
     """
     registry = AgentRegistry()
 
+    novel: Dict[str, Any] = {}
+
     def planner_for(name: str) -> PlannerAgentWrapper:
+        if name == "novel":
+            # "Figure it out": built once, keeps its skill library and budgets.
+            if "planner" not in novel:
+                from novel.factory import build_novel_planner
+
+                novel["planner"] = build_novel_planner(
+                    execution,
+                    memory_agent=memory_agent,
+                    failure_source=lambda: [
+                        f.message
+                        for f in (
+                            orchestrator._current_state.failures
+                            if orchestrator._current_state is not None
+                            else []
+                        )
+                    ][-3:],
+                )
+            return PlannerAgentWrapper(novel["planner"])  # type: ignore[arg-type]
         # `react` uses the configured language model when there is one and
         # falls back to the rule-based planner when there isn't (it says
         # so on the task as `planner_note`).

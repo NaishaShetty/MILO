@@ -64,3 +64,7 @@ eval-worldmodel:
 ## How often a "success" is contradicted by the world (goal predicates), and trace cost
 eval-goal-check:
 	cd backend && $(PY) -m verification.eval_goal_check --episodes 300
+
+## Novel tasks: 60 held-out commands (baseline / offline / reference plans; add --claude with credentials)
+eval-novel:
+	cd backend && $(PY) -m novel.eval_novel

@@ -68,6 +68,11 @@ function SeesPanel({ prompt, refreshKey }: { prompt: string; refreshKey: unknown
   );
 }
 
+interface NovelInfo {
+  source?: "skill" | "model" | "";
+  note?: string | null;
+}
+
 export function MissionsPage() {
   const navigate = useNavigate();
   const { activeTask, activeTaskStatus, history, setActiveTaskId, cancelActive, cancelling, submitInstruction, lastReply } =
@@ -98,7 +103,10 @@ export function MissionsPage() {
   const direction = directMilo(activeTask);
   const finished = TERMINAL.includes(activeTask.status);
   const line = statusLine(activeTask.status, activeTask.cancel_requested);
-  const retry = () => void submitInstruction(activeTask.user_request, activeTask.input_source, activeTask.planner ?? undefined);
+  // "novel" is chosen by MILO itself, never a planner the user can ask for
+  const chosenPlanner = activeTask.planner && activeTask.planner !== "novel" ? activeTask.planner : undefined;
+  const retry = () => void submitInstruction(activeTask.user_request, activeTask.input_source, chosenPlanner);
+  const novel = activeTask.planner === "novel" ? (activeTask.current_plan?.metadata?.novel as NovelInfo | undefined) ?? {} : null;
   const seconds = activeTask.metrics.total_ms ? Math.round(activeTask.metrics.total_ms / 1000) : null;
 
   return (
@@ -133,6 +141,14 @@ export function MissionsPage() {
               )}
             </div>
           </div>
+          {novel && (
+            <p className="notice" role="status">
+              {novel.source === "skill"
+                ? "I've done something like this before, so I'm using what I learned."
+                : "I don't know this one yet, so I'm working it out."}
+              {novel.note ? ` ${novel.note}` : ""}
+            </p>
+          )}
           {activeTask.planner_note && <div className="notice">{activeTask.planner_note}</div>}
           {activeTask.cancel_summary && <div className="notice">{activeTask.cancel_summary}</div>}
           {activeTask.answer && <div className="notice">{activeTask.answer}</div>}

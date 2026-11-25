@@ -69,7 +69,7 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from agents.events import Event, EventBus, EventType
 from agents.execution_agent import ExecutionAgentWrapper
-from agents.failures import AgentFailure
+from agents.failures import AgentFailure, FailureCategory
 from agents.memory_agent import MemoryAgentWrapper
 from agents.navigation_agent import NavigationAgent
 from agents.planner_agent import PlannerAgentWrapper
@@ -240,7 +240,12 @@ class Orchestrator:
         episode_id = str(uuid.uuid4())
         task_state = TaskState(
             task_id=task_id,
-            user_request=task.goal or "",
+            # a novel task carries the user's own words (its goal is just "novel")
+            user_request=(
+                task.estimated_goal
+                if task.goal == "novel" and task.estimated_goal
+                else task.goal or ""
+            ),
             input_source=input_source,
             goal=task.goal,
             objects=[o for o in (task.object,) if o],
@@ -260,6 +265,10 @@ class Orchestrator:
             on_created(task_state)
         self._publish(task_state, EventType.TASK_CREATED)
         self._publish(task_state, EventType.TASK_PARSED)
+        if self._planner.planner_type == "novel":
+            self._think(
+                task_state, "planner", "I don't know this one yet. Let me work it out."
+            )
         if self._episode_logger is not None:
             self._episode_logger.begin(
                 task_state.task_id,
@@ -449,6 +458,24 @@ class Orchestrator:
                 },
             )
 
+            unmet = (
+                self._unmet_stated_goal(task_state)
+                if reflection.action == "continue" and attempt < max_replans
+                else None
+            )
+            if unmet:
+                # Every step "worked" but the plan's own success conditions are
+                # false in the world: replan with that reason instead of finishing.
+                task_state.failures.append(
+                    AgentFailure(
+                        category=FailureCategory.ENVIRONMENT_CHANGED,
+                        message=unmet,
+                        agent="orchestrator",
+                    )
+                )
+                self._think(task_state, "eyes", unmet)
+                reflection = reflection.model_copy(update={"action": "replan"})
+                self._replans += 1
             if reflection.action == "continue":
                 task_state.latencies_ms["total_ms"] = (
                     time.perf_counter() - run_started_at
@@ -1061,8 +1088,44 @@ class Orchestrator:
             reason=None,
         )
         task_state.status = TaskStatus.SUCCEEDED
+        self._after_mission(task_state)
         self._publish(task_state, EventType.TASK_COMPLETED)
         return task_state
+
+    def _unmet_stated_goal(self, task_state: TaskState) -> Optional[str]:
+        """For a plan that states its own success conditions: the reason they are
+        not met in the world right now, else None."""
+        plan = task_state.current_plan
+        stated = (plan.metadata.get("success_predicates") if plan else None) or []
+        if not stated:
+            return None
+        try:
+            from verification.predicates import Predicate, check_all
+
+            missed = [
+                r
+                for r in check_all(
+                    [Predicate.from_dict(p) for p in stated],
+                    self._execution.get_metadata(),
+                )
+                if not r.ok
+            ]
+        except Exception:
+            return None
+        if not missed:
+            return None
+        return "Every step ran, but " + "; ".join(r.reason for r in missed) + "."
+
+    def _after_mission(self, task_state: TaskState) -> None:
+        """Lets a planner that learns from outcomes (the novel-task planner) see how
+        the mission ended. Never raises."""
+        hook = getattr(getattr(self._planner, "_planner", None), "after_mission", None)
+        if hook is None:
+            return
+        try:
+            hook(task_state)
+        except Exception:
+            logger.warning("orchestrator.after_mission_failed", exc_info=True)
 
     def _verify_goal(
         self,
@@ -1075,12 +1138,20 @@ class Orchestrator:
         and narrate; `enforce` also turns a failed check into a failed mission).
         Returns the failure reason when enforcing, else None. Never raises."""
         mode = os.environ.get("MILO_GOAL_CHECK", "report").strip().lower()
+        plan = task_state.current_plan
+        stated = (plan.metadata.get("success_predicates") if plan else None) or []
+        if stated:
+            # A plan MILO worked out itself states its own success conditions;
+            # they are always enforced -- the world decides, not the model.
+            mode = "enforce"
         if mode not in ("report", "enforce"):
             return None
         try:
-            from verification.predicates import check_all, goal_predicates
+            from verification.predicates import Predicate, check_all, goal_predicates
 
-            predicates = [p for t in (subtasks or [task]) for p in goal_predicates(t)]
+            predicates = [Predicate.from_dict(p) for p in stated] or [
+                p for t in (subtasks or [task]) for p in goal_predicates(t)
+            ]
             if not predicates:
                 return None
             results = check_all(predicates, self._execution.get_metadata())
@@ -1116,6 +1187,7 @@ class Orchestrator:
             reason=reason,
         )
         task_state.status = TaskStatus.FAILED
+        self._after_mission(task_state)
         self._publish(task_state, EventType.TASK_FAILED, payload={"reason": reason})
         return task_state
 

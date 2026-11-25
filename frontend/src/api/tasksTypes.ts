@@ -148,8 +148,8 @@ export interface TaskState {
   sub_goals?: SubGoal[];
   /** What MILO learned from the mission, as sentences. */
   learned?: string[];
-  /** The planner that was asked for: rule_based | react | behavior_tree | htn. */
-  planner?: PlannerChoice | null;
+  /** The planner that ran: rule_based | react | behavior_tree | htn, or "novel" when MILO worked the task out itself. */
+  planner?: PlannerChoice | "novel" | null;
   /** Set when the planner did not do exactly what was asked (e.g. fell back). */
   planner_note?: string | null;
   cancel_requested?: boolean;
@@ -182,7 +182,7 @@ export interface TaskSummary {
   user_request: string;
   goal: string | null;
   status: TaskStatus;
-  planner: PlannerChoice | null;
+  planner: PlannerChoice | "novel" | null;
   current_step: number | null;
   answer: string | null;
   cancel_requested: boolean;

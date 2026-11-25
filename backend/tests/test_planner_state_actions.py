@@ -103,6 +103,11 @@ def test_place_requires_holding_and_open_container():
 
     state.robot_holding = "apple"
     state.object("apple").is_held = True
+    # holding it but not at the container yet -> invalid
+    assert [p.code for p in place_spec.check_preconditions(state, "apple", params)] == [
+        "at_container"
+    ]
+    state.robot_location = "refrigerator"
     # container never opened (is_open is None) -> treated as ready
     assert not place_spec.check_preconditions(state, "apple", params)
 
