@@ -1,5 +1,9 @@
 # Running Tests, Benchmarks, and E2E Suites (Detailed)
 
+> **Current counts (2026-11-25, main):** backend 1,422 passed, 2 skipped (the two need a live
+> LLM key); frontend 217 passed in 38 files; Playwright 7 passed. black, ruff, mypy, tsc and
+> eslint (`--max-warnings 0`) are clean.
+
 > The complete, exhaustive per-phase test/benchmark command
 > reference, moved here from the README's old "Quick Start" section
 > during the Phase 8.7 README restructure (2026-08-11). The README

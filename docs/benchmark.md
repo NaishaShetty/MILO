@@ -21,10 +21,18 @@ A fixed synthetic home with fixed tasks, faults and seeds, so repeated runs give
 | Planner | Known | New tasks | Under faults | Steps | Sim time (s) | Replans |
 |---|---|---|---|---|---|---|
 | rule-based | 100% | 0% | 78% | 7.52 | 12.5 | 0.144 |
-| ReAct | 100% | 0% | 78% | 7.52 | 12.5 | 0.144 |
+| ReAct | not measured (needs a model) | | | | | |
 | behaviour tree | 100% | 0% | 78% | 5.63 | 9.88 | 0.144 |
 | HTN | 100% | 0% | 78% | 5.63 | 9.88 | 0.144 |
 | language model (reference plans) | not run | 100% | not run | 5.25 | 9.38 | 0 |
+
+- **ReAct** isn't measured: with no language model configured it falls back to the rule-based
+  planner, so `benchmarks/latest.json` repeats the rule-based numbers under its name. A real
+  ReAct result needs a model (for example a local one through Ollama).
+- **Behaviour tree and HTN are identical for a real reason.** Checked plan by plan, all three
+  classical planners produce exactly the same first plan for all 23 known tasks. Rule-based
+  still executes more steps per mission (5.83 vs 4.43 on known tasks, 8.33 vs 6.23 under
+  faults), so the difference arises during execution; the cause has not been traced yet.
 
 Recovery by fault kind (all four classical planners are identical), before → after in-mission recovery:
 
