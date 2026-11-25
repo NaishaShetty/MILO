@@ -91,7 +91,13 @@ def test_success_sends_schema_temperature_zero_and_dev_examples(fake):
     assert p.propose(_request()) == GOOD
     body = server.requests[0]
     assert body["format"]["type"] == "object"  # the plan JSON schema
-    assert body["options"] == {"temperature": 0, "seed": 0}
+    assert body["options"] == {
+        "temperature": 0,
+        "seed": 0,
+        "num_ctx": 8192,  # not Ollama's 4096 default, which cut long prompts
+        "num_predict": 1024,
+    }
+    assert "\n" not in body["messages"][-1]["content"]  # compact JSON prompt
     assert body["stream"] is False
     examples = [m["content"] for m in body["messages"][1:-1] if m["role"] == "user"]
     assert examples and all(

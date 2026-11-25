@@ -106,6 +106,9 @@ def one_run(model: str, url: str, seed: int) -> Dict[str, Any]:
         ),
         "seconds_per_command": (time.perf_counter() - started) / len(rows),
         "timeouts": s["timeouts"],
+        "context_full": s["context_full"],
+        "prompt_tokens_max": s["prompt_tokens_max"],
+        "num_ctx": provider.num_ctx,
         "peak_vram_mib": vram.peak,
         "rows": rows,
     }
@@ -113,6 +116,8 @@ def one_run(model: str, url: str, seed: int) -> Dict[str, Any]:
 
 def summary(runs: List[Dict[str, Any]]) -> Dict[str, Any]:
     out: Dict[str, Any] = {"model": runs[0]["model"], "runs": len(runs)}
+    out["context_full"] = sum(r.get("context_full", 0) for r in runs)
+    out["prompt_tokens_max"] = max(r.get("prompt_tokens_max", 0) for r in runs)
     for key in ("correct_rate", "valid_json_rate", "plan_validity", "model_calls_per_command",
                 "tokens_per_second", "seconds_per_command", "peak_vram_mib"):  # fmt: skip
         values = [r[key] for r in runs if r[key] is not None]

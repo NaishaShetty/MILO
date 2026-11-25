@@ -203,6 +203,14 @@ def _post_json(url: str, body: Dict[str, Any], timeout_s: float) -> Dict[str, An
         return json.loads(resp.read().decode() or "{}")
 
 
+def _compact(text: str) -> str:
+    """The same JSON without indentation: far fewer tokens for a local model."""
+    try:
+        return json.dumps(json.loads(text), separators=(",", ":"))
+    except (json.JSONDecodeError, TypeError):
+        return text
+
+
 def ollama_reachable(url: str, timeout_s: float = 2.0) -> bool:
     try:
         with urllib.request.urlopen(url.rstrip("/") + "/api/tags", timeout=timeout_s):
@@ -240,6 +248,11 @@ class OllamaProvider:
         MILO_NOVEL_PROVIDER=ollama
         MILO_OLLAMA_MODEL=qwen2.5:7b        MILO_OLLAMA_URL=http://localhost:11434
         MILO_OLLAMA_KEEP_ALIVE=5m           how long Ollama keeps the model in VRAM
+        MILO_OLLAMA_NUM_CTX=8192            context window; Ollama's own default (4096)
+                                            silently cuts the start of a long prompt
+
+    The prompt is sent as compact JSON, generation is capped (`num_predict`), and a reply
+    that filled the whole context window is counted in `stats["context_full"]`.
     """
 
     name = "ollama"
@@ -255,7 +268,11 @@ class OllamaProvider:
         think: Optional[bool] = False,
         few_shot: bool = True,
         post: Any = None,
+        num_ctx: Optional[int] = None,
+        num_predict: int = 1024,
     ) -> None:
+        self.num_ctx = num_ctx or int(os.environ.get("MILO_OLLAMA_NUM_CTX", "8192"))
+        self.num_predict = num_predict
         self.model = model or os.environ.get("MILO_OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
         self.url = (
             url or os.environ.get("MILO_OLLAMA_URL", DEFAULT_OLLAMA_URL)
@@ -265,12 +282,16 @@ class OllamaProvider:
         self.seed = seed
         self.keep_alive = keep_alive or os.environ.get("MILO_OLLAMA_KEEP_ALIVE", "5m")
         self.think = think
-        self._examples = _few_shot() if few_shot else []
+        self._examples = [
+            {**m, "content": _compact(m["content"])}
+            for m in (_few_shot() if few_shot else [])
+        ]
         self._post = post or _post_json
         self._cache: Dict[str, Dict[str, Any]] = {}
         #: Totals for evaluation: calls made, bad JSON answers, tokens and seconds.
-        self.stats: Dict[str, float] = {"calls": 0, "invalid_json": 0, "timeouts": 0,
-                                        "eval_tokens": 0, "eval_seconds": 0.0, "seconds": 0.0}  # fmt: skip
+        self.stats: Dict[str, float] = {"calls": 0, "invalid_json": 0, "timeouts": 0, "context_full": 0,
+                                        "prompt_tokens_max": 0, "eval_tokens": 0,
+                                        "eval_seconds": 0.0, "seconds": 0.0}  # fmt: skip
 
     def _body(self, prompt: str) -> Dict[str, Any]:
         body: Dict[str, Any] = {
@@ -278,7 +299,8 @@ class OllamaProvider:
             "stream": False,
             "format": PLAN_SCHEMA,
             "keep_alive": self.keep_alive,
-            "options": {"temperature": 0, "seed": self.seed},
+            "options": {"temperature": 0, "seed": self.seed, "num_ctx": self.num_ctx,
+                        "num_predict": self.num_predict},  # fmt: skip
             "messages": [{"role": "system", "content": SYSTEM}]
             + self._examples
             + [{"role": "user", "content": prompt}],
@@ -288,7 +310,7 @@ class OllamaProvider:
         return body
 
     def propose(self, request: PlanRequest) -> Dict[str, Any]:
-        prompt = render(request)
+        prompt = _compact(render(request))
         key = hashlib.sha256(f"{self.model}\n{prompt}".encode()).hexdigest()
         if key in self._cache:
             return self._cache[key]
@@ -325,6 +347,12 @@ class OllamaProvider:
                 ) from exc
             finally:
                 self.stats["seconds"] += time.perf_counter() - started
+            prompt_tokens = reply.get("prompt_eval_count") or 0
+            self.stats["prompt_tokens_max"] = max(
+                self.stats["prompt_tokens_max"], prompt_tokens
+            )
+            if prompt_tokens + (reply.get("eval_count") or 0) >= self.num_ctx:
+                self.stats["context_full"] += 1  # the start of the prompt may be cut
             self.stats["eval_tokens"] += reply.get("eval_count") or 0
             self.stats["eval_seconds"] += (reply.get("eval_duration") or 0) / 1e9
             text = (reply.get("message") or {}).get("content", "")
