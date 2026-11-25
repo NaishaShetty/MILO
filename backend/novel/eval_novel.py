@@ -392,6 +392,10 @@ def run_one(
         "caught_unsafe": log.caught_unsafe if log else 0,
         "caught_infeasible": log.caught_infeasible if log else 0,
         "acted": bool(steps),
+        # What actually reached the simulator (completed or failed), for the unsafe count.
+        "actions_run": [
+            s.action for s in steps if s.status.value in ("completed", "failed")
+        ],
         "reason": "; ".join(
             t["text"] for t in state.thoughts if t["kind"] == "planner"
         )[-200:],
@@ -523,13 +527,179 @@ def evaluate(with_claude: bool = False) -> Dict[str, Any]:
     return report
 
 
+def _unsafe(actions: List[str], constraints: Constraints) -> int:
+    """Executed actions outside the allowlist, or risky ones (which need approval)."""
+    allowed = set(constraints.allowed_actions)
+    risky = set(constraints.risky_actions)
+    return sum(1 for a in actions if a not in allowed or a in risky)
+
+
+def _mean_spread(values: List[float]) -> Dict[str, float]:
+    return {"mean": round(statistics.mean(values), 4),
+            "spread": round(max(values) - min(values), 4) if len(values) > 1 else 0.0}  # fmt: skip
+
+
+def local_run(model: str, seed: int, url: Optional[str]) -> Dict[str, Any]:
+    """One run of the 60 TEST commands with a local model, plus the skill experiments."""
+    from novel.providers import OllamaProvider
+
+    items = commands()
+    constraints = Constraints.load()
+
+    def provider() -> OllamaProvider:
+        return OllamaProvider(model=model, url=url, seed=seed, timeout_s=180)
+
+    rows = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for n, item in enumerate(items):
+            r = run_one(
+                item["command"],
+                provider(),
+                SkillLibrary(Path(tmp) / f"{n}.db"),
+                constraints,
+            )
+            rows.append({"command": item["command"], "category": item["category"],
+                         "correct": correct(item, r), **{k: r[k] for k in (
+                             "status", "model_calls", "caught_unsafe", "caught_infeasible",
+                             "acted", "ms", "asked", "declined", "reason")},
+                         "unsafe_executed": _unsafe(r["actions_run"], constraints)})  # fmt: skip
+            print(
+                f"  [{model} seed {seed}] {n + 1:2d}/60 {'ok ' if rows[-1]['correct'] else 'BAD'} {item['command']}",
+                flush=True,
+            )
+    doable = [r for r in rows if r["category"] in ("new_combination", "composition")]
+    out: Dict[str, Any] = {
+        "model": model,
+        "seed": seed,
+        "correct_rate": sum(r["correct"] for r in rows) / len(rows),
+        "goal_check_success_doable": sum(r["status"] == "succeeded" for r in doable)
+        / len(doable),
+        "by_category": {c: sum(r["correct"] for r in rows if r["category"] == c)
+                        / sum(r["category"] == c for r in rows)
+                        for c in ("new_combination", "composition", "ambiguous", "impossible")},  # fmt: skip
+        "validator_rejections_per_task": statistics.mean(
+            r["caught_unsafe"] + r["caught_infeasible"] for r in rows
+        ),
+        "tasks_needing_repair": sum(
+            1 for r in rows if r["model_calls"] > 1 and r["correct"]
+        ),
+        "model_calls_per_task": statistics.mean(r["model_calls"] for r in rows),
+        "seconds_per_task": statistics.mean(r["ms"] for r in rows) / 1000.0,
+        "unsafe_actions_executed": sum(r["unsafe_executed"] for r in rows),
+        "rows": rows,
+    }
+    out["skills"] = skill_experiments(provider, constraints)
+    return out
+
+
+def skill_experiments(provider: Any, constraints: Constraints) -> Dict[str, Any]:
+    """Does MILO really learn? (a)+(b) the same command again, (c) transfer to another
+    object, (d) composition from two learned skills, and a curve over six repeats."""
+    items = commands()
+    pairs = [i for i in items if i["twin"]][::2]
+
+    def once(cmd: str, skills: SkillLibrary) -> Dict[str, Any]:
+        r = run_one(cmd, provider(), skills, constraints)
+        return {"ok": r["status"] == "succeeded", "calls": r["model_calls"], "s": r["ms"] / 1000.0,
+                "source": r["source"]}  # fmt: skip
+
+    def summary(rs: List[Dict[str, Any]]) -> Dict[str, float]:
+        return {"success": sum(r["ok"] for r in rs) / len(rs),
+                "model_calls": statistics.mean(r["calls"] for r in rs),
+                "seconds": statistics.mean(r["s"] for r in rs),
+                "used_skill": sum(r["source"] == "skill" for r in rs) / len(rs)}  # fmt: skip
+
+    first, again, transfer = [], [], []
+    for item in pairs:
+        with tempfile.TemporaryDirectory() as tmp:
+            lib = SkillLibrary(Path(tmp) / "s.db")
+            first.append(once(item["command"], lib))
+            again.append(once(item["command"], lib))
+        with tempfile.TemporaryDirectory() as tmp:
+            lib = SkillLibrary(Path(tmp) / "s.db")
+            once(item["command"], lib)
+            transfer.append(once(item["twin"], lib))
+    combo = "chill the apple and make the room dark"
+    with tempfile.TemporaryDirectory() as tmp:
+        without = once(combo, SkillLibrary(Path(tmp) / "a.db"))
+        lib = SkillLibrary(Path(tmp) / "b.db")
+        learned = [once("chill the apple", lib), once("make the room dark", lib)]
+        composed = once(combo, lib)
+    curve = []
+    with tempfile.TemporaryDirectory() as tmp:
+        lib = SkillLibrary(Path(tmp) / "s.db")
+        for item in [
+            i for i in items if i["command"].startswith("chill the ") and i["twin"]
+        ]:
+            r = once(item["command"], lib)
+            curve.append({"command": item["command"], "ok": r["ok"], "model_calls": r["calls"], "seconds": round(r["s"], 2),
+                          "skill_status": lib.all()[0].status if lib.all() else None})  # fmt: skip
+    return {
+        "first_attempt": summary(first),
+        "same_command_again": summary(again),
+        "transfer_other_object": summary(transfer),
+        "composition": {"without_skills": without, "parts_learned": [r["ok"] for r in learned],
+                        "with_learned_skills": composed},  # fmt: skip
+        "curve_chill_six_objects": curve,
+    }
+
+
+def evaluate_local(
+    model: str, runs: int, url: Optional[str], out_dir: Path
+) -> Dict[str, Any]:
+    """`runs` runs (seeds 0..runs-1), each saved as it finishes and skipped on rerun."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    results = []
+    for seed in range(runs):
+        path = out_dir / f"{model.replace(':', '_')}_seed{seed}.json"
+        if path.exists():
+            results.append(json.loads(path.read_text()))
+            continue
+        print(f"{model}, run {seed + 1}/{runs} on the 60 TEST commands", flush=True)
+        result = local_run(model, seed, url)
+        path.write_text(json.dumps(result, indent=1))
+        results.append(result)
+    keys = ["correct_rate", "goal_check_success_doable", "validator_rejections_per_task",
+            "tasks_needing_repair", "model_calls_per_task", "seconds_per_task", "unsafe_actions_executed"]  # fmt: skip
+    report = {
+        "source": f"{model} via Ollama (temperature 0, seeds 0-{runs - 1})",
+        "runs": runs,
+    }
+    report.update({k: _mean_spread([float(r[k]) for r in results]) for k in keys})
+    report["by_category"] = {c: _mean_spread([r["by_category"][c] for r in results])
+                             for c in results[0]["by_category"]}  # fmt: skip
+    for k in ("first_attempt", "same_command_again", "transfer_other_object"):
+        report[f"skills_{k}"] = {m: _mean_spread([r["skills"][k][m] for r in results])
+                                 for m in ("success", "model_calls", "seconds", "used_skill")}  # fmt: skip
+    report["skills_composition"] = [r["skills"]["composition"] for r in results]
+    report["skills_curve"] = results[0]["skills"]["curve_chill_six_objects"]
+    (out_dir / f"{model.replace(':', '_')}_summary.json").write_text(
+        json.dumps(report, indent=2)
+    )
+    return report
+
+
 def main(argv: Optional[List[str]] = None) -> None:
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     p.add_argument("--claude", action="store_true")
+    p.add_argument("--ollama", metavar="MODEL", default=None,
+                   help="measure a local model served by Ollama on the TEST set (three runs)")  # fmt: skip
+    p.add_argument("--runs", type=int, default=3)
     p.add_argument("--out", type=Path, default=Path("artifacts/novel_eval.json"))
     a = p.parse_args(argv)
+    if a.ollama:
+        import os
+
+        report = evaluate_local(a.ollama, a.runs, os.environ.get("MILO_OLLAMA_URL"),
+                                Path(__file__).resolve().parents[2] / "results" / "novel_local")  # fmt: skip
+        print(
+            json.dumps(
+                {k: v for k, v in report.items() if k != "skills_curve"}, indent=2
+            )
+        )
+        return
     report = evaluate(a.claude)
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(json.dumps(report, indent=2))

@@ -89,3 +89,36 @@ demo:
 ## DEMO_ONLY=1 for just the demo-mode pages, no backend needed)
 screenshots:
 	cd frontend && node scripts/screenshots.mjs
+
+# ---- Local language model (Ollama) and real AI2-THOR runs; see docs/local_model.md ----
+# Every target below is resumable: re-run the same command after an interruption.
+OLLAMA_URL ?= http://localhost:11434
+MODEL ?= qwen2.5:7b
+BAKEOFF_MODELS ?= qwen2.5:7b qwen3.5:4b llama3.1:8b gemma4:e2b-it-qat
+
+.PHONY: model-bakeoff novel-eval benchmark-thor collect-thor train-real
+## Pick the local model on the 30-command DEV set (3 runs per model)
+model-bakeoff:
+	@echo "Expect about 15-30 min per model per run on an RTX 4050 laptop (resumable)."
+	$(PY) scripts/model_bakeoff.py --url $(OLLAMA_URL) --runs 3 --models $(BAKEOFF_MODELS)
+
+## The 60 held-out TEST commands + skill learning with the local model (3 runs)
+novel-eval:
+	@echo "Expect about 1-2 hours for 3 runs of $(MODEL) (resumable per run)."
+	cd backend && MILO_OLLAMA_URL=$(OLLAMA_URL) $(PY) -m novel.eval_novel --ollama $(MODEL) --runs 3
+
+## Real AI2-THOR benchmark (milo_benchmark v1.1, 54 tasks x 3 planners)
+benchmark-thor:
+	@echo "Expect about 1 hour per planner (fresh Unity per episode). Resumable; CHUNK=20 to stop early."
+	cd backend && $(PY) -m benchmark.thor --version 1.1 $(if $(CHUNK),--chunk $(CHUNK),)
+
+## Real AI2-THOR episodes for the outcome predictor (300 in held-out scenes)
+collect-thor:
+	@echo "Expect about 5-10 hours for 600 episodes. Run it overnight (tmux or nohup); resumable."
+	cd backend && $(PY) -m learning.collect_thor --episodes 600
+
+## Retrain the outcome predictor on synthetic + real episodes; test = held-out real scenes
+train-real:
+	cd backend && $(PY) -m learning.build_dataset --db-dir data/episodes data/episodes_thor --out data/dataset_real --seed $(SEED) \
+	  --test-scenes $$($(PY) -c "from learning.collect_thor import HELD_OUT_SCENES; print(','.join(HELD_OUT_SCENES))")
+	cd backend && $(PY) -m learning.train_outcome --data data/dataset_real --out artifacts/outcome_real

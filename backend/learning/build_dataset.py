@@ -54,10 +54,16 @@ def split_scenes(
 
 
 def assign_splits(
-    episodes: Dict[str, str], test_frac: float, val_frac: float, seed: int
+    episodes: Dict[str, str],
+    test_frac: float,
+    val_frac: float,
+    seed: int,
+    test_scenes: Optional[List[str]] = None,
 ) -> Dict[str, str]:
-    """`{episode_id: "train" | "val" | "test"}` from `{episode_id: scene_id}`."""
-    _, test_scenes = split_scenes(sorted(set(episodes.values())), test_frac, seed)
+    """`{episode_id: "train" | "val" | "test"}` from `{episode_id: scene_id}`.
+    `test_scenes`, when given, are the held-out scenes (e.g. real AI2-THOR ones)."""
+    if test_scenes is None:
+        _, test_scenes = split_scenes(sorted(set(episodes.values())), test_frac, seed)
     out = {}
     for episode_id, scene in episodes.items():
         if scene in test_scenes:
@@ -67,10 +73,17 @@ def assign_splits(
     return out
 
 
-def _read(db_dir: Path) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[str]]:
+def _read(db_dir: Any) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[str]]:
     episodes: List[Dict[str, Any]] = []
     steps: List[Dict[str, Any]] = []
-    shards = sorted(db_dir.glob("shard-*.db")) or sorted(db_dir.glob("*.db"))
+    dirs = [
+        Path(d) for d in (db_dir if isinstance(db_dir, (list, tuple)) else [db_dir])
+    ]
+    shards = [
+        s
+        for d in dirs
+        for s in (sorted(d.glob("shard-*.db")) or sorted(d.glob("*.db")))
+    ]
     for shard in shards:
         with closing(sqlite3.connect(str(shard))) as conn:
             conn.row_factory = sqlite3.Row
@@ -209,16 +222,21 @@ def _markdown(rep: Dict[str, Any]) -> str:
 
 
 def build(
-    db_dir: Path,
+    db_dir: Any,
     out: Path,
     test_frac: float = 0.2,
     val_frac: float = 0.15,
     seed: int = 0,
+    test_scenes: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     episodes, steps, shards = _read(db_dir)
     by_id = {e["episode_id"]: e for e in episodes}
     split_of = assign_splits(
-        {e["episode_id"]: e["scene_id"] for e in episodes}, test_frac, val_frac, seed
+        {e["episode_id"]: e["scene_id"] for e in episodes},
+        test_frac,
+        val_frac,
+        seed,
+        test_scenes,
     )
 
     rows: Dict[str, List[Dict[str, Any]]] = {"train": [], "val": [], "test": []}
@@ -259,13 +277,23 @@ def main(argv: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--db-dir", type=Path, default=Path("data/episodes"))
+    parser.add_argument(
+        "--db-dir", type=Path, nargs="+", default=[Path("data/episodes")]
+    )
     parser.add_argument("--out", type=Path, default=Path("data/dataset"))
     parser.add_argument("--test-scene-frac", type=float, default=0.2)
     parser.add_argument("--val-frac", type=float, default=0.15)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--test-scenes",
+        default=None,
+        help="comma-separated scene ids to hold out (default: a hashed fraction)",
+    )
     args = parser.parse_args(argv)
-    rep = build(args.db_dir, args.out, args.test_scene_frac, args.val_frac, args.seed)
+    held_out = args.test_scenes.split(",") if args.test_scenes else None
+    rep = build(
+        args.db_dir, args.out, args.test_scene_frac, args.val_frac, args.seed, held_out
+    )
     print((args.out / "report.md").read_text())
     if rep["failure_types_below_minimum"]:
         print(
