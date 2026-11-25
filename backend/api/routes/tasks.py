@@ -883,12 +883,24 @@ def correct(
     return new.to_dict()
 
 
+# A hung simulator call fails its step after this many seconds unless
+# EXECUTION_STEP_TIMEOUT_S says otherwise (0 or negative = no timeout).
+DEFAULT_STEP_TIMEOUT_S = 120.0
+
+
 def _step_timeout_from_env() -> Optional[float]:
     raw = os.environ.get("EXECUTION_STEP_TIMEOUT_S", "").strip()
+    if not raw:
+        return DEFAULT_STEP_TIMEOUT_S
     try:
-        value = float(raw) if raw else 0.0
+        value = float(raw)
     except ValueError:
-        return None
+        logger.warning(
+            "EXECUTION_STEP_TIMEOUT_S=%r is not a number; using %ss",
+            raw,
+            DEFAULT_STEP_TIMEOUT_S,
+        )
+        return DEFAULT_STEP_TIMEOUT_S
     return value if value > 0 else None
 
 
