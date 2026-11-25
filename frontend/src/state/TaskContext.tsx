@@ -43,8 +43,7 @@ import type {
   PlannerChoice,
   RobotState,
   TaskEvent,
-  TaskState,
-} from "../api/tasksTypes";
+  TaskState, ReplyChoice } from "../api/tasksTypes";
 import { TERMINAL_TASK_STATUSES } from "../api/tasksTypes";
 import type { LiveTransport } from "../hooks/useLiveTask";
 import { useLiveTask } from "../hooks/useLiveTask";
@@ -58,6 +57,8 @@ const ROBOT_POLL_INTERVAL_MS = 2000;
 export interface MiloReply {
   kind: "answer" | "remembered" | "not_remembered" | "clarify" | "unsupported";
   text: string;
+  /** Tappable answers to a question back ("which cup?"). */
+  choices?: ReplyChoice[];
 }
 
 export interface TaskContextValue {
@@ -76,6 +77,7 @@ export interface TaskContextValue {
     instruction: string,
     inputSource?: InputSource,
     planner?: PlannerChoice,
+    objectId?: string,
   ) => Promise<CreateTaskResult>;
   submitting: boolean;
   submitError: string | null;
@@ -98,6 +100,9 @@ function replyFrom(result: CreateTaskResult): MiloReply | null {
       return null;
     case "answer":
       return { kind: "answer", text: result.answer };
+    case "clarify":
+    case "unsupported":
+      return { kind: result.kind, text: result.message, choices: result.choices };
     default:
       return { kind: result.kind, text: result.message };
   }
@@ -161,6 +166,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     instruction: string,
     inputSource: InputSource = "text",
     planner?: PlannerChoice,
+    objectId?: string,
   ): Promise<CreateTaskResult> {
     // Context-level re-entrancy guard: two overlapping calls must never
     // both reach the backend, whatever the UI does.
@@ -170,9 +176,10 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const result = planner
-        ? await createTask(instruction, inputSource, planner)
-        : await createTask(instruction, inputSource);
+      const result =
+        planner || objectId
+          ? await createTask(instruction, inputSource, planner, objectId)
+          : await createTask(instruction, inputSource);
       if (result.kind === "task") {
         setLastReply(null);
         setActiveTaskId(result.task_id);

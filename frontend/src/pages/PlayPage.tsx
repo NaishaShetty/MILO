@@ -217,6 +217,21 @@ export function PlayPage() {
             {lastReply && (
               <div className="notice" role="status">
                 {lastReply.text}
+                {lastReply.choices && lastReply.choices.length > 0 && (
+                  <div className="filters" role="group" aria-label="Answers">
+                    {lastReply.choices.map((c) => (
+                      <button
+                        key={`${c.label}-${c.object_id ?? ""}`}
+                        type="button"
+                        className="chip"
+                        disabled={submitting}
+                        onClick={() => void submitInstruction(c.instruction, "text", undefined, c.object_id).catch(() => undefined)}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

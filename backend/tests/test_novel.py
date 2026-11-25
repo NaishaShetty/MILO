@@ -379,11 +379,22 @@ def test_api_routes_unknown_commands_to_the_novel_planner(monkeypatch, tmp_path)
         assert body["understood_as"] == "I don't know this yet, let me work it out"
         import time
 
-        for _ in range(200):
+        previewed = False
+        for _ in range(300):
             final = client.get(f"/api/v1/tasks/{body['task_id']}").json()
             if final["status"] in ("succeeded", "failed"):
                 break
+            pending = final.get("pending_decision")
+            if (
+                pending and pending["kind"] == "plan"
+            ):  # a plan MILO worked out: approve it
+                previewed = True
+                client.post(
+                    f"/api/v1/tasks/{body['task_id']}/decision",
+                    json={"choice": "approve"},
+                )
             time.sleep(0.02)
+        assert previewed
         assert final["status"] == "succeeded" and final["planner"] == "novel"
     finally:
         app.dependency_overrides.pop(get_language_agent, None)

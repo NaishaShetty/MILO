@@ -47,3 +47,6 @@ import tempfile  # noqa: E402
 os.environ.setdefault(
     "MILO_TRACE_DB", os.path.join(tempfile.mkdtemp(prefix="milo-trace-"), "t.db")
 )
+
+# A risky step or plan preview nobody answers in a test is skipped quickly, not after 5 min.
+os.environ.setdefault("MILO_APPROVAL_TIMEOUT", "2")

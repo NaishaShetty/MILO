@@ -63,10 +63,11 @@ import logging
 import os
 import threading
 import time
-from typing import Any, Dict, Iterator, List, Optional, Union
+from typing import Any, Dict, Iterator, List, Literal, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from agents.execution_agent import ExecutionAgentWrapper
 from agents.memory_agent import MemoryAgentWrapper
@@ -317,12 +318,34 @@ def create_task(
         )
         planner_name = "novel"
 
+    metadata = _safe_metadata(simulator)
+    if interpretation.kind == "task" and isinstance(interpretation.task, SingleTask):
+        from oversight.ambiguity import which_one
+
+        if body.object_id:
+            known = {o.get("objectId") for o in (metadata or {}).get("objects") or []}
+            if metadata is not None and body.object_id not in known:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "category": "unknown_object",
+                        "message": "I can't see that one any more. Ask me again?",
+                    },
+                )
+            interpretation.task.object = body.object_id
+        elif interpretation.task.goal != "novel":
+            question = which_one(interpretation.task, body.instruction, metadata)
+            if question is not None:
+                response.status_code = 200
+                return question
+
     if interpretation.kind == "task":
         assert interpretation.task is not None
         try:
             task_state = _store.start(
                 interpretation.task, InputSource(body.input_source), planner_name
             )
+            task_state.instruction = body.instruction.strip()
         except _TaskAlreadyRunningError:
             raise HTTPException(
                 status_code=409,
@@ -384,12 +407,21 @@ def create_task(
             "library": library_as_dicts(),
         }
 
-    # "clarify" / "unsupported": a plain question or reason, shown as-is.
-    return {
+    # "clarify" / "unsupported": a plain question or reason, shown as-is --
+    # with tappable answers when MILO can list them ("where should it go?").
+    reply: Dict[str, Any] = {
         "kind": interpretation.kind,
         "message": interpretation.message,
         "details": interpretation.details,
     }
+    details = interpretation.details or {}
+    if interpretation.kind == "clarify" and details.get("slot") == "target":
+        from oversight.ambiguity import where_to
+
+        obj = details.get("object")
+        if obj:
+            reply["choices"] = where_to(str(obj), metadata)
+    return reply
 
 
 def _safe_metadata(simulator: Any) -> Any:
@@ -717,6 +749,140 @@ def cancel_task(task_id: str) -> dict:
     return task_state.to_dict()
 
 
+class _Decide(BaseModel):
+    choice: Literal["approve", "skip", "cancel"]
+    steps: Optional[List[Dict[str, Any]]] = None
+
+
+@router.post("/{task_id}/decision", summary="Answer what MILO is waiting for")
+def decide(task_id: str, body: _Decide) -> dict:
+    from oversight.gate import Decision
+
+    state = _require_task_state(task_id)
+    gate = getattr(_store._orchestrator, "_gate", None)
+    if gate is None or not gate.decide(task_id, Decision(body.choice, body.steps)):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "category": "not_waiting",
+                "message": "I'm not waiting for an answer on that one.",
+            },
+        )
+    return state.to_dict()
+
+
+def _undo_plan(state: TaskState):
+    from oversight.undo import inverse_plan
+
+    return inverse_plan(state.undo_log)
+
+
+@router.get("/{task_id}/undo", summary="What undoing this mission would do")
+def undo_preview(task_id: str) -> dict:
+    state = _require_task_state(task_id)
+    steps, cannot, _ = _undo_plan(state)
+    return {"steps": steps, "cannot_undo": cannot, "possible": bool(steps)}
+
+
+@router.post("/{task_id}/undo", status_code=202, summary="Undo a finished mission")
+def undo(task_id: str) -> dict:
+    state = _require_task_state(task_id)
+    if state.status.value not in _TERMINAL:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "category": "still_running",
+                "message": "Let me finish (or stop me) first.",
+            },
+        )
+    steps, cannot, success = _undo_plan(state)
+    if not steps:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "category": "nothing_to_undo",
+                "message": "There's nothing I can undo there.",
+            },
+        )
+    key = f"undo:{task_id}"
+    _FIXED.pending[key] = (steps, success)
+    try:
+        new = _store.start(
+            SingleTask(goal="undo", estimated_goal=key), InputSource.TEXT, "fixed"
+        )
+    except _TaskAlreadyRunningError:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "category": "task_in_progress",
+                "message": "I'm busy with another job.",
+            },
+        ) from None
+    new.instruction = f"undo: {state.instruction or state.user_request}"
+    return {**new.to_dict(), "cannot_undo": cannot}
+
+
+class _Correct(BaseModel):
+    object_id: Optional[str] = None
+
+
+@router.post(
+    "/{task_id}/correct",
+    status_code=202,
+    summary='"No, the other one": redo with another object',
+)
+def correct(
+    task_id: str, body: _Correct, simulator: Simulator = Depends(get_simulator)
+) -> dict:
+    from oversight.ambiguity import same_kind
+
+    state = _require_task_state(task_id)
+    if not state.instruction or not state.objects:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "category": "cannot_correct",
+                "message": "Tell me again what you'd like instead.",
+            },
+        )
+    meta = _safe_metadata(simulator) or {}
+    current = state.objects[0]
+    choices = [o.get("objectId") for o in same_kind(current, meta)]
+    pinned = current if "|" in current else (choices[0] if choices else None)
+    target = body.object_id or next((c for c in choices if c != pinned), None)
+    if target is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"category": "no_other", "message": "I can only see one of those."},
+        )
+    if state.status.value not in _TERMINAL:
+        _store.cancel(task_id)
+        end = time.time() + 5.0
+        while state.status.value not in _TERMINAL and time.time() < end:
+            time.sleep(0.02)
+    task = SingleTask(goal=state.goal, object=target, target=state.target)
+    try:
+        new = _store.start(
+            task,
+            state.input_source,
+            (
+                state.planner
+                if state.planner in ("rule_based", "react", "behavior_tree", "htn")
+                else None
+            ),
+        )
+    except _TaskAlreadyRunningError:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "category": "task_in_progress",
+                "message": "I'm still stopping the last one.",
+            },
+        ) from None
+    new.instruction = state.instruction
+    return new.to_dict()
+
+
 def _step_timeout_from_env() -> Optional[float]:
     raw = os.environ.get("EXECUTION_STEP_TIMEOUT_S", "").strip()
     try:
@@ -729,6 +895,30 @@ def _step_timeout_from_env() -> Optional[float]:
 def current_orchestrator() -> Optional[Orchestrator]:
     """The orchestrator the task routes use (for the Lab's Models panel)."""
     return _store._orchestrator
+
+
+from oversight.undo import FixedPlanner  # noqa: E402
+
+_FIXED = FixedPlanner()
+
+
+def _build_gate() -> Any:
+    """`MILO_APPROVALS=0` turns approvals off; `MILO_APPROVAL_TIMEOUT` (s) is how long
+    MILO waits before skipping a risky step / dropping a plan (default 300)."""
+    if os.environ.get("MILO_APPROVALS", "1").strip().lower() in (
+        "0",
+        "false",
+        "no",
+        "off",
+    ):
+        return None
+    from oversight.gate import ApprovalGate
+
+    try:
+        timeout = float(os.environ.get("MILO_APPROVAL_TIMEOUT", "300"))
+    except ValueError:
+        timeout = 300.0
+    return ApprovalGate(timeout_s=timeout)
 
 
 def build_orchestrator(
@@ -751,6 +941,8 @@ def build_orchestrator(
     novel: Dict[str, Any] = {}
 
     def planner_for(name: str) -> PlannerAgentWrapper:
+        if name == "fixed":
+            return PlannerAgentWrapper(_FIXED)  # type: ignore[arg-type]
         if name == "novel":
             # "Figure it out": built once, keeps its skill library and budgets.
             if "planner" not in novel:
@@ -787,6 +979,7 @@ def build_orchestrator(
         registry=registry,
         planner_factory=planner_for,
         trace_recorder=build_recorder(frame_source=execution.get_frame),
+        approval_gate=_build_gate(),
         **learning_kwargs(),
     )
     _store.set_orchestrator(orchestrator)

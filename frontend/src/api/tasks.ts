@@ -37,9 +37,11 @@ export async function createTask(
   instruction: string,
   inputSource: CreateTaskRequestBody["input_source"] = "text",
   planner?: PlannerChoice,
+  objectId?: string,
 ): Promise<CreateTaskResult> {
   const body: CreateTaskRequestBody = { instruction, input_source: inputSource };
   if (planner) body.planner = planner;
+  if (objectId) body.object_id = objectId;
   return request<CreateTaskResult>("/api/v1/tasks", {
     method: "POST",
     body: JSON.stringify(body),
@@ -92,4 +94,33 @@ export async function cancelTask(taskId: string): Promise<TaskState> {
   return request<TaskState>(`/api/v1/tasks/${encodeURIComponent(taskId)}/cancel`, {
     method: "POST",
   });
+}
+
+/** `POST /api/v1/tasks/{id}/decision` -- answer a risky-step or plan question. */
+export async function decide(
+  taskId: string,
+  choice: "approve" | "skip" | "cancel",
+  steps?: Array<{ step_id: number }>,
+): Promise<TaskState> {
+  return request<TaskState>(`/api/v1/tasks/${taskId}/decision`, {
+    method: "POST",
+    body: JSON.stringify(steps ? { choice, steps } : { choice }),
+  });
+}
+
+/** `GET /api/v1/tasks/{id}/undo` -- what undoing would do, and what can't be undone. */
+export async function undoPreview(
+  taskId: string,
+): Promise<{ steps: Array<{ action: string; target: string | null }>; cannot_undo: string[]; possible: boolean }> {
+  return request(`/api/v1/tasks/${taskId}/undo`);
+}
+
+/** `POST /api/v1/tasks/{id}/undo` -- start the undo mission. */
+export async function undoTask(taskId: string): Promise<TaskState & { cannot_undo: string[] }> {
+  return request(`/api/v1/tasks/${taskId}/undo`, { method: "POST" });
+}
+
+/** `POST /api/v1/tasks/{id}/correct` -- "no, the other one". */
+export async function correctTask(taskId: string): Promise<TaskState> {
+  return request(`/api/v1/tasks/${taskId}/correct`, { method: "POST", body: "{}" });
 }

@@ -15,7 +15,7 @@ module docstring and this session's plan for why speech is deferred).
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -50,6 +50,13 @@ class CreateTaskRequest(BaseModel):
         "'rule_based' (fast and predictable), 'react' (asks a language "
         "model, falls back to rule-based if none is configured), "
         "'behavior_tree', or 'htn'. Reported back on the task as `planner`.",
+    )
+
+    object_id: Optional[str] = Field(
+        default=None,
+        max_length=120,
+        description="Pins the object the instruction means to one simulator id "
+        "(the answer to a 'which one?' question, e.g. 'Cup|2').",
     )
 
     @field_validator("instruction", mode="after")

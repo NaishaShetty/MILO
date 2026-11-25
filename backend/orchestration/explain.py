@@ -31,6 +31,8 @@ from planner.models import PlanStep
 
 
 def _the(name: Optional[str]) -> str:
+    if name and "|" in name:  # a pinned simulator id ("Cup|2") -> "the cup"
+        name = name.split("|", 1)[0].lower()
     return f"the {name}" if name else "it"
 
 

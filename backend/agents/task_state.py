@@ -134,6 +134,13 @@ class TaskState:
     #: Success-predicate results checked against the simulator at the end
     #: (`verification.predicates`): [{kind, object, text, ok, reason}, ...].
     verification: List[Dict[str, Any]] = field(default_factory=list)
+    #: What MILO is waiting for the user to decide (a risky step or a plan preview);
+    #: None when it isn't waiting (`oversight.gate`).
+    pending_decision: Optional[Dict[str, Any]] = None
+    #: Each completed step with the state just before it, for undo (`oversight.undo`).
+    undo_log: List[Dict[str, Any]] = field(default_factory=list)
+    #: The user's own words, when the task came from a sentence.
+    instruction: Optional[str] = None
     #: When the task was created (epoch seconds) -- for "yesterday"-style
     #: labels on recent missions.
     created_at: float = field(default_factory=time.time)
@@ -192,6 +199,9 @@ class TaskState:
             "agent_states": {k: v.value for k, v in self.agent_states.items()},
             "status": self.status.value,
             "verification": self.verification,
+            "pending_decision": self.pending_decision,
+            "undo_log": self.undo_log,
+            "instruction": self.instruction,
             "latencies_ms": self.latencies_ms,
             "created_memories": self.created_memories,
             "answer": self.answer,

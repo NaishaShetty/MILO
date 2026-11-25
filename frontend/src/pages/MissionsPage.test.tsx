@@ -114,3 +114,41 @@ describe("Save as skill", () => {
     expect(screen.queryByRole("button", { name: "Save as skill" })).not.toBeInTheDocument();
   });
 });
+
+describe("Undo and 'the other one'", () => {
+  it("previews an undo, says what can't be undone, then starts it", async () => {
+    const tasksApi = await import("../api/tasks");
+    vi.spyOn(tasksApi, "undoPreview").mockResolvedValue({
+      steps: [
+        { action: "locate", target: "Fridge|1" },
+        { action: "navigate", target: "Fridge|1" },
+        { action: "close", target: "Fridge|1" },
+      ],
+      cannot_undo: ["push the egg"],
+      possible: true,
+    });
+    const undo = vi.spyOn(tasksApi, "undoTask").mockResolvedValue({ task_id: "u1" } as never);
+    const t = task("htn", null, "succeeded");
+    renderWith(t);
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(await screen.findByText(/put things back with 1 actions/)).toHaveTextContent("I can't undo: push the egg.");
+    fireEvent.click(screen.getByRole("button", { name: "Put it back" }));
+    await vi.waitFor(() => expect(undo).toHaveBeenCalledWith("t1"));
+  });
+
+  it("offers 'No, the other one' for a pinned object", async () => {
+    const tasksApi = await import("../api/tasks");
+    const correct = vi.spyOn(tasksApi, "correctTask").mockResolvedValue({ task_id: "t2" } as never);
+    renderWith({ ...task("rule_based", null, "executing"), objects: ["Cup|1"] });
+    fireEvent.click(screen.getByRole("button", { name: "No, the other one" }));
+    await vi.waitFor(() => expect(correct).toHaveBeenCalledWith("t1"));
+  });
+
+  it("shows MILO's question when it is waiting", () => {
+    renderWith({
+      ...task("rule_based", null, "executing"),
+      pending_decision: { kind: "step", why: "the egg is fragile", text: "Pushing the egg." },
+    });
+    expect(screen.getByRole("alertdialog", { name: "MILO needs your OK" })).toBeInTheDocument();
+  });
+});

@@ -71,6 +71,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import Any, Callable, Dict, Optional
@@ -322,6 +323,18 @@ class ExecutionController:
         step_result = next(s for s in record.step_results if s.step_id == step.step_id)
         step_result.status = StepStatus.RUNNING
         self._emit(record, step, "started")
+        if step.parameters.get("skip_requested"):
+            # The user said "skip" when asked to approve this step.
+            step.status = StepStatus.SKIPPED
+            step_result.status = StepStatus.SKIPPED
+            self._emit(record, step, "skipped")
+            return ActionResult(
+                success=True,
+                action=step.action,
+                action_id=str(uuid.uuid4()),
+                step_id=step.step_id,
+                metadata={"skipped_by_user": True},
+            )
 
         if self._simulator is None or self._dispatcher is None:
             raise SimulatorUnavailableError(

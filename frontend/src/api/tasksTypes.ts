@@ -130,6 +130,10 @@ export interface TaskState {
   target: string | null;
   current_location: string | null;
   current_plan: Plan | null;
+  /** Set while MILO waits for an approve / skip / edit answer. */
+  pending_decision?: PendingDecision | null;
+  /** The user's own words, when the task came from a sentence. */
+  instruction?: string | null;
   current_step: number | null;
   observations: Record<string, unknown>[];
   known_objects: string[];
@@ -205,7 +209,26 @@ export type CreateTaskResult =
   | (TaskState & { kind: "task"; understood_as: string })
   | { kind: "answer"; answer: string; understood_as?: string; library?: TaskKind[] }
   | { kind: "remembered" | "not_remembered"; message: string; understood_as?: string }
-  | { kind: "clarify" | "unsupported"; message: string; details?: Record<string, unknown> };
+  | { kind: "clarify" | "unsupported"; message: string; details?: Record<string, unknown>; choices?: ReplyChoice[] };
+
+/** A tappable answer to MILO's question: send `instruction` (pinned to `object_id`). */
+export interface ReplyChoice {
+  label: string;
+  instruction: string;
+  object_id?: string;
+}
+
+/** What MILO is waiting for the user to decide (a risky step, or a plan it worked out). */
+export interface PendingDecision {
+  kind: "step" | "plan";
+  why: string;
+  step_id?: number;
+  action?: string;
+  target?: string | null;
+  text?: string;
+  steps?: Array<{ step_id: number; action: string; target: string | null; container?: string | null; text: string }>;
+  asked_at?: number;
+}
 
 /** One entry of the task library (`GET /tasks/library`). */
 export interface TaskKind {
@@ -227,6 +250,8 @@ export interface CreateTaskRequestBody {
   instruction: string;
   input_source?: InputSource;
   planner?: PlannerChoice;
+  /** The answer to "which one?": pins the object to one simulator id. */
+  object_id?: string;
 }
 
 // `GET /{task_id}/robot`'s response shape -- a curated view of AI2-THOR's

@@ -13,6 +13,8 @@ import { useTask } from "../state/TaskContext";
 import { confidenceWord, stepTitle } from "../utils/friendly";
 import { ApiError } from "../api/client";
 import { readableWording, saveTaskAsSkill } from "../api/skills";
+import { DecisionCard } from "../components/DecisionCard";
+import { correctTask, undoPreview, undoTask } from "../api/tasks";
 
 const WHO: Record<string, string> = { memory: "M", planner: "P", eyes: "E", hands: "H", reflect: "R" };
 const TERMINAL = ["succeeded", "failed", "cancelled"];
@@ -67,6 +69,82 @@ function SeesPanel({ prompt, refreshKey }: { prompt: string; refreshKey: unknown
         )}
       </div>
     </section>
+  );
+}
+
+/** "No, the other one" (while it runs or after) and Undo (after). */
+function AfterThoughts({
+  taskId,
+  finished,
+  pinned,
+  onStarted,
+}: {
+  taskId: string;
+  finished: boolean;
+  pinned: boolean;
+  onStarted: (id: string) => void;
+}) {
+  const [undoInfo, setUndoInfo] = useState<{ steps: number; cannot: string[] } | null>(null);
+  const [said, setSaid] = useState<{ text: string; bad: boolean } | null>(null);
+  const fail = (error: unknown) =>
+    setSaid({ text: error instanceof ApiError ? error.message : "That didn't work. Is MILO's server running?", bad: true });
+  const other = async () => {
+    try {
+      onStarted((await correctTask(taskId)).task_id);
+    } catch (error) {
+      fail(error);
+    }
+  };
+  const previewUndo = async () => {
+    try {
+      const p = await undoPreview(taskId);
+      if (!p.possible) {
+        setSaid({ text: `There's nothing I can undo there.${p.cannot_undo.length ? ` I can't undo: ${p.cannot_undo.join(", ")}.` : ""}`, bad: false });
+        return;
+      }
+      setUndoInfo({ steps: p.steps.filter((s) => s.action !== "locate" && s.action !== "navigate").length, cannot: p.cannot_undo });
+    } catch (error) {
+      fail(error);
+    }
+  };
+  const undo = async () => {
+    try {
+      onStarted((await undoTask(taskId)).task_id);
+      setUndoInfo(null);
+    } catch (error) {
+      fail(error);
+    }
+  };
+  return (
+    <div className="controls">
+      {pinned && (
+        <button type="button" className="chip" onClick={() => void other()}>
+          No, the other one
+        </button>
+      )}
+      {finished && !undoInfo && (
+        <button type="button" className="chip" onClick={() => void previewUndo()}>
+          Undo
+        </button>
+      )}
+      {undoInfo && (
+        <div className="notice" role="status">
+          I'll put things back with {undoInfo.steps} actions.
+          {undoInfo.cannot.length > 0 && ` I can't undo: ${undoInfo.cannot.join(", ")}.`}{" "}
+          <button type="button" className="btn btn--go" onClick={() => void undo()}>
+            Put it back
+          </button>{" "}
+          <button type="button" className="btn" onClick={() => setUndoInfo(null)}>
+            Never mind
+          </button>
+        </div>
+      )}
+      {said && (
+        <p className={`notice${said.bad ? " notice--error" : ""}`} role={said.bad ? "alert" : "status"}>
+          {said.text}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -189,6 +267,8 @@ export function MissionsPage() {
               {novel.note ? ` ${novel.note}` : ""}
             </p>
           )}
+          {activeTask.pending_decision && <DecisionCard taskId={activeTask.task_id} pending={activeTask.pending_decision} />}
+          <AfterThoughts taskId={activeTask.task_id} finished={finished} pinned={(activeTask.objects[0] ?? "").includes("|")} onStarted={setActiveTaskId} />
           {activeTask.status === "succeeded" && <SaveAsSkill taskId={activeTask.task_id} wording={activeTask.user_request} />}
           {activeTask.planner_note && <div className="notice">{activeTask.planner_note}</div>}
           {activeTask.cancel_summary && <div className="notice">{activeTask.cancel_summary}</div>}

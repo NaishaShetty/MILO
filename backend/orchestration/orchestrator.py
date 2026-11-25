@@ -65,7 +65,7 @@ import os
 import threading
 import time
 import uuid
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from agents.events import Event, EventBus, EventType
 from agents.execution_agent import ExecutionAgentWrapper
@@ -122,6 +122,7 @@ class Orchestrator:
         outcome_predictor=None,
         plan_ranker=None,
         trace_recorder=None,
+        approval_gate=None,
     ) -> None:
         self._planner = planner_agent
         #: Builds a planner wrapper for a requested strategy name; without
@@ -137,6 +138,10 @@ class Orchestrator:
         self._ranker = plan_ranker
         #: Optional `tracelog.recorder.TraceRecorder`: per-mission trace store.
         self._trace = trace_recorder
+        #: Optional `oversight.gate.ApprovalGate`: ask before risky steps and
+        #: before running plans MILO worked out itself.
+        self._gate = approval_gate
+        self._undo_before: Dict[int, Dict[str, Any]] = {}
         self._contexts: Dict[int, Dict] = {}
         #: Extra fields for the logger's `begin()` (scene id, seed, injected fault...).
         self.episode_context: Dict = {}
@@ -193,6 +198,9 @@ class Orchestrator:
         self._cancel_event.set()
         if self._current_state is not None:
             self._current_state.cancel_requested = True
+            if self._gate is not None:
+                # stop waiting for an answer that no longer matters
+                self._gate.cancel_all(self._current_state.task_id)
         self._execution.cancel_current()
 
     def run(
@@ -352,6 +360,14 @@ class Orchestrator:
             ),
         )
         self._publish(task_state, EventType.PLAN_CREATED)
+        refused = self._preview(task_state)
+        if refused is not None:
+            task_state.latencies_ms["total_ms"] = (
+                time.perf_counter() - run_started_at
+            ) * 1000.0
+            return self._finish_failed(
+                task, task_state, episode_id, record=None, reason=refused
+            )
 
         if not planning_result.plan.steps:
             # Every step was already satisfied by the current world state
@@ -709,6 +725,12 @@ class Orchestrator:
         task's `current_step`, and adds a thought when a step finishes."""
 
         def listen(step: PlanStep, status: str) -> None:
+            if status == "started":
+                self._before_step(task_state, step)
+            elif status == "success":
+                before = self._undo_before.pop(step.step_id, None)
+                if before is not None:
+                    task_state.undo_log.append(before)
             if self._episode_logger is not None:
                 self._snapshot(step, status)
             if status == "started" and self._predictor is not None:
@@ -1091,6 +1113,114 @@ class Orchestrator:
         self._after_mission(task_state)
         self._publish(task_state, EventType.TASK_COMPLETED)
         return task_state
+
+    def _before_step(self, task_state: TaskState, step: PlanStep) -> None:
+        """Records the state undo needs, then asks the user about a risky step."""
+        try:
+            meta = self._execution.get_metadata() or {}
+            from oversight.ambiguity import same_kind
+
+            def snap(name: Optional[str]) -> Dict[str, Any]:
+                if not name:
+                    return {}
+                match = (
+                    [o for o in meta.get("objects") or [] if o.get("objectId") == name]
+                    if "|" in name
+                    else same_kind(name, meta)[:1]
+                )
+                obj = match[0] if match else {}
+                parents = obj.get("parentReceptacles") or []
+                return {
+                    "id": obj.get("objectId"),
+                    "parent": str(parents[0]) if parents else None,
+                    "isOpen": obj.get("isOpen"),
+                    "isToggled": obj.get("isToggled"),
+                }
+
+            before = snap(step.target)
+            if step.action == "place":
+                # where it was before it was picked up, not "in MILO's hand"
+                earlier = next(
+                    (
+                        e
+                        for e in reversed(task_state.undo_log)
+                        if e["action"] == "pickup"
+                        and e.get("target") in (before.get("id"), step.target)
+                    ),
+                    None,
+                )
+                before["parent"] = (earlier or {}).get("before", {}).get("parent")
+            target = before.get("id") or step.target
+            home = before.get("parent")
+            self._undo_before[step.step_id] = {
+                "step_id": step.step_id,
+                "action": step.action,
+                "target": target,
+                "container": step.parameters.get("container"),
+                "before": {**before, "parent": home},
+            }
+        except Exception:
+            logger.warning("orchestrator.undo_snapshot_failed", exc_info=True)
+        if self._gate is None or step.parameters.get("approved"):
+            return
+        why = self._gate.step_risk(step.action, step.target)
+        if not why:
+            return
+        decision = self._gate.ask(
+            task_state,
+            {
+                "kind": "step",
+                "step_id": step.step_id,
+                "action": step.action,
+                "target": step.target,
+                "text": explain_step(step, "doing"),
+                "why": why,
+            },
+        )
+        if decision.choice == "approve":
+            step.parameters["approved"] = True
+            self._think(task_state, "hands", "Thanks, going ahead.", step.step_id)
+        else:
+            step.parameters["skip_requested"] = True
+            self._think(
+                task_state, "hands", "OK, I'll leave that step out.", step.step_id
+            )
+
+    def _preview(self, task_state: TaskState) -> Optional[str]:
+        """A plan MILO worked out itself (not a saved skill) is shown before it runs:
+        approve, approve with steps left out, or cancel. Returns a reason to stop."""
+        plan = task_state.current_plan
+        novel = (plan.metadata.get("novel") if plan else None) or {}
+        if self._gate is None or plan is None or novel.get("source") != "model":
+            return None
+        decision = self._gate.ask(
+            task_state,
+            {
+                "kind": "plan",
+                "why": "I worked this plan out myself. Shall I go ahead?",
+                "steps": [
+                    {
+                        "step_id": s.step_id,
+                        "action": s.action,
+                        "target": s.target,
+                        "container": s.parameters.get("container"),
+                        "text": explain_step(s, "doing"),
+                    }
+                    for s in plan.steps
+                ],
+            },
+        )
+        if decision.choice != "approve":
+            return "You stopped the plan before I started."
+        if decision.steps is not None:
+            keep = {int(s["step_id"]) for s in decision.steps if "step_id" in s}
+            plan.steps = [s for s in plan.steps if s.step_id in keep]
+            self._think(
+                task_state,
+                "planner",
+                f"OK, I'll do it your way ({len(plan.steps)} steps).",
+            )
+        return None
 
     def _unmet_stated_goal(self, task_state: TaskState) -> Optional[str]:
         """For a plan that states its own success conditions: the reason they are
