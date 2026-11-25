@@ -84,3 +84,8 @@ benchmark-ci:
 ## Re-record the demo missions the hosted UI replays (frontend/public/demo)
 demo:
 	cd backend && $(PY) -m demo.record
+
+## README screenshots into docs/images/ (dev server on $BASE with the real backend behind it;
+## DEMO_ONLY=1 for just the demo-mode pages, no backend needed)
+screenshots:
+	cd frontend && node scripts/screenshots.mjs

@@ -1,476 +1,216 @@
-# MILO
+# MILO: a household robot you can talk to, teach and trust
 
-**Memory Integrated Language-Oriented Robot**
+**Memory Integrated Language-Oriented Robot.** MILO takes plain-language requests ("put the apple in the fridge", "is the fridge open?", "chill the tomato") and carries them out in a simulated home ([AI2-THOR](https://ai2thor.allenai.org/)). When it hasn't been programmed for a task, it works out a plan, checks it before acting, and asks before anything risky. It then checks the result against the world and saves what worked as a reusable skill.
 
-MILO is a research platform for embodied AI: a natural-language
-instruction is understood, planned, and executed by a simulated robot
-in [AI2-THOR](https://ai2thor.allenai.org/), with every stage — vision,
-language, memory, planning, execution, and reflection — implemented as
-an independently testable, swappable module rather than a monolithic
-pipeline.
+![MILO's Play page: tell MILO a job in plain words, pick a planner, see recent missions](../docs/images/play-desktop.png)
 
-## Overview
+*The Play page, captured on 2026-11-25 from the real app running against AI2-THOR.*
 
-Most "vision-language robotics" demos wire a single detector directly
-into a single policy, which makes it hard to answer basic research
-questions in isolation — does memory actually help planning? does a
-different planning strategy change task success? MILO is built the
-other way: perception, language understanding, memory, planning,
-execution, and reflection are separate modules behind small, consistent
-interfaces, so each can be evaluated and swapped independently.
+## Quick start
 
-**Research question:** Can a modular embodied agent — with
-independently swappable perception, language-understanding, planning,
-execution, memory, and reflection stages — perceive an AI2-THOR scene,
-understand a natural-language instruction, retrieve and use relevant
-past experience, generate and validate a multi-step plan, execute it
-with step-by-step precondition/result checking against simulator
-ground truth, detect its own execution failures, and replan in
-response — producing a structured, traceable record of every decision
-along the way?
+| What you want | Command |
+|---|---|
+| **See it in 60 seconds, no backend** (recorded missions, replays, leaderboard) | `cd frontend && npm ci && VITE_DEMO=1 npm run dev`, then open http://localhost:5173 (or add `?demo=1` to any URL) |
+| **The whole app**, one command | `docker compose up --build`, then open http://localhost:8080 |
+| Backend and frontend separately (Python 3.9, Node 20) | `cd backend && pip install -r requirements.txt && uvicorn api.app:app --reload`; then `cd frontend && npm install && npm run dev` |
+| Real AI2-THOR (needs a GPU and a display) | set `VISION_ENABLE_SIMULATOR=true` in `backend/.env` (copy `backend/.env.example`) |
+| Run the benchmark | `make benchmark` (CI gate: `make benchmark-ci`) |
+| Regenerate these screenshots | `make screenshots` |
 
-This is scoped to what the implemented system can actually
-demonstrate: it's a question about *architecture and integration*, not
-about generalization across many environments (see
-[Known Limitations](#known-limitations)).
+Live demo link: not deployed yet.
 
-## What MILO Can Do
+## What MILO does
 
-- **Perception** — open-vocabulary object detection (Grounding DINO),
-  segmentation (SAM2), depth estimation, and a heuristic spatial scene
-  graph over live AI2-THOR frames.
-- **Spatial/temporal understanding** — 2D→3D object localization,
-  cross-frame object tracking, and scene-change detection (new/moved/
-  removed/occluded objects).
-- **Language understanding** — natural-language instructions parsed
-  into structured goals via a real LLM call (not rule-based NLU).
-- **Planning** — four interchangeable strategies behind one interface:
-  a deterministic rule-based planner, an LLM-driven ReAct planner, a
-  Behavior Tree planner, and `HTNPlanner`, a real Hierarchical Task
-  Network engine (compound tasks, a state-conditional method library,
-  recursive decomposition) — each validated against a symbolic world
-  model.
-- **Vision-grounded planning** — the planner's world model is grounded
-  from a live Vision `Scene` before planning: existence, proximity, and
-  containment, plus `is_open` (from a vision open/closed classifier)
-  and held-object state (from a depth-proxied heuristic over live
-  detections) — not just a symbolic default or a raw simulator scan.
-  Held-object grounding has known calibration limits; see
-  [Known Limitations](#known-limitations).
-- **Execution** — plans are driven step by step through real AI2-THOR,
-  with preconditions checked before every action and results validated
-  against simulator ground truth, never assumed.
-- **Memory** — episodic, semantic, and failure memory, persisted in
-  SQLite with ranked vector retrieval, read and written on every real
-  task, with a real, confirmed-engaging memory-hint mechanism under
-  real AI2-THOR.
-- **Reflection & replanning** — execution failures are classified and
-  drive a real `continue`/`retry`/`replan`/`abort` decision, bounded to
-  avoid infinite loops.
-- **Speech** — Whisper (local) and ElevenLabs (cloud) speech-to-text,
-  and ElevenLabs text-to-speech for MILO's spoken responses.
-- **Frontend dashboard** — a 7-page real-time UI (Home, Mission
-  Control, Memory, Activity, About, MILO Lab, Settings) showing live
-  backend state, not mocked data.
-- **LLM provider abstraction** — OpenAI, Google Gemini, or a local
-  Qwen-compatible server (e.g. Ollama, vLLM), selected purely through
-  configuration.
-- **Two published benchmarks** — `milo_benchmark v1.0` (25 tasks, 5
-  scenes) and `v1.1` (54 tasks, 9 scenes) on the Hugging Face Hub, with
-  a reproducible runner and real four-planner baselines. See
-  [Current Results](#current-results).
+- **Understands plain requests.** It covers fetch, deliver, put in/on, open/close, turn on/off, find, clear a table and tidy up. Questions ("where is the mug?") are answered without moving. A phrasebook and an optional learned parser run first; a language model is only consulted for wording neither knows.
+- **Works out new tasks.** For a request it has no recipe for, it reuses a saved skill if one matches, otherwise asks a language model for a plan. Every plan is validated before acting: registry actions only, objects that exist, a step budget, and a symbolic dry run. Risky steps need your approval. See [novel tasks](../docs/novel_tasks.md).
+- **Learns skills.** You can save a successful mission as a skill, or teach one in words ("pick up the mug", "put it on the table"). Skills can call other skills, up to 3 levels deep. See [skills](../docs/skills.md).
+- **Asks instead of guessing, and can undo.** "Which mug?" comes with tappable choices, and risky steps wait for approve or skip. Undo plays the inverse actions. See [oversight](../docs/oversight.md).
+- **Checks its work.** Success conditions (held, in the fridge, door closed, light on) are read from the simulator after every mission. See [foundation](../docs/foundation.md).
+- **Recovers mid-mission.** If it can't see or reach something, it looks around or re-approaches before retrying or replanning.
+- **Has memory you can trust.** Every memory carries a source, a confidence, decay and quarantine; you can pin, fix, set aside or forget memories, and failed missions leave lessons. See [memory trust](../docs/memory_trust.md).
+- **Shows its working.** Mission traces, replay with a timeline, per-stage timings (p50/p95), a scene map and a downloadable report. See [observability](../docs/observability.md).
+- **Voice.** It uses the browser's own speech recognition and synthesis, with a fallback to recorded audio. See [voice](../docs/voice.md).
+- **Learned models, all optional.** A step-outcome predictor, a fast detector, a memory embedder, an instruction parser and a world model. All are off by default and fall back to the rules. See [models](../docs/models/README.md).
 
-Only capabilities that are actually implemented and verified are
-listed here — see [Known Limitations](#known-limitations) for what
-isn't.
-
-## Tech Stack
-
-**Backend** — Python, FastAPI + Uvicorn (API layer), Pydantic (data
-models), AI2-THOR (simulated environment), Grounding DINO (open-vocab
-detection), SAM2 (segmentation), CUDA-enabled PyTorch (GPU vision
-inference — see [Current Results](#current-results)), SQLite + a
-vector store (memory persistence), OpenAI / Google Gemini / local Qwen-
-compatible server (pluggable LLM providers), OpenAI Whisper (local
-STT), ElevenLabs (cloud STT + TTS), pytest (test suite).
-
-**Frontend** — React + TypeScript, built with Vite, react-router-dom
-(routing across 7 pages), Vitest + Testing Library (unit/component
-tests), Playwright (real-browser E2E tests). No CSS or UI component
-framework — a single hand-authored design system. No state-management
-library beyond React Context (six purpose-built polling contexts).
-
-**Infrastructure** — Docker + docker-compose (containerized
-backend/frontend), nginx (frontend production serving), GitHub Actions
-(CI: format/lint/type-check/test on every push and PR).
-
-**Explicitly not used** — no WebSocket/SSE (all real-time UI updates
-are polling-based), no message queue/event bus between agents (direct
-method calls through a single `Orchestrator`), no ORM.
-
-Full stack detail: [`docs/application/tech_stack.md`](../docs/application/tech_stack.md).
-
-## What's New: Friendly MILO (task library, planner choice, live updates, new look)
-
-**Task library.** MILO does fetch, deliver, put in/on, open/close, turn on/off, find (and says where), clear a table and tidy up (using what it remembers). Ask in plain words ("could you grab me the mug", "is the fridge open?"); questions are answered without moving, and vague or impossible requests get a clear question or reason. `GET /api/v1/tasks/library` lists everything with examples.
-
-**Planner choice.** `POST /api/v1/tasks` accepts `planner`: `rule_based` (default), `react`, `behavior_tree` or `htn`. The choice is validated and reported on the task (`planner`, plus `planner_note` if a planner fell back).
-
-**Live updates (SSE).** `GET /api/v1/tasks/{id}/stream` pushes task state and events (`GET /api/v1/tasks/stream` for all tasks); the UI falls back to polling if the stream fails. `POST /api/v1/tasks/{id}/cancel` stops between steps and puts down whatever MILO holds.
-
-**API key and limits (optional).** Set `API_KEY` to require an `X-API-Key` header on task, lab and memory routes (the two `/stream` routes also accept `?api_key=`). Set `RATE_LIMIT_PER_MINUTE=N` to rate-limit per caller, and `SPEECH_MAX_UPLOAD_BYTES` to cap audio uploads (default 10 MB). In the UI, store the key with `VITE_API_KEY` or in browser storage under `milo.apiKey`.
-
-**Memory.** "Forget this" archives a memory (`POST /api/v1/memory/{id}/forget`). Each mission writes what it learned; tell MILO preferences like "the mug goes on the shelf".
-
-**New design.** Four spaces (Play, Missions, Memory, Lab), About/Settings under the gear, Activity as a drawer, and a bottom tab dock on phones. Design tokens are in `frontend/src/tokens.css`; MILO is the layered SVG `MiloRobot` (front and side rigs), driven by real task state through `state/miloDirector.ts`. Visual snapshots: `npx playwright test visual.spec.ts`.
-
-**Measured (Phase 1; RTX 4050 laptop, 25 interleaved runs, real simulator).**
-
-| Metric | Before | After |
-|---|---|---|
-| Observe per planning loop, mean | 2720 ms (full pipeline) | 2066 ms (no SAM2 masks) |
-| SAM2 stage alone | 117 ms median | skipped on the planning path |
-| Vector search at 5,000 memories | 59 ms | 6.9 ms (one run; later runs 0.1-0.7 ms) |
-
-Grounding DINO's time swung between 0.5 and 4 s on this machine and was not root-caused, so treat the observe mean as indicative and the SAM2 figure as solid. Reproduce with `python -m scripts.measure_observe_cost` and `pytest tests/test_memory_scaling_benchmark.py -s`.
-
-## Models (learned components)
-
-All learned components are **off by default** and fall back to the rule-based behaviour if a model is missing, slow, unsure or the inputs drift. See `docs/models/` for model cards.
-
-| Model | What it does | Data | Held-out result | Flag |
-|---|---|---|---|---|
-| Step outcome predictor | Per-step success / retry / failure-type / duration; drives per-step confidence, a learned reflector and plan ranking | 28,896 labelled steps, 6,000 synthetic episodes, 50 scenes (2026-11-24, seed 0) | AUROC 0.968, ECE 0.005 (rules: 0.661); online 600 episodes: success 0.717 -> 0.783, wasted steps 1.94 -> 1.22 | `MILO_LEARNED_REFLECTOR=off\|shadow\|on`, `MILO_PLAN_RANKING=1` |
-
-| Lightweight detector | Fast ONNX object detector for the planning loop's observe step, Grounding DINO as fallback | 21,777 real AI2-THOR frames, 119 scenes, ground-truth boxes (2026-11-24) | Held-out scenes: mAP@0.5 0.567 vs 0.315 for zero-shot Grounding DINO; 5.9 ms vs 547 ms per frame; real missions (30 per mode): success 0.90 both, observe time 1.37 s -> 0.07 s | `MILO_FAST_DETECTOR=1`, `MILO_DETECTOR_FALLBACK=confidence\|target` |
-
-**Pipeline.** `make data` (resumable episode generator with failure injection) -> `make dataset` (scene-held-out splits + report) -> `make train-outcome` -> `make eval-outcome` -> `make promote-outcome` (only promotes a model that wins; keeps the previous for rollback). Trained artifacts and data live in `backend/artifacts/` and `backend/data/` (not in git); `registry.json` records name, version, data hash, metrics and date. The Lab page has a Models panel with a per-model toggle.
-
-**Honest status.** The data is synthetic (a fast simulator with injected faults), so the online gain is not yet shown on AI2-THOR: keep the reflector at `shadow` until real episodes are logged and compared.
-
-## Architecture
+## How it fits together
 
 ```mermaid
 flowchart LR
-    User(["User<br/>text or speech"]) --> Lang["Language<br/>Understanding"]
-    Lang --> Memory["Memory"]
-    Lang --> Planner["Planner"]
-    Memory <--> Planner
-    Planner --> Vision["Vision"]
-    Planner --> Nav["Navigation"]
-    Planner --> Exec["Execution"]
-    Vision --> Exec
-    Nav --> Exec
-    Exec --> Sim["AI2-THOR"]
-    Sim --> Reflect["Reflection"]
-    Reflect -->|replan| Planner
-    Reflect --> Memory
-    Memory --> User
+  U[You: text / voice] --> I[Interpreter<br/>phrasebook + learned parser]
+  I -->|known task| P[Planners<br/>rule-based · HTN · behaviour tree · ReAct]
+  I -->|unknown| N[Novel planner<br/>skills → language model → validate → safety gate]
+  I -->|ambiguous| Q[One question,<br/>tappable choices]
+  P & N --> O[Orchestrator<br/>plan → approve risky steps → execute → reflect → recover / replan]
+  O <--> E[Executor + action registry] <--> S[(AI2-THOR / synthetic sim)]
+  O <--> M[(Memory: trust, decay,<br/>quarantine, lessons)]
+  O --> V[Goal predicates<br/>check the world]
+  O --> T[(Trace store)] --> R[Replay · timings · scene map · benchmark]
+  N <--> K[(Skills)]
 ```
 
-A single `Orchestrator` runs this loop for every task: parse → retrieve
-memory → plan → observe/execute → reflect → replan (bounded) or finish
-→ write memory. Every step publishes a real event the frontend polls
-and renders live. Before planning, the planner's `WorldState` is
-grounded from a live Vision `Scene` — existence, proximity, and
-containment, plus `is_open` and held-object state — not just a
-symbolic default.
-
-For the full agent/frontend architecture (with diagrams of the real,
-verified implementation) see
-[`docs/application/architecture.md`](../docs/application/architecture.md).
-For the historical Phase 2–5 pipeline design (perception, language,
-planning, execution in implementation detail) see
-[`docs/architecture/pre_orchestrator_pipeline_snapshot.md`](../docs/architecture/pre_orchestrator_pipeline_snapshot.md).
-
-## Research Contributions
-
-| Type | Contribution |
-|---|---|
-| Research | A modular agent architecture with an explicit failure taxonomy and a reflection step that decides `continue`/`retry`/`replan`/`abort` from structured execution failures, not a hardcoded retry count |
-| Research | A memory system with distinct episodic, semantic, and failure memory types, ranked retrieval (similarity + confidence + recency + provenance + context), and a memory-vs-no-memory ablation confirmed engaging under real AI2-THOR |
-| Research | A provider-agnostic LLM abstraction letting the same planner/agent code run against OpenAI, Gemini, or a local OpenAI-compatible server (Ollama, vLLM) purely through configuration |
-| Research | [`milo_benchmark`](https://huggingface.co/datasets/naishashetty/milo_benchmark) — two published Hugging Face dataset versions (`v1.0`: 25 tasks/5 scenes; `v1.1`: 54 tasks/9 scenes, all 4 iTHOR room types) with a reproducible runner and real four-planner baselines scored against live post-execution simulator state |
-| Engineering | Four interchangeable planner strategies behind one interface — including a real Hierarchical Task Network engine (`HTNPlanner`), not a second implementation reusing another strategy's control flow — with shared plan validation against a symbolic world model |
-| Engineering | A real-time frontend driven entirely by backend polling |
-| Product | MILO Lab — a research interface exposing perception benchmarks, planner evaluation, and a parse/plan sandbox as real, runnable operations |
-
-See [`docs/phases/phase8_7_final_audit.md`](../docs/phases/phase8_7_final_audit.md)
-for the full research-contribution breakdown and final evaluation.
-
-## Current Results
-
-- **Tests**: backend `968 passed, 2 skipped, 0 failed` (~9 seconds; the
-  2 skips are LLM smoke tests requiring a live API key); frontend `186
-  passed, 0 failed` (29 files, ~3.5s); production build clean.
-  `backend/tests/conftest.py` forces `VISION_ENABLE_SIMULATOR=false`
-  for the whole suite regardless of a local `.env`'s interactive-dev
-  setting — no manual env-var step needed for a clean, fast run.
-  Static gates (`black`, `ruff`, `mypy`, `eslint`, `tsc`) all clean;
-  CI green on the latest commit (backend, frontend, Docker build, and
-  Playwright E2E jobs).
-- **`milo_benchmark v1.0`** (25 tasks, 5 scenes, all 4 iTHOR room
-  types), scored against live post-execution AI2-THOR state. Published
-  on the Hugging Face Hub:
-  [huggingface.co/datasets/naishashetty/milo_benchmark](https://huggingface.co/datasets/naishashetty/milo_benchmark)
-  — companion leaderboard + episode replay Space (static, pre-recorded;
-  AI2-THOR needs a GPU/Unity this Space's free tier doesn't have, so it
-  isn't a live demo):
-  [huggingface.co/spaces/naishashetty/milo_benchmark_companion](https://huggingface.co/spaces/naishashetty/milo_benchmark_companion).
-
-  | Planner | Goal success | tier1 (locate) | tier2 (pickup) | tier3 (store) |
-  |---|---|---|---|---|
-  | `rule_based` | 24/25 (96%) | 10/10 | 10/10 | 4/5 |
-  | `behavior_tree` | 24/25 (96%) | 10/10 | 10/10 | 4/5 |
-  | `htn` | 24/25 (96%) | 10/10 | 10/10 | 4/5 |
-  | `react` (`qwen2.5:7b`, local, via Ollama) | 20/25 (80%) | 10/10 | 10/10 | 0/5 |
-
-  All three symbolic planners fail the identical single task
-  (`milo-v1-fp301-t3a`) — a real AI2-THOR placement/geometry limit, not
-  a planner bug. `htn` matches `rule_based`/`behavior_tree` exactly,
-  including that shared failure, at comparable latency (~647ms/episode
-  avg vs. ~620–633ms) — a real task-network engine, not a second
-  implementation of the same control flow. `react`'s baseline:
-  `goal_success`/`execution_success`/`plan_success` agree on every
-  episode, zero rate-limit retries needed, reconfirmed unchanged after
-  this session's detection/prompt fixes (identical 20/25, identical
-  per-task failure signatures). Run locally against `qwen2.5:7b`
-  (Q4_K_M) served by Ollama on an RTX 4050 Laptop GPU. All 5 `react`
-  failures are genuine multi-step reasoning mistakes (proposing an
-  action before its precondition chain is satisfied), not
-  infrastructure. Full methodology:
-  [`experiments/reports/phase_e_milo_benchmark_report.md`](../experiments/reports/phase_e_milo_benchmark_report.md).
-
-- **`milo_benchmark v1.1`** (54 tasks, 9 scenes, all 4 iTHOR room
-  types) — extends `v1.0` with 4 more scenes and a `tier4_multi_step`
-  tier (two independent, sequential sub-goals per task against one
-  live episode); `v1.0` stays the frozen reference set.
-
-  | Planner | Goal success | tier1 | tier2 | tier3 | tier4 |
-  |---|---|---|---|---|---|
-  | `rule_based` | 50/54 (92.6%) | 18/18 | 18/18 | 7/9 | 7/9 |
-  | `behavior_tree` | 50/54 (92.6%) | 18/18 | 18/18 | 7/9 | 7/9 |
-  | `htn` | 43/45 (95.6%)¹ | 18/18 | 18/18 | 7/9 | not attempted¹ |
-  | `react` (`qwen2.5:7b`) | 36/54 (66.7%) | 18/18 | 18/18 | 0/9 | 0/9 |
-
-  ¹ `HTNPlanner` is slice 1 — it does not yet support
-  `tier4_multi_step`'s multi-subtask decomposition, so those 9 tasks
-  were deliberately not attempted, not scored as failures. Its 43/45
-  across the 45 non-`tier4` tasks (all 9 scenes) is a generalization
-  check on the `v1.0` result above: no new failure mode appeared across
-  the 4 additional scenes — both `tier3_store` failures
-  (`milo-v1-fp301-t3a`, `milo-v1.1-fp203-t3a`) are the same shared
-  placement-geometry limit `rule_based`/`behavior_tree` hit on the
-  identical pair. Design-doc detail:
-  [`docs/architecture/planning.md`](../docs/architecture/planning.md)'s
-  "Generalization check" section.
-
-  Scaling to 9 scenes surfaced a real `WorldState`-reseeding gap in
-  `tier4_multi_step`: a failed `place` sub-goal can leave an object
-  physically held with no signal to the next sub-goal's planner.
-  Investigation traced this to two distinct causes — a Grounding DINO
-  multi-phrase joint-prompt confidence drop (confirmed on 2 independent
-  objects/frames, unrelated to any scored planning or benchmark path,
-  which already query one object name at a time) and a held-object
-  depth cutoff calibrated on smaller objects than some real held items.
-  One of the two known-failing episodes has its engine-crash symptom
-  fixed (demonstrated via targeted re-seeding, not yet merged into the
-  production harness); the other remains open on the depth-calibration
-  gap, with a concrete next step identified but not implemented. Full
-  chain: [`docs/roadmap.md`](../docs/roadmap.md).
-
-- **`react` model comparison, `qwen2.5:3b` vs `qwen2.5:7b`** (same
-  v1.1 54-task set): identical aggregate score, 36/54 (66.7%) each,
-  confirmed task-for-task identical (0/54 differences) rather than a
-  coincidence of totals. `qwen2.5:3b` ran ~2.3x faster (~3.1s vs
-  ~7.2s avg/episode) with full GPU residency (vs. `7b`'s partial CPU
-  offload) and slightly fewer tokens, at zero accuracy cost. Full
-  writeup: Addendum 8 of the
-  [benchmark report](../experiments/reports/phase_e_milo_benchmark_report.md).
-
-- **Cost/latency** (v1.0, 25 episodes each): `rule_based` ~620ms,
-  `behavior_tree` ~633ms, `htn` ~647ms, `react`/`qwen2.5:7b` ~7.5s
-  avg/episode. Plan+execution time only (captured before any
-  perception-grounding check runs).
-- **Vision inference, CPU vs. GPU** — PyTorch previously resolved to a
-  CPU-only build despite the RTX 4050 being present; now fixed. Same
-  machine, same image, same code path, 5 iterations (first excluded as
-  warmup): `GroundingDINODetector` 6189ms → 511ms (~12.1x), `SAM2Segmenter`
-  39120ms → 4734ms (~8.3x). Running vision inference and a loaded
-  `qwen2.5:7b` Ollama model concurrently peaks at ~5.9GB of this card's
-  6.1GB VRAM (~96%) — fits, with little headroom.
-
-Full detail, methodology, and provenance:
-[`docs/phases/phase8_7_final_audit.md`](../docs/phases/phase8_7_final_audit.md).
-
-## Known Limitations
-
-- **AI2-THOR only** — no physical robot validation; all execution
-  results are simulator results.
-- **Scene diversity validated, not exhaustive** — `milo_benchmark
-  v1.1`'s 9-scene sweep (all 4 iTHOR room types, up to 6 tasks each)
-  found object resolution, navigation, pickup, and (for the three
-  symbolic planners) store generalize cleanly across every new scene;
-  9 of ~120 iTHOR scenes is a broader real number than `v1.0`'s
-  original 5, still not a statistically powered study. See
-  [Current Results](#current-results).
-- **Held-object vision grounding has real, measured calibration
-  limits** — `is_open` and held-object state are now fused into the
-  planner's `WorldState` from live vision (not symbolic-only), but the
-  held-object heuristic's depth cutoff was calibrated against smaller
-  objects than some real held items measure, and it can misattribute
-  "holding" to the nearest detected object rather than the actually-
-  held one. Separately, Grounding DINO's confidence measurably drops
-  under multi-phrase joint prompts (confirmed on 2 independent
-  objects/frames) — this does not affect any scored planning or
-  benchmark path (those already query one object name at a time), but
-  does affect the frontend's default multi-object Vision-panel prompt
-  and several manual demo/verification scripts. See
-  [Current Results](#current-results) and `backend/planner/grounding.py`.
-- **HTN planning covers tier1-3 only (slice 1)** — `HTNPlanner` matches
-  `rule_based`/`behavior_tree` exactly on `v1.0` (24/25, 96%) and
-  generalizes cleanly across `v1.1`'s 9 scenes on the same three tiers
-  (43/45, 95.6%), but `tier4_multi_step`, `fetch`/`deliver`/
-  `navigate_to`, and memory-conditioned methods are explicit next-slice
-  work, not yet built.
-- **External API dependence** — cloud LLM providers and ElevenLabs are
-  paid third-party services; a fully local setup (Ollama/vLLM + local
-  Whisper) avoids this but isn't the default.
-- **No production authentication, rate limiting, or request quotas**
-  on any API route.
-
-Full, honest detail:
-[`docs/application/limitations.md`](../docs/application/limitations.md) and
-[`docs/phases/phase8_7_final_audit.md`](../docs/phases/phase8_7_final_audit.md).
-
-## Quick Start
-
-```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-cp .env.example .env   # fill in an LLM provider key -- see Configuration below
-uvicorn api.app:app --reload
-# -> http://localhost:8000 (docs at /docs, health at /health)
-
-# Frontend (separate terminal)
-cd frontend
-npm install
-npm run dev
-# -> http://localhost:5173
-
-# Tests
-cd backend && python -m pytest tests/ -v
-cd frontend && npm test && npm run build
-```
-
-For the full per-phase test/benchmark command reference and the
-Playwright browser E2E suite, see
-[`docs/testing/running_tests.md`](../docs/testing/running_tests.md).
-
-## Configuration
-
-The backend reads its configuration from the environment
-(`backend/language/config.py`, `backend/voice/config.py`); every
-setting has a sensible default except the API key itself.
-
-```bash
-# LLM provider -- "openai" (default), "gemini", or "qwen" (local, e.g. Ollama)
-export LANGUAGE_LLM_PROVIDER="qwen"
-export LANGUAGE_LLM_MODEL="qwen2.5:7b"
-export LANGUAGE_LLM_BASE_URL="http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
-export QWEN_API_KEY="not-needed"     # or GEMINI_API_KEY for gemini,
-                                      # or OPENAI_API_KEY for openai
-
-# AI2-THOR simulator -- off by default (most of the API 503s without it)
-export VISION_ENABLE_SIMULATOR="true"
-
-# Speech -- Whisper (local, default) or ElevenLabs (cloud)
-export SPEECH_ENABLE_WHISPER="true"
-export VOICE_ENABLE_ELEVENLABS="true"
-export ELEVENLABS_API_KEY="..."
-```
-
-Switching LLM providers is a one-variable change — no planner or
-orchestrator code depends on which provider is selected. Local Qwen
-(or any OpenAI-API-compatible server, e.g. vLLM/Ollama) reuses the same
-client the OpenAI provider uses — this is exactly the setup the real
-`react` baseline above was run against.
-
-Full configuration reference (every variable, every default, provider
-setup walkthroughs, and the security model):
-[`docs/phases/phase8_5_configuration_and_providers.md`](../docs/phases/phase8_5_configuration_and_providers.md).
-Deployment/Docker: [`docker/README.md`](../docker/README.md) and
-[`deployment/README.md`](../deployment/README.md).
-
-## Deployment
-
-MILO is not currently deployed publicly -- see [Quick Start](#quick-start)
-to run it locally, or [`docker/README.md`](../docker/README.md) /
-[`deployment/README.md`](../deployment/README.md) for deployment
-configuration if you want to host it yourself.
-
-## Project Structure
-
-```
-backend/        FastAPI app, agents, orchestration, planner, memory,
-                 vision, execution, simulator wrapper, tests,
-                 planning_evaluation (milo_benchmark dataset + runner)
-frontend/        React + TypeScript dashboard (Vite)
-docs/            Architecture, phase history, testing, application docs
-datasets/        Language understanding evaluation datasets
-models/          Downloaded model weights (gitignored)
-experiments/     Research experiment runners and results/reports
-benchmarks/      Reproducible evaluation suite entry points
-deployment/      Environment/target-specific deployment config
-docker/          Container definitions (backend + frontend)
-```
-
-Open items and full rationale: [`docs/roadmap.md`](../docs/roadmap.md).
-
-## Documentation
-
-- [`docs/application/architecture.md`](../docs/application/architecture.md) — current system & agent architecture
-- [`docs/application/tech_stack.md`](../docs/application/tech_stack.md) — full technology stack
-- [`docs/phases/phase8_7_final_audit.md`](../docs/phases/phase8_7_final_audit.md) — final research-readiness audit
-- [`backend/planning_evaluation/dataset/v1.0/README.md`](../backend/planning_evaluation/dataset/v1.0/README.md) — `milo_benchmark v1.0` dataset card
-- [`backend/planning_evaluation/dataset/v1.1/README.md`](../backend/planning_evaluation/dataset/v1.1/README.md) — `milo_benchmark v1.1` dataset card
-
-More detailed docs in [`docs/`](../docs/).
+Backend: Python 3.9, FastAPI, Pydantic, SQLite, AI2-THOR, Grounding DINO, SAM2, PyTorch (CUDA), scikit-learn. Frontend: React and TypeScript on Vite, with live updates over SSE and polling as a fallback. Tests: pytest, Vitest and Playwright. Deployment: Docker Compose with nginx. CI: GitHub Actions (backend, frontend, browser end-to-end, Docker build, and a benchmark regression gate).
 
 ## Screenshots
 
-All screenshots below are real renders of the actual frontend/backend
-code -- see [`docs/screenshots/README.md`](../docs/screenshots/README.md)
-for exactly which are captured against a live backend + real AI2-THOR
-run versus a mocked API response used to reliably reproduce a specific
-UI state (e.g. "plan mid-execution"). Neither category fabricates data
-values; the mocked set only fixes *which* real UI state renders.
+All captured on 2026-11-25 from the real app, after real missions on AI2-THOR. Regenerate them with `make screenshots`.
 
-**A real mission, driven through the actual UI** (live AI2-THOR, real LLM parse, real plan/execution):
+| Missions: a finished "find the mug" mission, MILO's camera view with the detection, and the room map | Replay: step through what MILO saw, planned and thought |
+|---|---|
+| ![Missions page showing a completed find-the-mug mission, the AI2-THOR camera frame with the mug detected, and the scene map](../docs/images/missions-desktop.png) | ![Replay page for the find-the-mug mission: camera frame, four-step plan and MILO's thoughts](../docs/images/replay-desktop.png) |
 
-| Instruction typed | Executing | Complete |
+| Memory: what MILO remembers, where it came from and how sure it is | Skills: a mission saved as a skill, and the teach form |
+|---|---|
+| ![Memory scrapbook with moments and facts, each showing its source and confidence, with pin, fix, set aside, forget and delete](../docs/images/memory-desktop.png) | ![Skills page listing the saved "chill it" skill and the Teach MILO form](../docs/images/skills-desktop.png) |
+
+| Leaderboard: every planner on the fixed benchmark | Lab: model switches and where the time goes |
+|---|---|
+| ![Leaderboard with known-task, new-task and under-fault success for each planner, recovery by fault kind and the ablations](../docs/images/leaderboard-desktop.png) | ![Lab page with the learned-model switches and per-stage p50 and p95 timings](../docs/images/lab-desktop.png) |
+
+In the Lab screenshot, every model reads "not trained yet". That's because trained model files aren't stored in git; train them with the `make` targets in [models](../docs/models/README.md).
+
+| Phone | Demo mode (no backend) |
+|---|---|
+| ![Play page on a phone, with MILO and the bottom tab dock](../docs/images/play-mobile.png) | ![Demo mode home page listing the recorded missions to replay](../docs/images/demo-home-desktop.png) |
+
+![Demo mode replaying a recorded mission](../docs/demo.gif)
+
+*Demo mode replays recorded missions with no simulator or GPU. Its "camera" panel shows a schematic sketch, not a real frame.*
+
+## Results
+
+Unless a row says otherwise, everything was measured on 2026-11-25 in the fixed synthetic home with fixed seeds. Each table names the command that reproduces it.
+
+**Tests (2026-11-25):**
+
+- Backend: 1,422 passed, 2 skipped (`cd backend && python -m pytest tests/`). The 2 skipped tests need a live LLM key.
+- Frontend: 215 passed in 37 files (`npm test`).
+- Playwright: 7 passed (`npx playwright test`).
+- black, ruff, mypy, tsc and eslint report no errors.
+
+**Benchmark** (`make benchmark`: 23 known tasks, 8 new tasks, and every known task under 6 fault kinds):
+
+| Planner | Known tasks | New tasks | Under faults | Steps | Sim time (s) |
+|---|---|---|---|---|---|
+| rule-based | 100% | 0% | 78% | 7.52 | 12.5 |
+| behaviour tree | 100% | 0% | 78% | 5.63 | 9.88 |
+| HTN | 100% | 0% | 78% | 5.63 | 9.88 |
+| ReAct | not measured (needs a model) | | | | |
+| novel planner (reference plans) | not run | 100% | not run | 5.25 | 9.38 |
+
+- **ReAct:** without a language model it falls back to the rule-based planner, so its benchmark row would only repeat rule-based.
+- **Behaviour tree and HTN:** their rows are genuinely identical. Checked plan by plan, all three classical planners produce the same first plan on all 23 known tasks.
+- **Rule-based:** executes more steps per mission (5.83 vs 4.43 on known tasks), so the difference arises during execution, not in the first plan. The cause hasn't been traced yet.
+
+**Recovery by fault kind** (before → after in-mission recovery):
+
+| Blocked path | Out of reach | Stuck door | Timeout | Wrong detection | Missing object |
+|---|---|---|---|---|---|
+| 100% | 22% → **100%** | 100% | 100% | 4% → **83%** | 0% |
+
+**Ablations** (rule-based, known tasks + faults):
+
+| Variant | Success |
+|---|---|
+| everything on | 81% |
+| no memory | 81% |
+| no reflection | 21% |
+| no replanning | 21% |
+| no in-mission recovery | 57% |
+
+Saved skills turn a repeated new task from 1 model call into 0.
+
+**New tasks** (`python -m novel.eval_novel`; 60 held-out commands):
+
+| Plan source | Correct |
+|---|---|
+| before (unknown tasks refused) | 0 / 60 |
+| offline (no model) | 0 / 60 |
+| reference plans (upper bound for the pipeline, not a model result) | 60 / 60 |
+| Claude | **not measured**: no API credits |
+
+- All 10 deliberately bad plans were caught before acting, and 0 unsafe actions were executed.
+- The Claude path is in the code but has never been run against the API.
+
+**Memory poisoning** (`python -m memory.eval_trust`): "put it away" correct under a 100% attack rate, defence off → on:
+
+| Attack | Off → on |
+|---|---|
+| imported preference | 0% → **100%** |
+| fake imported skills | 0% → **100%** |
+| spoofed "user" preference | 0% → **0%** (not defended) |
+
+**Failure memory:** with a persistent "can't see it" fault, repeat attempts went from 0% to **100%**. Out-of-reach failures, which have no known fix, are unchanged.
+
+**Goal checks** (`python -m verification.eval_goal_check`): the world contradicted 3 of 213 reported successes. All 3 were "find" tasks under a wrong detection.
+
+**Learned models** (details and model cards in [docs/models](../docs/models/README.md)):
+
+| Model | Baseline | Learned | Verdict |
+|---|---|---|---|
+| Step outcome predictor | rules: AUROC 0.661; mission success 0.717 | AUROC 0.968, ECE 0.005; success 0.783, wasted steps 1.94 → 1.22 | Better (synthetic simulator only) |
+| Fast detector (YOLO11n, real AI2-THOR frames) | Grounding DINO: mAP@0.5 0.315, 547 ms | mAP@0.5 0.548, 5.9 ms; observe time 1.37 s → 0.068 s | Better |
+| Memory embedder | hashing: recall@5 0.606 | 0.9997 | Better retrieval, no effect on missions (0.72 both) |
+| Instruction parser | phrasebook: 0.137 exact on new wording | 0.647 (learned first) | Better on new wording |
+| World model | static plan scoring | plan-score AUROC 0.525 → 0.552 | No mission gain (0.70 both); leave off |
+
+**Earlier results on real AI2-THOR** (`milo_benchmark` [v1.0 and v1.1](https://huggingface.co/datasets/naishashetty/milo_benchmark), August 2026, scored against live simulator state). These come from before the work above and weren't re-run:
+
+| Planner | v1.0 (25 tasks, 5 scenes) | v1.1 (54 tasks, 9 scenes) |
 |---|---|---|
-| ![Instruction typed](../docs/screenshots/demo/live-01-instruction-typed.png) | ![Task in progress](../docs/screenshots/demo/live-02-task-in-progress.png) | ![Task complete](../docs/screenshots/demo/live-03-task-complete.png) |
+| rule-based | 24/25 (96%) | 50/54 (92.6%) |
+| behaviour tree | 24/25 (96%) | 50/54 (92.6%) |
+| HTN | 24/25 (96%) | 43/45 (95.6%), multi-step tier not attempted |
+| ReAct with `qwen2.5:7b` (local, via Ollama) | 20/25 (80%) | 36/54 (66.7%) |
 
-**Mission Control** (agent status, live plan, activity feed):
+The companion leaderboard and episode replay are in the [Hugging Face Space](https://huggingface.co/spaces/naishashetty/milo_benchmark_companion).
 
-![Mission Control](../docs/screenshots/ui/mission-control.png)
+## What didn't beat its baseline
 
-**Memory** (episodic/semantic/failure memory, real retrieval):
+- **Spoofed "user" memories aren't defended.** A fake memory claiming to come from you wins, just as a real change of mind would.
+- **Memory adds nothing on the current benchmark**, where every object is in view.
+- **The world model and the memory embedder** didn't change mission success.
+- **No language-model result for new tasks.** The 60/60 comes from hand-written reference plans, so it measures the pipeline, not a model's planning. Claude was never run.
+- **Wrong detection on "find" tasks** is caught only by the final goal check, not within the mission.
+- **The synthetic simulator.** Except for the detector and the earlier v1.0/v1.1 runs, everything was measured there, not in real AI2-THOR.
 
-![Memory](../docs/screenshots/ui/memory.png)
+## Configuration
 
-**Home**, **Activity**, **MILO Lab**, **About MILO**, **Settings**:
+Copy `backend/.env.example` to `backend/.env`. Everything has a safe default.
 
-| Home | Activity |
-|---|---|
-| ![Home](../docs/screenshots/ui/home.png) | ![Activity](../docs/screenshots/ui/activity.png) |
+| Setting | Default | What it does |
+|---|---|---|
+| `EXECUTION_STEP_TIMEOUT_S` | `120` | A hung simulator call fails its step after this many seconds (`0` = no timeout) |
+| `VISION_ENABLE_SIMULATOR` | `false` | Start real AI2-THOR (needs a GPU and a display) |
+| `LANGUAGE_LLM_PROVIDER` | `openai` | Model for unrecognised wording: `openai`, `gemini` or `qwen` (any local OpenAI-compatible server, such as Ollama) |
+| `MILO_NOVEL_PROVIDER` | `claude` | Planner for new tasks; falls back to `offline` when no key is set |
+| `MILO_GOAL_CHECK` | `report` | `enforce` turns a failed success check into a replan |
+| `MILO_INMISSION_RECOVERY` | `1` | Look around or re-approach before retrying |
+| `MILO_MEMORY_DEFENCE` | `1` | Trust-weighted memory, quarantine and reconciliation |
+| `MILO_FAILURE_MEMORY` | `1` | Learn lessons from failed missions |
+| `MILO_APPROVALS`, `MILO_APPROVAL_TIMEOUT` | `1`, `300` | Ask before risky steps; no answer means skip |
+| `API_KEY`, `RATE_LIMIT_PER_MINUTE` | unset | Require an `X-API-Key` header; rate-limit per caller |
+| `MILO_LEARNED_REFLECTOR`, `MILO_FAST_DETECTOR`, `MILO_LEARNED_PARSER`, `MILO_WORLD_MODEL` | off | The learned models (see [models](../docs/models/README.md)) |
 
-| MILO Lab | Settings |
-|---|---|
-| ![MILO Lab](../docs/screenshots/ui/lab.png) | ![Settings](../docs/screenshots/ui/settings.png) |
+Never commit `backend/.env` or any key.
+
+## Documentation
+
+- Write-up: [docs/writeup.md](../docs/writeup.md)
+- The parts: [foundation](../docs/foundation.md) · [novel tasks](../docs/novel_tasks.md) · [skills](../docs/skills.md) · [oversight](../docs/oversight.md) · [memory trust](../docs/memory_trust.md) · [benchmark and CI](../docs/benchmark.md) · [observability](../docs/observability.md) · [voice](../docs/voice.md) · [learned models](../docs/models/README.md)
+- Running the tests: [docs/testing/running_tests.md](../docs/testing/running_tests.md)
+- Docker and deployment: [docker/README.md](../docker/README.md) · [deployment/README.md](../deployment/README.md)
+- Older design notes and phase history: [docs/](../docs/)
+
+## What's left
+
+1. Measure new tasks with a real language model. Claude needs API credits; a free local model (Ollama) is the next option.
+2. Run the outcome predictor on real AI2-THOR before switching it on by default.
+3. Defend against spoofed "user" memories: assign each memory's source on the server and log who changed it.
+4. Recover "find" tasks under a wrong detection within the mission, by taking a second look.
+5. Add benchmark tasks that genuinely need memory, so the memory ablation means something.
+6. Deploy demo mode as a free static site, and add the link here.
+7. Move off Python 3.9, which is nearing end of life.
 
 ## License
 
-MIT — see [`LICENSE`](../LICENSE).
+MIT. See [LICENSE](../LICENSE).
