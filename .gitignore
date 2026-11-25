@@ -91,6 +91,10 @@ models/*
 results/*
 !results/.gitkeep
 !results/README.md
+# Small summaries the docs quote: the machine they were measured on and the
+# local-model bake-off (per-run JSON, a few KB each).
+!results/hardware.json
+!results/bakeoff/
 
 # experiments/results/ holds raw benchmark run output (timestamped
 # json/csv), same nature as results/ above -- ignored by default so

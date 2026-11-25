@@ -1,0 +1,73 @@
+{
+  "date": "2026-11-25T11:50:07+00:00",
+  "os": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "wsl": true,
+  "gpu": {
+    "present": true,
+    "name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+    "vram_mib": 6141,
+    "vram_used_mib": 0,
+    "vram_free_mib": 5920,
+    "driver": "610.88",
+    "processes_visible": [],
+    "note": "On WSL, Windows processes using the GPU may not be listed individually."
+  },
+  "memory": {
+    "ram_gib": 7.6,
+    "ram_available_gib": 6.7
+  },
+  "cpu": {
+    "model": "13th Gen Intel(R) Core(TM) i7-13620H",
+    "logical_cores": 16
+  },
+  "ollama": {
+    "installed": true,
+    "url": "http://172.24.160.1:11434",
+    "running": true,
+    "models": [
+      {
+        "name": "qwen3.5:4b",
+        "size_gb": 3.3,
+        "quantization": "Q4_K_M"
+      },
+      {
+        "name": "mistral:7b-text",
+        "size_gb": 4.1,
+        "quantization": "Q4_0"
+      },
+      {
+        "name": "phi3:mini",
+        "size_gb": 2.2,
+        "quantization": "Q4_0"
+      },
+      {
+        "name": "llama2:latest",
+        "size_gb": 3.8,
+        "quantization": "Q4_0"
+      },
+      {
+        "name": "mistral:7b",
+        "size_gb": 4.4,
+        "quantization": "Q4_K_M"
+      },
+      {
+        "name": "llama3.1:8b",
+        "size_gb": 4.9,
+        "quantization": "Q4_K_M"
+      },
+      {
+        "name": "qwen2.5:7b",
+        "size_gb": 4.7,
+        "quantization": "Q4_K_M"
+      }
+    ],
+    "loaded_now": []
+  },
+  "milo_gpu_users": [
+    "AI2-THOR (Unity rendering) when VISION_ENABLE_SIMULATOR=true",
+    "Grounding DINO (open-vocabulary detection)",
+    "SAM2 (segmentation, Vision panel only)",
+    "YOLO11n ONNX fast detector when MILO_FAST_DETECTOR=1",
+    "the local language model served by Ollama"
+  ]
+}
