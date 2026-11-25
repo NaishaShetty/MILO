@@ -33,3 +33,14 @@ Latency (fine-tuned, GPU, real `RetrievalEngine`): 5,000 memories p50 5.8 ms / p
 - Recommendation: keep `hashing` as the default; use `learned` when queries are phrased more freely than the object name (synonyms), and re-evaluate on real memory logs before promoting it.
 
 Reproduce: `make train-embedder eval-retrieval eval-retrieval-missions`.
+
+## Re-checked on the benchmark's memory tier (2026-11-25)
+
+The memory tier (`docs/benchmark.md`) is the first place remembered locations change mission success: objects start out of view, and only going where they usually are finds them.
+
+| Embedder | Memory tier success (rule-based, 8 missions) | Steps per mission |
+|---|---|---|
+| hashing (default) | 8 / 8 | 8.38 |
+| learned (fine-tuned BGE-small) | 8 / 8 | 8.38 |
+
+Identical, for a structural reason. The planner's memory hint looks up a stored fact by its subject ("mug located_on shelf"), not by embedding similarity, so the embedder is not on the path that decides these missions. Retraining it on retrieval logs from these tasks can't change this result. The embedder matters where MILO searches free-text memories, which no benchmark tier exercises yet. Recommendation unchanged: optional, off by default.
