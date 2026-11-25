@@ -14,6 +14,8 @@ import { LabPage } from "./pages/LabPage";
 import { MemoryPage } from "./pages/MemoryPage";
 import { SkillsPage } from "./pages/SkillsPage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
+import { ReplayPage } from "./pages/ReplayPage";
+import { ObservabilityPanel } from "./components/ObservabilityPanel";
 import { MissionsPage } from "./pages/MissionsPage";
 import { PlayPage } from "./pages/PlayPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -39,7 +41,9 @@ export default function App() {
                         <Route path="/memory" element={<MemoryPage />} />
                         <Route path="/skills" element={<SkillsPage />} />
                         <Route path="/leaderboard" element={<LeaderboardPage />} />
-                        <Route path="/lab" element={<div className="legacy-page"><ModelsPanel /><LabPage /></div>} />
+                        <Route path="/replay" element={<ReplayPage />} />
+                        <Route path="/replay/:missionId" element={<ReplayPage />} />
+                        <Route path="/lab" element={<div className="legacy-page"><ModelsPanel /><ObservabilityPanel /><LabPage /></div>} />
                         <Route path="/about" element={<div className="legacy-page"><AboutPage /></div>} />
                         <Route path="/settings" element={<div className="legacy-page"><SettingsPage /></div>} />
                         <Route path="*" element={<Navigate to="/" replace />} />

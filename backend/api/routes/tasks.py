@@ -978,7 +978,10 @@ def build_orchestrator(
         vision_agent=vision_agent,
         registry=registry,
         planner_factory=planner_for,
-        trace_recorder=build_recorder(frame_source=execution.get_frame),
+        trace_recorder=build_recorder(
+            frame_source=execution.get_frame,
+            pose_source=lambda: (execution.get_metadata() or {}).get("agent"),
+        ),
         approval_gate=_build_gate(),
         **learning_kwargs(),
     )

@@ -135,6 +135,7 @@ from api.routes.lab import router as lab_router
 from api.routes.language import router as language_router
 from api.routes.memory import router as memory_router
 from api.routes.planner import router as planner_router
+from api.routes.scene_map import router as scene_map_router
 from api.routes.skills import router as skills_router
 from api.routes.speech import router as speech_router
 from api.routes.tasks import build_orchestrator
@@ -480,6 +481,7 @@ app.include_router(
     skills_router, prefix="/api/v1/skills", tags=["skills"], dependencies=_GUARDED
 )
 app.include_router(benchmark_router, prefix="/api/v1/benchmark", tags=["benchmark"])
+app.include_router(scene_map_router, prefix="/api/v1/scene", tags=["scene"])
 
 
 _STATUS_MESSAGES = {

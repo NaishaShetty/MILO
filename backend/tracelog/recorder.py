@@ -50,9 +50,12 @@ class TraceRecorder:
         store: TraceStore,
         frame_source: Optional[FrameSource] = None,
         keep_frames: bool = True,
+        pose_source: Optional[Callable[[], Any]] = None,
     ) -> None:
         self.store = store
         self._frames = frame_source if keep_frames else None
+        #: Returns the simulator's agent pose ({"position": {x, y, z}, "rotation": ...}).
+        self._pose = pose_source
         self._thoughts_seen: Dict[str, int] = {}
         self._step_started: Dict[tuple, float] = {}
 
@@ -162,6 +165,15 @@ class TraceRecorder:
         }
         if self._frames is not None:
             data["frame"] = thumbnail(self._frames())
+        if self._pose is not None:
+            pose = self._pose() or {}
+            pos = pose.get("position") or {}
+            if "x" in pos and "z" in pos:
+                data["pose"] = {
+                    "x": round(float(pos["x"]), 3),
+                    "z": round(float(pos["z"]), 3),
+                    "yaw": round(float((pose.get("rotation") or {}).get("y", 0.0)), 1),
+                }
         self.store.add(ts.task_id, "step", data, step_id=step.step_id, ts=now)
         self._flush_thoughts(ts)
 
@@ -180,6 +192,7 @@ class TraceRecorder:
 
 def build_recorder(
     frame_source: Optional[FrameSource] = None,
+    pose_source: Optional[Callable[[], Any]] = None,
 ) -> Optional[TraceRecorder]:
     """The recorder the API uses (None when `MILO_TRACE=0` or the store can't open)."""
     if os.environ.get("MILO_TRACE", "1").strip().lower() in ("0", "false", "no", "off"):
@@ -195,4 +208,6 @@ def build_recorder(
         "no",
         "off",
     )
-    return TraceRecorder(store, frame_source=frame_source, keep_frames=keep)
+    return TraceRecorder(
+        store, frame_source=frame_source, keep_frames=keep, pose_source=pose_source
+    )

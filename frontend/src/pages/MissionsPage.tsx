@@ -2,7 +2,7 @@
 // steps, step cards, MILO's thoughts, what MILO sees, the reflection options,
 // what he learned, and Stop / Try again / Replay controls.
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { perceive } from "../api/vision";
 import { MiloActor } from "../components/MiloActor";
@@ -15,6 +15,7 @@ import { ApiError } from "../api/client";
 import { readableWording, saveTaskAsSkill } from "../api/skills";
 import { DecisionCard } from "../components/DecisionCard";
 import { correctTask, undoPreview, undoTask } from "../api/tasks";
+import { SceneMap } from "../components/SceneMap";
 
 const WHO: Record<string, string> = { memory: "M", planner: "P", eyes: "E", hands: "H", reflect: "R" };
 const TERMINAL = ["succeeded", "failed", "cancelled"];
@@ -274,7 +275,11 @@ export function MissionsPage() {
           {activeTask.cancel_summary && <div className="notice">{activeTask.cancel_summary}</div>}
           {activeTask.answer && <div className="notice">{activeTask.answer}</div>}
           <MissionTrack steps={steps} direction={direction} />
+          <p>
+            <Link to={`/replay/${activeTask.task_id}`}>Replay this mission</Link>
+          </p>
         </section>
+        <SceneMap live={!finished} />
 
         <section>
           <h2>The path</h2>

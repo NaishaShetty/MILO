@@ -15,7 +15,7 @@ function Trend({ points }: { points: number[] }) {
   const d = points.map((p, i) => `${(i / (points.length - 1)) * w},${h - p * h}`).join(" ");
   return (
     <svg width={w} height={h} role="img" aria-label={`trend over ${points.length} runs`}>
-      <polyline points={d} fill="none" stroke="var(--orange, #e8743b)" strokeWidth="2" />
+      <polyline points={d} fill="none" stroke="var(--tangerine)" strokeWidth="2" />
     </svg>
   );
 }

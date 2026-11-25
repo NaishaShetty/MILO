@@ -171,3 +171,14 @@ a { color: var(--tangerine-ink); }
 .library__item { border: var(--border); border-radius: 12px; padding: 8px 12px; background: #fffaf0; }
 .select { font: 700 15px var(--font-body); border: var(--border); border-radius: 12px; padding: 8px 12px; background: #fffaf0; color: var(--ink); }
 .legacy-page { margin-top: var(--space-3); }
+
+/* Lab: per-mission waterfall (Phase 7) */
+.waterfall { display: grid; gap: 4px; margin-top: 12px; }
+.waterfall__row { display: grid; grid-template-columns: 160px 1fr 64px; gap: 8px; align-items: center; font-size: 0.85rem; }
+.waterfall__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.waterfall__track { position: relative; height: 12px; background: var(--cream-dots); border-radius: 6px; }
+.waterfall__bar { position: absolute; top: 0; height: 12px; border-radius: 6px; background: var(--apricot); }
+.waterfall__bar--plan, .waterfall__bar--replan { background: var(--sun); }
+.waterfall__bar--reflection { background: var(--peach); }
+.waterfall__bar--failed { background: var(--danger-ink); }
+.replay { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
