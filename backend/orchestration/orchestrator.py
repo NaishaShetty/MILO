@@ -123,8 +123,12 @@ class Orchestrator:
         plan_ranker=None,
         trace_recorder=None,
         approval_gate=None,
+        in_mission_recovery: Optional[bool] = None,
     ) -> None:
         self._planner = planner_agent
+        #: Targeted in-mission fixes (`orchestration.recovery`); None = follow
+        #: `MILO_INMISSION_RECOVERY`.
+        self._in_mission_recovery = in_mission_recovery
         #: Builds a planner wrapper for a requested strategy name; without
         #: one, every task uses `planner_agent`.
         self._planner_factory = planner_factory
@@ -148,6 +152,8 @@ class Orchestrator:
         self._snapshots: Dict[int, Dict] = {}
         self._retries = 0
         self._replans = 0
+        #: In-mission recovery tally: (failure, action, target) -> fixes applied.
+        self._mitigations: Dict[Tuple[str, str, str], int] = {}
         self._memory_stats: Dict[str, float] = {}
         self._execution = execution_agent
         self._memory = memory_agent
@@ -211,6 +217,7 @@ class Orchestrator:
         """Runs a task (see `_run`) and, if an episode logger is attached, records the outcome."""
         started = time.perf_counter()
         self._retries = self._replans = 0
+        self._mitigations = {}
         self._snapshots = {}
         self._memory_stats = {}
         self._contexts = {}
@@ -515,6 +522,7 @@ class Orchestrator:
 
             attempt += 1
             if reflection.action == "retry":
+                self._recover_in_mission(task_state, record)
                 continue
 
             if self._cancel_event.is_set():
@@ -548,6 +556,7 @@ class Orchestrator:
                 )
             task_state.current_plan = planning_result.plan
             self._apply_lessons(task, task_state)
+            self._recover_in_mission(task_state, record)
             self._note_planner(task_state, planning_result.plan)
             self._think(
                 task_state,
@@ -1305,6 +1314,26 @@ class Orchestrator:
         if said:
             plan.metadata["lessons"] = found
             self._think(task_state, "memory", said)
+
+    def _recover_in_mission(
+        self, task_state: TaskState, record: ExecutionRecord
+    ) -> None:
+        """Targeted fix before the next attempt: look around after "not visible",
+        walk up again after "not reachable" (see `orchestration.recovery`). Any
+        error leaves the plan as the plain retry/replan would have it."""
+        from orchestration import recovery
+
+        plan = task_state.current_plan
+        on = self._in_mission_recovery
+        if plan is None or not (recovery.enabled() if on is None else on):
+            return
+        try:
+            said = recovery.mitigate(plan, record, self._mitigations)
+        except Exception:
+            logger.warning("orchestrator.recovery_failed", exc_info=True)
+            return
+        if said:
+            self._think(task_state, "planner", said)
 
     def _after_mission(self, task_state: TaskState) -> None:
         """Lets a planner that learns from outcomes (the novel-task planner) see how

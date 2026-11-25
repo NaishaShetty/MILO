@@ -161,6 +161,9 @@ def _run(agent, fault="wrong_detection"):
         PlannerAgentWrapper(create_planner("rule_based")),
         ExecutionAgentWrapper(sim),  # type: ignore[arg-type]
         memory_agent=MemoryAgentWrapper(agent),
+        # These tests are about the *next* mission; in-mission recovery would
+        # rescue the first one (see tests/test_in_mission_recovery.py).
+        in_mission_recovery=False,
     )
     return orch.run(SingleTask(goal="fetch", object="apple"), max_replans=1)
 
