@@ -10,7 +10,7 @@ One command, every planner, JSON + Markdown reports:
 
 Reported per planner: success rate (the mission ended "succeeded" *and* the world-state
 goal checks passed), steps run, simulated time, replans. Plus an ablation table (what
-memory, reflection, replanning and skills are each worth) and a fault-recovery table
+memory, reflection, replanning, in-mission recovery and skills are each worth) and a fault-recovery table
 (success under each injected fault kind). Every run appends a summary line to
 `benchmarks/history.jsonl` for the Leaderboard.
 """
@@ -114,6 +114,7 @@ def run_case(
     memory: bool = True,
     reflection: bool = True,
     replanning: bool = True,
+    recovery: bool = True,
 ) -> Dict[str, Any]:
     sim = SyntheticSimulator(
         scene(),
@@ -134,7 +135,9 @@ def run_case(
             memory_agent=MemoryAgentWrapper(_memory(tmp)) if memory else None,
             reflection_agent=None if reflection else NoReflection(),
         )
-        with _env(MILO_GOAL_CHECK="enforce"):
+        with _env(
+            MILO_GOAL_CHECK="enforce", MILO_INMISSION_RECOVERY="1" if recovery else "0"
+        ):
             state = orch.run(
                 SingleTask(**case.task_fields()), max_replans=2 if replanning else 0
             )
@@ -236,7 +239,10 @@ def ablation_table(provider: Optional[Provider]) -> Dict[str, Any]:
     novel = novel_cases()
 
     def known_score(
-        memory: bool = True, reflection: bool = True, replanning: bool = True
+        memory: bool = True,
+        reflection: bool = True,
+        replanning: bool = True,
+        recovery: bool = True,
     ) -> float:
         rows = [
             run_case(
@@ -245,6 +251,7 @@ def ablation_table(provider: Optional[Provider]) -> Dict[str, Any]:
                 memory=memory,
                 reflection=reflection,
                 replanning=replanning,
+                recovery=recovery,
             )
             for c in known
         ]
@@ -277,6 +284,7 @@ def ablation_table(provider: Optional[Provider]) -> Dict[str, Any]:
         "no_memory": {"known+faults success": known_score(memory=False)},
         "no_reflection": {"known+faults success": known_score(reflection=False)},
         "no_replanning": {"known+faults success": known_score(replanning=False)},
+        "no_in_mission_recovery": {"known+faults success": known_score(recovery=False)},
     }
     with_skills, without = novel_score(True), novel_score(False)
     out["full"]["novel second pass"] = {

@@ -120,6 +120,10 @@ def run_episode(db: Path, scene_index: int, index: int, seed: int) -> None:
         PlannerAgentWrapper(create_planner(planner)),
         ExecutionAgentWrapper(sim),  # type: ignore[arg-type]
         episode_logger=EpisodeLogger(db),
+        # The dataset (and the outcome-model metrics in docs/models) was generated
+        # with plain retry/replan; keep it reproducible. Re-generating with in-mission
+        # recovery on is a separate, re-measured change.
+        in_mission_recovery=False,
     )
     orchestrator.episode_context = {
         "scene_id": scene_id,

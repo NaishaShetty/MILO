@@ -53,26 +53,27 @@ Measured on 2026-11-25 in the fixed synthetic home, with fixed seeds. Every numb
 
 | Planner | Known tasks | New tasks | Under faults | Steps | Sim time (s) |
 |---|---|---|---|---|---|
-| rule-based | 100% | 0% | 48% | 7.78 | 11.67 |
-| ReAct (falls back to rule-based without a model) | 100% | 0% | 48% | 7.78 | 11.67 |
-| behaviour tree | 100% | 0% | 48% | 5.58 | 9.05 |
-| HTN | 100% | 0% | 48% | 5.58 | 9.05 |
+| rule-based | 100% | 0% | 78% | 7.52 | 12.5 |
+| ReAct (falls back to rule-based without a model) | 100% | 0% | 78% | 7.52 | 12.5 |
+| behaviour tree | 100% | 0% | 78% | 5.63 | 9.88 |
+| HTN | 100% | 0% | 78% | 5.63 | 9.88 |
 | language-model planner (reference plans) | not run | 100% | not run | 5.25 | 9.38 |
 
-**Recovery by fault kind:**
+**Recovery by fault kind** (before → after in-mission recovery):
 
 | Blocked path | Out of reach | Stuck door | Timeout | Wrong detection | Missing object |
 |---|---|---|---|---|---|
-| 100% | 22% | 100% | 100% | 4% | 0% |
+| 100% | 22% → **100%** | 100% | 100% | 4% → **83%** | 0% |
 
 **Ablations** (rule-based, known tasks + faults):
 
 | Variant | Success |
 |---|---|
-| everything on | 57% |
-| no memory | 57% |
+| everything on | 81% |
+| no memory | 81% |
 | no reflection | 21% |
 | no replanning | 21% |
+| no in-mission recovery | 57% |
 
 Skills turn a repeated new task from 1 model call into 0.
 
@@ -106,7 +107,7 @@ All 10 deliberately bad plans were caught before acting, and 0 unsafe actions we
 ## What didn't beat its baseline (plainly)
 
 - **Spoofed user memories** aren't defended: a fake memory claiming to come from the user wins, just as a real change of mind would.
-- **Two fault kinds recover badly within a mission:** wrong detection (4%) and out of reach (22%).
+- **Wrong detection on "find" tasks** still isn't recovered within a mission (wrong detection overall: 83%). No step fails there; only the final goal check notices.
 - **Memory adds nothing on the benchmark,** where everything is in view.
 - **The world model and the learned memory embedder** didn't change mission success.
 - **The novel-task results with an LLM are unmeasured here.** The 60/60 uses hand-written reference plans and measures the pipeline, not the model's planning.
@@ -115,7 +116,7 @@ All 10 deliberately bad plans were caught before acting, and 0 unsafe actions we
 ## Next steps
 
 1. Run the 60-command novel-task benchmark with Claude (`--claude`), and the full benchmark with `--provider claude`.
-2. Add mitigations for wrong detection and out-of-reach that work within a mission (look around, re-approach), not only on the next one.
+2. Recover "find" tasks under a wrong detection within the mission: when the final goal check fails, look around and check again.
 3. Authenticate user statements so spoofed "user" memories can be told apart.
 4. Re-measure everything on real AI2-THOR scenes.
 5. Retire or update the nine pre-redesign Playwright specs (`tests/e2e/microphone.spec.ts`, `screenshots.spec.ts`), which fail on the current UI.

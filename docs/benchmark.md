@@ -20,36 +20,38 @@ A fixed synthetic home with fixed tasks, faults and seeds, so repeated runs give
 
 | Planner | Known | New tasks | Under faults | Steps | Sim time (s) | Replans |
 |---|---|---|---|---|---|---|
-| rule-based | 100% | 0% | 48% | 7.78 | 11.67 | 0.144 |
-| ReAct | 100% | 0% | 48% | 7.78 | 11.67 | 0.144 |
-| behaviour tree | 100% | 0% | 48% | 5.58 | 9.05 | 0.144 |
-| HTN | 100% | 0% | 48% | 5.58 | 9.05 | 0.144 |
+| rule-based | 100% | 0% | 78% | 7.52 | 12.5 | 0.144 |
+| ReAct | 100% | 0% | 78% | 7.52 | 12.5 | 0.144 |
+| behaviour tree | 100% | 0% | 78% | 5.63 | 9.88 | 0.144 |
+| HTN | 100% | 0% | 78% | 5.63 | 9.88 | 0.144 |
 | language model (reference plans) | not run | 100% | not run | 5.25 | 9.38 | 0 |
 
-Recovery by fault kind (all four classical planners are identical):
+Recovery by fault kind (all four classical planners are identical), before → after in-mission recovery:
 
 | Blocked path | Out of reach | Stuck door | Timeout | Wrong detection | Missing object |
 |---|---|---|---|---|---|
-| 100% | 22% | 100% | 100% | 4% | 0% |
+| 100% | 22% → **100%** | 100% | 100% | 4% → **83%** | 0% |
 
 What each part is worth (rule-based on known + fault cases; the novel planner on a second pass over the new tasks):
 
 | Variant | Known + faults | New tasks, 2nd pass | Model calls per task |
 |---|---|---|---|
-| everything on | 57% | 100% | 0 |
-| no memory | 57% | | |
+| everything on | 81% | 100% | 0 |
+| no memory | 81% | | |
 | no reflection (first failure ends the mission) | 21% | | |
 | no replanning | 21% | | |
+| no in-mission recovery (`MILO_INMISSION_RECOVERY=0`) | 57% | | |
 | no skills | | 100% | 1 |
 
 **Read honestly:**
 - **ReAct is identical to rule-based here.** With no language model configured it falls back to the rule-based planner, by design.
 - **Memory is worth nothing on this suite.** Every object is in view, so remembered locations change nothing.
-- **Reflection and replanning are worth 36 points under faults** (57% vs 21%).
+- **Reflection and replanning are worth 60 points under faults** (81% vs 21%). Without the in-mission fixes below they were worth 36 (57% vs 21%).
 - **Skills don't change success** with reference plans, but they remove the model call entirely on repeat tasks.
-- **Two fault kinds are barely recovered within a mission:**
-  - Wrong detection (4%): replanning doesn't add a look-around. Failure memory (Phase 5) only helps on the *next* mission.
-  - Out of reach (22%).
+- **In-mission recovery is worth 24 points** (81% vs 57%):
+  - **Why it was needed.** A retry re-runs the same plan, and the executor skips steps already marked done. So the `navigate` that left MILO unable to see or reach the object never ran again, and a replan produced the same steps.
+  - **What it does now** (`backend/orchestration/recovery.py`). After a "not visible" step failure it inserts `look_around` before the next attempt. After "not reachable" it inserts a fresh `navigate` to the target. A second time for the same step, it looks around and then re-approaches. Each fix is capped at two per step per mission, and `max_replans` still bounds the attempts.
+  - **What's still missing.** The remaining wrong-detection failures (4 of 23) are all **find** tasks. There, no step fails: the plan "succeeds", and only the final goal check sees the object isn't visible. Failure memory (Phase 5) still fixes those on the *next* mission.
 - A missing object can't be recovered, as expected.
 
 ## CI

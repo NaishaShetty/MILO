@@ -46,7 +46,7 @@ Household-robot demos usually work for the commands they were built for and fail
 
 ## What didn't work
 
-- **Some faults barely recover within a mission.** Wrong detection recovers 4% of the time and out of reach 22%; replanning alone doesn't change how MILO looks. Failure memory fixes "couldn't see it" only on the *next* mission.
+- **Some faults used to barely recover within a mission.** Wrong detection recovered 4% of the time and out of reach 22%, because a retry never re-ran the walk-up. Targeted in-mission fixes (look around after "not visible", re-approach after "not reachable") raised these to 83% and 100%. "Find" tasks under a wrong detection still only recover on the *next* mission, through failure memory.
 - **Memory adds nothing on our benchmark** because every object is always visible. That's a weakness of the benchmark as much as a finding.
 - **Spoofed user memories can't be told apart from a real change of mind** without authenticated input.
 - **We never ran a language model in this environment** (no credentials). The novel-task numbers measure everything except the model's own planning.
