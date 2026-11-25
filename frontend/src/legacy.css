@@ -5601,10 +5601,10 @@ body {
   min-height: 270px;
   gap: 24px;
   border-radius: 20px;
-  border: 1px solid var(--milo-line);
+  border: 1px solid var(--milo-border);
   background:
-    radial-gradient(circle at 28% 55%, rgba(144, 91, 255, 0.15), transparent 26%),
-    linear-gradient(120deg, rgba(11, 11, 25, 0.96), rgba(255, 246, 229, 0.86));
+    radial-gradient(circle at 14% 55%, rgba(255, 138, 43, 0.2), transparent 32%),
+    linear-gradient(120deg, #FFE7C2, #FFF6E5);
 }
 
 .lab-page__hero-title {
@@ -5618,7 +5618,7 @@ body {
 
 .lab-page__tagline {
   font-size: 1.15rem;
-  color: #E8C98A;
+  color: #C2410C;
 }
 
 .lab-page__hero-description {
@@ -5645,7 +5645,7 @@ body {
 .lab-page__hero-card:hover {
   transform: translateY(-2px);
   border-color: rgba(255, 138, 43, 0.35);
-  box-shadow: 0 0 28px rgba(143, 93, 255, 0.1);
+  box-shadow: 0 0 28px rgba(255, 138, 43, 0.14);
 }
 
 .lab-page__grid {
