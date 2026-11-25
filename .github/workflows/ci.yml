@@ -69,6 +69,14 @@ jobs:
         working-directory: backend
         run: python -m pytest tests/ -v
 
+      # Mission-level regression gate: the fixed benchmark's fast slice
+      # (backend/benchmark/suite.py::ci_subset, deterministic seeds) must not
+      # drop more than 5 points below benchmarks/ci_baseline.json for any
+      # planner. After an intended change: python -m benchmark.ci --write-baseline
+      - name: Benchmark regression gate
+        working-directory: backend
+        run: python -m benchmark.ci --margin 0.05
+
   frontend:
     name: Frontend -- lint, type-check, test, build
     runs-on: ubuntu-latest

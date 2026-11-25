@@ -83,6 +83,9 @@ export function NavBar() {
                 <Link className="menu__item" role="menuitem" to="/settings" onClick={() => setMenuOpen(false)}>
                   Settings
                 </Link>
+                <Link className="menu__item" role="menuitem" to="/leaderboard" onClick={() => setMenuOpen(false)}>
+                  Leaderboard
+                </Link>
                 <Link className="menu__item" role="menuitem" to="/about" onClick={() => setMenuOpen(false)}>
                   About MILO
                 </Link>

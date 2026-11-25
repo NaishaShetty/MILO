@@ -72,3 +72,11 @@ eval-novel:
 ## Memory poisoning red-team (defence off vs on) and repeat failures with failure memory
 eval-trust:
 	cd backend && $(PY) -m memory.eval_trust
+
+## Fixed benchmark: every planner, ablations, fault recovery -> benchmarks/latest.{json,md}
+benchmark:
+	cd backend && $(PY) -m benchmark.run --subset full
+
+## The CI regression gate (fast subset vs benchmarks/ci_baseline.json)
+benchmark-ci:
+	cd backend && $(PY) -m benchmark.ci

@@ -128,6 +128,7 @@ from agents.speech_agent import SpeechAgent
 from agents.vision_agent import VisionAgentWrapper
 from agents.voice_agent import VoiceAgent
 from api.routes.agents import router as agents_router
+from api.routes.benchmark import router as benchmark_router
 from api.routes.execution import router as execution_router
 from api.routes.health import router as health_router
 from api.routes.lab import router as lab_router
@@ -478,6 +479,7 @@ app.include_router(
 app.include_router(
     skills_router, prefix="/api/v1/skills", tags=["skills"], dependencies=_GUARDED
 )
+app.include_router(benchmark_router, prefix="/api/v1/benchmark", tags=["benchmark"])
 
 
 _STATUS_MESSAGES = {
