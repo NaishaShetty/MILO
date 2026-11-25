@@ -361,9 +361,13 @@ def bad_plans() -> List[Tuple[str, str, Dict[str, Any]]]:
 
 
 def run_one(
-    command: str, provider: Provider, skills: SkillLibrary, constraints: Constraints
+    command: str,
+    provider: Provider,
+    skills: SkillLibrary,
+    constraints: Constraints,
+    scene_objects: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    sim = SyntheticSimulator(scene(), Faults())
+    sim = SyntheticSimulator(scene_objects or scene(), Faults())
     execution = ExecutionAgentWrapper(sim)  # type: ignore[arg-type]
     holder: Dict[str, Any] = {}
     novel = NovelPlanner(provider, execution.get_metadata, constraints=constraints, skills=skills,
