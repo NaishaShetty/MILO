@@ -77,6 +77,11 @@ jobs:
         working-directory: backend
         run: python -m benchmark.ci --margin 0.05
 
+      # The README's results tables, model numbers and links must match
+      # benchmarks/latest.json, docs/models/ and the files they point at.
+      - name: README numbers match their sources
+        run: python scripts/check_readme_numbers.py
+
   frontend:
     name: Frontend -- lint, type-check, test, build
     runs-on: ubuntu-24.04
