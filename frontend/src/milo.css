@@ -20,6 +20,7 @@ a { color: var(--tangerine-ink); }
 .btn { font: 600 16px var(--font-heading); border: var(--border); border-radius: 999px; padding: 8px 18px; background: #fffaf0; color: var(--ink); cursor: pointer; box-shadow: var(--shadow-sm); }
 .btn:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+a.btn { display: inline-block; text-decoration: none; text-align: center; white-space: nowrap; justify-self: start; }
 .btn--go { background: var(--tangerine); font-size: 20px; padding: 12px 26px; }
 .btn--sun { background: var(--sun); }
 .btn--icon { padding: 0; width: 44px; height: 44px; display: inline-grid; place-items: center; }
@@ -154,6 +155,7 @@ a { color: var(--tangerine-ink); }
 .memory-layout { display: grid; grid-template-columns: 1fr minmax(240px, 300px); gap: var(--space-5); margin-top: var(--space-4); }
 @media (max-width: 900px) { .memory-layout { grid-template-columns: 1fr; } }
 .scrap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: var(--space-4); align-content: start; }
+ul.scrap-grid { list-style: none; padding: 0; }
 .scrap { border: var(--border); border-radius: 18px; box-shadow: var(--shadow); padding: 12px; display: grid; gap: 8px; transform: rotate(-0.6deg); }
 .scrap:nth-child(even) { transform: rotate(0.7deg); }
 .scrap--fact { background: var(--apricot); } .scrap--moment { background: var(--peach); } .scrap--oops { background: var(--coral); }
