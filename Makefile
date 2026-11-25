@@ -61,6 +61,10 @@ eval-parser:
 eval-worldmodel:
 	cd backend && $(PY) -m learning.eval_worldmodel --data data/dataset --model artifacts/outcome --out artifacts/worldmodel --episodes 400
 
+## World model on the competing-route tier: failures caught before acting
+eval-worldmodel-routes:
+	cd backend && $(PY) -m learning.eval_worldmodel_routes --artifacts artifacts
+
 ## How often a "success" is contradicted by the world (goal predicates), and trace cost
 eval-goal-check:
 	cd backend && $(PY) -m verification.eval_goal_check --episodes 300

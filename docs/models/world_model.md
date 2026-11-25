@@ -36,3 +36,21 @@ Plan scores (365 held-out episodes): the static scorer gives a score of exactly 
 - Recommendation: leave off until there is a setting where planners produce different plans; it costs a few milliseconds per candidate plan.
 
 Reproduce: `make eval-worldmodel`.
+
+## Re-evaluated on competing routes (2026-11-25)
+
+The benchmark's routes tier (`docs/benchmark.md`) is where a world model should help: the nearest shelf or table is blocked for good and a farther one is clear, so every plan that goes to the near one fails. A failure counts as caught if its plan scores below every plan that succeeds, so it could be rejected before acting without rejecting a good plan.
+
+| | Plans | Rollout score | Caught before acting |
+|---|---|---|---|
+| Route plans (all fail) | 4 | 0.770 each | **0 of 4** |
+| Known-task plans (all succeed) | 23 | median 0.770, minimum 0.0 | – |
+
+**No gain, for two structural reasons:**
+
+1. The blockage isn't in anything the model sees. It is a hidden fault, not an object state, so a doomed route plan scores exactly like a good one.
+2. Plans name object types ("shelf"), not instances ("Shelf|2"). Even a perfect score could only reject the plan; nothing could ask for the other shelf instead.
+
+The criterion also can't catch anything while some successful plan scores 0.0. Fixing either reason needs new inputs, not a better model: an observable obstacle in the state, and plans that can name an instance. Until then the recommendation stands: leave it off.
+
+Reproduce: `make eval-worldmodel-routes` (uses `backend/artifacts`).
