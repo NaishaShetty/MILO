@@ -16,7 +16,7 @@ A fixed synthetic home with fixed tasks, faults and seeds, so repeated runs give
 - **Faults:** each known task again under each injected fault that happens once and then clears: blocked path, out of reach, stuck door, timeout, wrong detection, missing object.
 - **Planners:** rule-based, ReAct, behaviour tree, HTN, and the language-model ("novel") planner. Without credentials the language-model planner uses the reference plans of the novel-task benchmark and runs on the new tasks only; `--provider claude` uses the real model on everything.
 
-## Results (8 Oct-style dated runs are in `benchmarks/history.jsonl`; this table is `benchmarks/latest.md`)
+## Results (`benchmarks/latest.md`; every run is also a dated line in `benchmarks/history.jsonl`)
 
 | Planner | Known | New tasks | Under faults | Steps | Sim time (s) | Replans |
 |---|---|---|---|---|---|---|
@@ -58,4 +58,13 @@ What each part is worth (rule-based on known + fault cases; the novel planner on
 - **Weekly and on demand** (`.github/workflows/benchmark.yml`), the full suite runs and uploads the reports as an artifact.
 - `scikit-learn` was added to `backend/requirements.txt`. The learned-model tests (since Phase B) need it, and CI only installs that file.
 
-The gate was checked against a deliberately broken change on a throwaway branch; see the commit message for the run. It has not run on GitHub's own runners from this environment.
+**The gate catches a broken change.** On a throwaway local branch (`ci-gate-break-test`, since deleted), reflection was deliberately broken so it never retries or replans. The gate printed:
+
+```
+REGRESSION: rule_based: success 55% < baseline 68% - 5%
+REGRESSION: behavior_tree: success 55% < baseline 68% - 5%
+REGRESSION: htn: success 55% < baseline 68% - 5%
+benchmark gate: FAILED          (exit code 1)
+```
+
+This was run locally with the same command the CI step uses. Nothing was pushed, so the workflow itself hasn't yet run on GitHub's runners.
