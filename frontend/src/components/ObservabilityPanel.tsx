@@ -52,7 +52,10 @@ export function ObservabilityPanel() {
     <section className="card" aria-label="Where the time goes">
       <h2>Where the time goes</h2>
       {problem && <div className="notice notice--error" role="alert">{problem}</div>}
-      {stages && (
+      {stages && !Object.values(stages).some((s) => s.n > 0) && (
+        <p className="muted">No missions recorded yet. Timings appear here after MILO's first job.</p>
+      )}
+      {stages && Object.values(stages).some((s) => s.n > 0) && (
         <table aria-label="Stage timings">
           <thead>
             <tr>

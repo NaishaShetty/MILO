@@ -182,3 +182,11 @@ a { color: var(--tangerine-ink); }
 .waterfall__bar--reflection { background: var(--peach); }
 .waterfall__bar--failed { background: var(--danger-ink); }
 .replay { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+
+/* Voice (Phase 8) */
+.voice-toggle { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.milo-sweat { animation: milo-drip 1.2s ease-in-out infinite; }
+.milo-ask, .milo-wait { animation: milo-bob 1.6s ease-in-out infinite; }
+@keyframes milo-drip { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
+@keyframes milo-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .milo-sweat, .milo-ask, .milo-wait { animation: none; } }

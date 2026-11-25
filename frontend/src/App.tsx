@@ -19,12 +19,14 @@ import { ObservabilityPanel } from "./components/ObservabilityPanel";
 import { MissionsPage } from "./pages/MissionsPage";
 import { PlayPage } from "./pages/PlayPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { BrowserVoiceProvider } from "./state/BrowserVoice";
 
 // Four friendly spaces -- Play, Missions, Memory, Lab -- plus About and
 // Settings under the gear and Activity as a drawer (see NavBar).
 export default function App() {
   return (
     <SettingsProvider>
+      <BrowserVoiceProvider>
       <AgentsProvider>
         <TaskProvider>
           <SpeechProvider>
@@ -56,6 +58,7 @@ export default function App() {
           </SpeechProvider>
         </TaskProvider>
       </AgentsProvider>
+      </BrowserVoiceProvider>
     </SettingsProvider>
   );
 }

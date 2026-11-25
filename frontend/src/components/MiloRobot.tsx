@@ -12,6 +12,9 @@ import type { MiloState } from "../state/miloState";
 export type MiloPose =
   | "idle"
   | "listening"
+  | "asking"
+  | "waiting"
+  | "recovering"
   | "thinking"
   | "speaking"
   | "walk"
@@ -124,7 +127,22 @@ function FrontRig({ pose, carrying }: { pose: MiloPose; carrying: boolean }) {
         <rect x="74" y="70" width="52" height="9" rx="4.5" fill="#ffffff" opacity="0.14" />
         <Eyes happy={happy} slanted={slanted} />
         {pose === "listening" && <path d="M148 96 q10 6 0 16" stroke={AMBER} strokeWidth="3" fill="none" strokeLinecap="round" />}
+        {pose === "recovering" && (
+          <path className="milo-sweat" d="M140 70 q6 8 0 12 q-6 -4 0 -12 z" fill="#ffd25a" stroke="#2a1810" strokeWidth="1.5" />
+        )}
       </g>
+      {pose === "asking" && (
+        <g className="milo-part milo-ask" aria-label="asking">
+          <circle cx="150" cy="30" r="16" fill="#fff6e5" stroke="#2a1810" strokeWidth="2.5" />
+          <text x="150" y="37" textAnchor="middle" fontSize="20" fontWeight="700" fill="#b34a00">?</text>
+        </g>
+      )}
+      {pose === "waiting" && (
+        <g className="milo-part milo-wait" aria-label="waiting for you">
+          <circle cx="152" cy="30" r="14" fill="#fff6e5" stroke="#2a1810" strokeWidth="2.5" />
+          <path d="M152 22 v8 l6 4" stroke="#2a1810" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+        </g>
+      )}
     </g>
   );
 }

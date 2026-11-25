@@ -16,6 +16,7 @@ import { readableWording, saveTaskAsSkill } from "../api/skills";
 import { DecisionCard } from "../components/DecisionCard";
 import { correctTask, undoPreview, undoTask } from "../api/tasks";
 import { SceneMap } from "../components/SceneMap";
+import { VoiceCoach } from "../components/VoiceCoach";
 
 const WHO: Record<string, string> = { memory: "M", planner: "P", eyes: "E", hands: "H", reflect: "R" };
 const TERMINAL = ["succeeded", "failed", "cancelled"];
@@ -269,6 +270,7 @@ export function MissionsPage() {
             </p>
           )}
           {activeTask.pending_decision && <DecisionCard taskId={activeTask.task_id} pending={activeTask.pending_decision} />}
+          <VoiceCoach taskId={activeTask.task_id} pending={activeTask.pending_decision} />
           <AfterThoughts taskId={activeTask.task_id} finished={finished} pinned={(activeTask.objects[0] ?? "").includes("|")} onStarted={setActiveTaskId} />
           {activeTask.status === "succeeded" && <SaveAsSkill taskId={activeTask.task_id} wording={activeTask.user_request} />}
           {activeTask.planner_note && <div className="notice">{activeTask.planner_note}</div>}

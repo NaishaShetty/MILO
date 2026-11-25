@@ -17,6 +17,9 @@ import { useSpeech } from "../state/SpeechContext";
 import { useTask } from "../state/TaskContext";
 import { useSpeechToTask } from "../hooks/useSpeechToTask";
 import { relativeDay } from "../utils/friendly";
+import { VoiceCoach } from "../components/VoiceCoach";
+import { VoiceToggle } from "../components/VoiceToggle";
+import { useBrowserVoice } from "../state/BrowserVoice";
 
 const EXAMPLES = ["Put the apple in the fridge", "Find the mug", "Pick up the book", "Open the drawer"];
 const TOUR_KEY = "milo.tourSeen";
@@ -87,7 +90,10 @@ export function PlayPage() {
     getTaskLibrary().then(setLibrary).catch(() => setLibrary([]));
   }, [showLibrary, library]);
 
-  const direction = directMilo(activeTask, lastReply?.text);
+  const browserVoice = useBrowserVoice();
+  const useBrowserMic = browserVoice.enabled && browserVoice.canListen;
+  const baseDirection = directMilo(activeTask, lastReply?.text, lastReply?.kind === "clarify");
+  const direction = browserVoice.listening ? { ...baseDirection, pose: "listening" as const, speech: "I'm listening..." } : baseDirection;
   // Tapping the floor sends MILO there (only while no mission is moving him).
   const shown = floorX !== null && direction.x === null ? { ...direction, x: floorX, pose: "walk" as const } : direction;
 
@@ -159,10 +165,24 @@ export function PlayPage() {
               <button
                 type="button"
                 className="btn btn--icon btn--sun"
-                aria-label={listening ? "Stop listening" : "Talk to MILO"}
-                disabled={!micSupported || submitting}
-                title={micSupported ? "Talk to MILO" : "Your browser can't use the microphone here"}
-                onClick={() => (listening ? speech.stopListening() : void speech.startListening())}
+                aria-label={listening || browserVoice.listening ? "Stop listening" : "Talk to MILO"}
+                disabled={(!micSupported && !useBrowserMic) || submitting}
+                title={micSupported || useBrowserMic ? "Talk to MILO" : "Your browser can't use the microphone here"}
+                onClick={() => {
+                  if (useBrowserMic) {
+                    if (browserVoice.listening) browserVoice.stopListening();
+                    else
+                      void browserVoice
+                        .listen()
+                        .then((heard) => {
+                          if (heard) void send(heard);
+                        })
+                        .catch(() => undefined);
+                    return;
+                  }
+                  if (listening) speech.stopListening();
+                  else void speech.startListening();
+                }}
               >
                 <MicIcon />
               </button>
@@ -170,6 +190,12 @@ export function PlayPage() {
                 Go! <ArrowIcon />
               </button>
             </div>
+            <VoiceToggle />
+            <VoiceCoach
+              question={lastReply?.kind === "clarify" ? lastReply.text : null}
+              choices={lastReply?.choices}
+              onChoice={(c) => void submitInstruction(c.instruction, "speech", undefined, c.object_id).catch(() => undefined)}
+            />
             <div className="chips" aria-label="Try one">
               <span className="muted">Try one:</span>
               {EXAMPLES.map((example) => (

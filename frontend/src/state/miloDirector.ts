@@ -39,10 +39,23 @@ function carriedObject(task: TaskState): string | null {
   return holding;
 }
 
-export function directMilo(task: TaskState | null, lastReply?: string | null): MiloDirection {
+export function directMilo(
+  task: TaskState | null,
+  lastReply?: string | null,
+  replyIsQuestion = false,
+): MiloDirection {
   const home = { x: null, facing: "right" as const, carrying: null };
   if (!task) {
-    return { ...home, pose: lastReply ? "speaking" : "idle", speech: lastReply ?? GREETING };
+    return { ...home, pose: lastReply ? (replyIsQuestion ? "asking" : "speaking") : "idle", speech: lastReply ?? GREETING };
+  }
+  if (task.pending_decision) {
+    // Stopped and waiting for the user: approve a risky step, or check a plan.
+    const d = task.pending_decision;
+    return {
+      ...home,
+      pose: d.kind === "plan" ? "thinking" : "waiting",
+      speech: d.kind === "plan" ? "Here's my plan. Shall I go ahead?" : `${d.text ?? "Can I do this?"} I need your OK.`,
+    };
   }
   const steps = task.current_plan?.steps ?? [];
   const current = steps.find((s) => s.step_id === task.current_step) ?? steps.find((s) => s.status === "running");
@@ -67,7 +80,10 @@ export function directMilo(task: TaskState | null, lastReply?: string | null): M
         speech,
       };
     }
-    default:
-      return { ...home, pose: THINKING.has(task.status) ? "thinking" : "idle", speech };
+    default: {
+      // Reflecting or replanning after something went wrong: recovering, not just thinking.
+      const recovering = (task.status === "replanning" || task.status === "reflecting") && (task.failures?.length ?? 0) > 0;
+      return { ...home, pose: recovering ? "recovering" : THINKING.has(task.status) ? "thinking" : "idle", speech };
+    }
   }
 }

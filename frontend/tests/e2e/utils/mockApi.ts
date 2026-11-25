@@ -104,6 +104,16 @@ export async function mockBaselineApi(page: Page): Promise<void> {
   await page.route("**/api/v1/tasks/*/memory", (route) =>
     route.fulfill({ json: { retrieved: [], created: [] } }),
   );
+  // Roadmap 2 pages: traces (Lab timings, replay), scene map, skills, benchmark.
+  await page.route("**/api/v1/traces?*", (route) => route.fulfill({ json: { missions: [] } }));
+  await page.route("**/api/v1/traces/stats", (route) =>
+    route.fulfill({ json: { missions: 0, stages: {}, actions: {} } }),
+  );
+  await page.route("**/api/v1/scene/map", (route) =>
+    route.fulfill({ json: { agent: null, path: [], objects: [], beliefs: [], has_positions: false } }),
+  );
+  await page.route("**/api/v1/skills", (route) => route.fulfill({ json: { skills: [] } }));
+  await page.route("**/api/v1/benchmark", (route) => route.fulfill({ json: { latest: null, history: [] } }));
   // MILO Lab page (`GET /api/v1/lab/experiments`, `/lab/stats`).
   await page.route("**/api/v1/lab/experiments", (route) =>
     route.fulfill({ json: { experiments: [] } }),
