@@ -40,3 +40,19 @@ export async function forgetMemory(memoryId: string): Promise<Memory> {
     method: "POST",
   });
 }
+
+/** `PATCH /api/v1/memory/{id}` -- fix the place / text, pin, or set aside for review. */
+export async function editMemory(
+  memoryId: string,
+  change: { place?: string; content?: string; pinned?: boolean; quarantined?: boolean },
+): Promise<Memory> {
+  return request<Memory>(`/api/v1/memory/${encodeURIComponent(memoryId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(change),
+  });
+}
+
+/** `DELETE /api/v1/memory/{id}` -- remove it for good. */
+export async function deleteMemory(memoryId: string): Promise<void> {
+  await request(`/api/v1/memory/${encodeURIComponent(memoryId)}`, { method: "DELETE" });
+}

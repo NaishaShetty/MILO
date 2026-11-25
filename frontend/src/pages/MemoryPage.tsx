@@ -2,8 +2,8 @@
 // cards, a legend, and a "Forget this" button on every card.
 import { useState } from "react";
 
-import { forgetMemory } from "../api/memory";
-import type { Memory } from "../api/memoryTypes";
+import { deleteMemory, editMemory, forgetMemory } from "../api/memory";
+import type { Memory, MemoryTrust } from "../api/memoryTypes";
 import { MiloRobot } from "../components/MiloRobot";
 import { useMemoryList } from "../hooks/useMemoryList";
 import { relativeDay, sureness } from "../utils/friendly";
@@ -22,8 +22,19 @@ export function kindOf(memory: Memory): Exclude<Filter, "all"> {
   return "fact";
 }
 
-function Card({ memory, onForget }: { memory: Memory; onForget: (m: Memory) => void }) {
+const SOURCE_LABEL: Record<MemoryTrust["source"], string> = {
+  user: "you told me",
+  observation: "I saw it",
+  skill: "I worked it out",
+  imported: "imported",
+};
+
+type Act = (fn: () => Promise<unknown>) => void;
+
+function Card({ memory, trust, onForget, act }: { memory: Memory; trust?: MemoryTrust; onForget: (m: Memory) => void; act: Act }) {
   const kind = kindOf(memory);
+  const [fixing, setFixing] = useState(false);
+  const [place, setPlace] = useState("");
   const meta = memory.metadata as Record<string, unknown>;
   const sure = sureness(memory.confidence);
   const label = { fact: "Fact", moment: "Moment", oops: "Oops" }[kind];
@@ -31,8 +42,16 @@ function Card({ memory, onForget }: { memory: Memory; onForget: (m: Memory) => v
     <article className={`scrap scrap--${kind}`}>
       <div className="scrap__top">
         <span className="pill">{label}</span>
+        {trust && <span className="tag">{SOURCE_LABEL[trust.source]}</span>}
+        {trust?.pinned && <span className="tag">pinned</span>}
+        {trust?.quarantined && <span className="tag">set aside</span>}
         <span className="muted">{relativeDay(memory.created_at)}</span>
       </div>
+      {trust?.quarantined && (
+        <p className="notice" role="note">
+          I'm not using this because {trust.quarantine_reason ?? "it looked suspicious"}.
+        </p>
+      )}
       {kind === "fact" && typeof meta.subject === "string" ? (
         <div>
           <span className="tag">{String(meta.subject).replace(/_/g, " ")}</span>{" "}
@@ -49,15 +68,49 @@ function Card({ memory, onForget }: { memory: Memory; onForget: (m: Memory) => v
         </span>
       )}
       {kind === "oops" && <span className="muted">Learned: this kind of thing can go wrong, so MILO is more careful.</span>}
-      <button type="button" className="btn" onClick={() => onForget(memory)} aria-label={`Forget this: ${memory.content}`}>
-        Forget this
-      </button>
+      {fixing && (
+        <span className="ask__row">
+          <input className="input" aria-label="Correct place" value={place} placeholder="the right place" onChange={(e) => setPlace(e.target.value)} />
+          <button type="button" className="btn btn--go" onClick={() => { act(() => editMemory(memory.memory_id, { place })); setFixing(false); }}>
+            Save
+          </button>
+        </span>
+      )}
+      <div className="filters">
+        {kind === "fact" && typeof meta.subject === "string" && !fixing && (
+          <button type="button" className="filter" onClick={() => setFixing(true)}>
+            Fix the place
+          </button>
+        )}
+        <button type="button" className="filter" onClick={() => act(() => editMemory(memory.memory_id, { pinned: !trust?.pinned }))}>
+          {trust?.pinned ? "Unpin" : "Pin"}
+        </button>
+        <button
+          type="button"
+          className="filter"
+          onClick={() => act(() => editMemory(memory.memory_id, { quarantined: !trust?.quarantined }))}
+        >
+          {trust?.quarantined ? "Use it again" : "Set aside"}
+        </button>
+        <button type="button" className="btn" onClick={() => onForget(memory)} aria-label={`Forget this: ${memory.content}`}>
+          Forget this
+        </button>
+        <button
+          type="button"
+          className="filter"
+          onClick={() => {
+            if (window.confirm("Delete this memory for good? This can't be undone.")) act(() => deleteMemory(memory.memory_id));
+          }}
+        >
+          Delete
+        </button>
+      </div>
     </article>
   );
 }
 
 export function MemoryPage() {
-  const { memories, status, error, refresh } = useMemoryList();
+  const { memories, status, error, refresh, trust, quarantined } = useMemoryList();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
@@ -71,6 +124,15 @@ export function MemoryPage() {
       setProblem("I couldn't forget that one. Please try again in a moment.");
     }
   }
+
+  const act: Act = (fn) => {
+    fn()
+      .then(() => {
+        setProblem(null);
+        refresh();
+      })
+      .catch(() => setProblem("That didn't work. Please try again in a moment."));
+  };
 
   const q = query.trim().toLowerCase();
   const shown = memories
@@ -106,6 +168,12 @@ export function MemoryPage() {
         ))}
       </div>
       {problem && <div className="notice notice--error" role="alert">{problem}</div>}
+      {quarantined > 0 && (
+        <div className="notice" role="status">
+          I've set aside {quarantined} {quarantined === 1 ? "memory" : "memories"} that looked wrong or suspicious. Look for "set aside"
+          below: use them again or delete them.
+        </div>
+      )}
       <div className="memory-layout">
         <div>
           {status === "loading" && <div className="card empty">Flipping through the scrapbook...</div>}
@@ -122,7 +190,7 @@ export function MemoryPage() {
           )}
           <div className="scrap-grid">
             {shown.map((memory) => (
-              <Card key={memory.memory_id} memory={memory} onForget={forget} />
+              <Card key={memory.memory_id} memory={memory} trust={trust[memory.memory_id]} onForget={forget} act={act} />
             ))}
           </div>
         </div>

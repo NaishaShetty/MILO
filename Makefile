@@ -68,3 +68,7 @@ eval-goal-check:
 ## Novel tasks: 60 held-out commands (baseline / offline / reference plans; add --claude with credentials)
 eval-novel:
 	cd backend && $(PY) -m novel.eval_novel
+
+## Memory poisoning red-team (defence off vs on) and repeat failures with failure memory
+eval-trust:
+	cd backend && $(PY) -m memory.eval_trust

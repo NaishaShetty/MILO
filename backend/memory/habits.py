@@ -36,14 +36,20 @@ SURFACE_PREDICATES = frozenset({"located_on", "observed_on", "usually_on"})
 _ALL = INSIDE_PREDICATES | SURFACE_PREDICATES | {"observed_in"}
 
 
-def _rank(memory: Memory) -> Tuple[int, float, float]:
+def _rank(memory: Memory) -> tuple:
+    from memory.trust import defence_on, rank
+
+    if defence_on():
+        # pinned, then source trust (user > observation > skill > imported), then
+        # decayed confidence, then newer -- see `memory.trust`
+        return rank(memory)
     user_first = 1 if memory.memory_type == MemoryType.USER else 0
     return (user_first, memory.confidence, memory.created_at)
 
 
 def usual_places(memories: Iterable[Memory]) -> Dict[str, Tuple[str, str]]:
     """`{object name: (place, relation)}` from the best memory per object."""
-    best: Dict[str, Tuple[Tuple[int, float, float], Tuple[str, str]]] = {}
+    best: Dict[str, Tuple[tuple, Tuple[str, str]]] = {}
     for memory in memories:
         if memory.status != MemoryStatus.ACTIVE:
             continue

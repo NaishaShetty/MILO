@@ -518,7 +518,151 @@ class MemoryAgent:
 
     # -- internal -----------------------------------------------------
 
+    # -- trust (roadmap 2, Phase 5) ---------------------------------------------------
+
+    def _update(self, memory: Memory) -> Optional[Memory]:
+        if self._engine is None:
+            return None
+        try:
+            memory.updated_at = time.time()
+            return self._engine.update_and_reindex(memory)
+        except Exception:
+            logger.warning("memory_agent.update_failed", exc_info=True)
+            return None
+
+    def get(self, memory_id: str) -> Optional[Memory]:
+        if self._engine is None:
+            return None
+        try:
+            return self._engine.manager.get(memory_id)
+        except Exception:
+            return None
+
+    def reconcile(self, metadata: Any) -> List[Memory]:
+        """Location facts the live scene contradicts lose half their confidence;
+        contradicted twice (or once, if imported) they are quarantined. Returns the
+        memories that changed. Never raises."""
+        from memory.trust import contradictions, defence_on, source_of
+
+        if self._engine is None or not defence_on():
+            return []
+        changed = []
+        try:
+            for m in contradictions(metadata, self._engine.manager.list()):
+                meta = dict(m.metadata or {})
+                meta["contradicted"] = int(meta.get("contradicted", 0)) + 1
+                m.confidence = round(float(m.confidence) * 0.5, 4)
+                if meta["contradicted"] >= 2 or source_of(m) == "imported":
+                    m.status = MemoryStatus.QUARANTINED
+                    meta["quarantine_reason"] = "what I can see now disagrees with it"
+                m.metadata = meta
+                updated = self._update(m)
+                if updated is not None:
+                    changed.append(updated)
+        except Exception:
+            logger.warning("memory_agent.reconcile_failed", exc_info=True)
+        return changed
+
+    def import_memory(
+        self,
+        subject: str,
+        predicate: str,
+        object_: str,
+        *,
+        provenance: MemoryProvenance = MemoryProvenance.IMPORTED,
+        confidence: float = 1.0,
+        content: Optional[str] = None,
+    ) -> Optional[Memory]:
+        """A "where X goes / is" memory from outside (a file, another robot). Screened
+        like any imported memory (see `memory.trust.screen`)."""
+        if self._engine is None:
+            return None
+        memory = build_user_memory(
+            predicate,
+            object_,
+            subject=subject,
+            confidence=confidence,
+            provenance=provenance,
+        )
+        if content:
+            memory.content = content
+        return self._store_and_index(memory, event="imported")
+
+    def set_pinned(self, memory_id: str, value: bool) -> Optional[Memory]:
+        m = self.get(memory_id)
+        if m is None:
+            return None
+        m.metadata = {**(m.metadata or {}), "pinned": bool(value)}
+        return self._update(m)
+
+    def set_quarantined(
+        self, memory_id: str, value: bool, reason: str = ""
+    ) -> Optional[Memory]:
+        m = self.get(memory_id)
+        if m is None:
+            return None
+        m.status = MemoryStatus.QUARANTINED if value else MemoryStatus.ACTIVE
+        meta = dict(m.metadata or {})
+        if value:
+            meta["quarantine_reason"] = reason or "you asked me to set it aside"
+        else:
+            meta.pop("quarantine_reason", None)
+            meta["contradicted"] = 0
+        m.metadata = meta
+        return self._update(m)
+
+    def edit(
+        self,
+        memory_id: str,
+        *,
+        content: Optional[str] = None,
+        place: Optional[str] = None,
+        confidence: Optional[float] = None,
+    ) -> Optional[Memory]:
+        """Fix a memory: its text, the place in a "where it is/goes" fact, or how sure
+        MILO is. An edit by the user makes it a user memory."""
+        m = self.get(memory_id)
+        if m is None:
+            return None
+        meta = dict(m.metadata or {})
+        if place:
+            meta["object"] = place.strip().lower()
+            if "subject" in meta and "predicate" in meta and not content:
+                content = f"{meta['subject']} {meta['predicate']} {meta['object']}"
+        if content:
+            m.content = content.strip()
+        if confidence is not None:
+            m.confidence = max(0.0, min(1.0, float(confidence)))
+        m.metadata = meta
+        m.provenance = MemoryProvenance.USER_INPUT
+        return self._update(m)
+
+    def delete(self, memory_id: str) -> bool:
+        if self._engine is None:
+            return False
+        try:
+            if self._engine.manager.get(memory_id) is None:
+                return False
+            self._engine.delete_and_deindex(memory_id)
+            return True
+        except Exception:
+            logger.warning("memory_agent.delete_failed", exc_info=True)
+            return False
+
     def _store_and_index(self, memory: Memory, *, event: str) -> Optional[Memory]:
+        if self._engine is not None:
+            try:
+                from memory.trust import screen
+
+                why = screen(memory, self._engine.manager.list())
+                if why:
+                    memory.status = MemoryStatus.QUARANTINED
+                    memory.metadata = {
+                        **(memory.metadata or {}),
+                        "quarantine_reason": why,
+                    }
+            except Exception:
+                logger.warning("memory_agent.screen_failed", exc_info=True)
         if self._engine is None:
             logger.warning(
                 "memory_agent.write_skipped_unavailable",

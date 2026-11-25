@@ -16,9 +16,9 @@ exposing over HTTP -- same drift caveat `vision.py` documents for
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Any, Dict, List
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from memory.models import Memory
 
@@ -50,3 +50,7 @@ class MemoryListResponse(BaseModel):
 
     memories: List[Memory]
     counts_by_type: Dict[str, int]
+    #: Per memory id: source, trust, decayed confidence, pinned, quarantined, reason.
+    trust: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    #: How many memories are set aside for review.
+    quarantined: int = 0

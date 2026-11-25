@@ -290,6 +290,7 @@ class Orchestrator:
             )
 
         memory_context = self._retrieve_memory(task, episode_id, task_state)
+        self._reconcile_memory(task_state)
         self._think_about_memory(task_state, memory_context)
         self._memory_stats = self._memory_stats_of(memory_context)
 
@@ -350,6 +351,7 @@ class Orchestrator:
                 reason="; ".join(planning_result.errors) or "planning failed",
             )
         task_state.current_plan = planning_result.plan
+        self._apply_lessons(task, task_state)
         self._note_planner(task_state, planning_result.plan)
         self._think(
             task_state,
@@ -545,6 +547,7 @@ class Orchestrator:
                     reason="; ".join(planning_result.errors) or "replanning failed",
                 )
             task_state.current_plan = planning_result.plan
+            self._apply_lessons(task, task_state)
             self._note_planner(task_state, planning_result.plan)
             self._think(
                 task_state,
@@ -1246,6 +1249,63 @@ class Orchestrator:
             return None
         return "Every step ran, but " + "; ".join(r.reason for r in missed) + "."
 
+    def _learn_from_failure(
+        self, task: SingleTask, task_state: TaskState, episode_id: str
+    ) -> None:
+        from memory import lessons
+
+        agent = self._raw_memory()
+        if agent is None or not lessons.enabled():
+            return
+        try:
+            lesson = lessons.lesson_from(task_state, task.goal, task.object)
+            if lesson is not None:
+                lessons.remember(
+                    agent, lesson, episode_id=episode_id, task_id=task.task_id
+                )
+        except Exception:
+            logger.warning("orchestrator.lesson_write_failed", exc_info=True)
+
+    def _raw_memory(self) -> Any:
+        return getattr(self._memory, "_memory_agent", None) if self._memory else None
+
+    def _reconcile_memory(self, task_state: TaskState) -> None:
+        """Out-of-date location memories lose weight (or are quarantined) when the
+        scene in front of MILO disagrees with them."""
+        agent = self._raw_memory()
+        if agent is None or not hasattr(agent, "reconcile"):
+            return
+        changed = agent.reconcile(self._execution.get_metadata())
+        if changed:
+            names = sorted(
+                {str((m.metadata or {}).get("subject", "")) for m in changed}
+            )
+            self._think(
+                task_state,
+                "memory",
+                "What I remembered about the "
+                + ", ".join(n for n in names if n)
+                + " is out of date, so I'll trust my eyes instead.",
+            )
+
+    def _apply_lessons(self, task: SingleTask, task_state: TaskState) -> None:
+        """Failure memory: recall lessons for this kind of task and adjust the plan."""
+        from memory import lessons
+
+        agent = self._raw_memory()
+        plan = task_state.current_plan
+        if agent is None or plan is None or not lessons.enabled():
+            return
+        try:
+            found = lessons.recall(agent.list_memories(), task.goal, task.object)
+            said = lessons.apply(plan, found)
+        except Exception:
+            logger.warning("orchestrator.lessons_failed", exc_info=True)
+            return
+        if said:
+            plan.metadata["lessons"] = found
+            self._think(task_state, "memory", said)
+
     def _after_mission(self, task_state: TaskState) -> None:
         """Lets a planner that learns from outcomes (the novel-task planner) see how
         the mission ended. Never raises."""
@@ -1317,6 +1377,7 @@ class Orchestrator:
             reason=reason,
         )
         task_state.status = TaskStatus.FAILED
+        self._learn_from_failure(task, task_state, episode_id)
         self._after_mission(task_state)
         self._publish(task_state, EventType.TASK_FAILED, payload={"reason": reason})
         return task_state

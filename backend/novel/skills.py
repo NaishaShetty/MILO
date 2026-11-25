@@ -192,7 +192,7 @@ class SkillLibrary:
     ) -> Optional[Tuple[Skill, List[str]]]:
         template, binding = templatize(command, scene_objects)
         skill = self.get(template)
-        if skill is None or skill.status == "disabled":
+        if skill is None or skill.status in ("disabled", "quarantined"):
             return None
         return skill, binding
 
@@ -205,7 +205,8 @@ class SkillLibrary:
             (
                 s
                 for s in self.all()
-                if s.status != "disabled" and name in (s.name.lower(), s.template)
+                if s.status not in ("disabled", "quarantined")
+                and name in (s.name.lower(), s.template)
             ),
             None,
         )
@@ -265,6 +266,21 @@ class SkillLibrary:
             self._save(skill)
         self._mirror(f"skill: {skill.describe()}", "skill")
         return skill
+
+    def import_skill(
+        self, name: str, wording: str, proposal: Proposal, scene_objects: Sequence[str]
+    ) -> Optional[Skill]:
+        """A skill from outside. With the memory defence on it never replaces a skill
+        MILO already has, and a new one waits in quarantine until the user reviews it;
+        with it off it is saved like any other (and can overwrite)."""
+        from memory.trust import defence_on
+
+        if not defence_on():
+            return self.save(name, wording, proposal, scene_objects)
+        template, _ = templatize(wording, scene_objects)
+        if self.get(template) is not None:
+            return None  # refuse: it would replace one MILO learned itself
+        return self.save(name, wording, proposal, scene_objects, status="quarantined")
 
     def check_chain(self, skill: Skill) -> None:
         """Dry-run expansion with placeholder objects (catches cycles/unknown skills)."""

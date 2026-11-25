@@ -99,6 +99,8 @@ _DEFAULT_PROVENANCE_SCORES: Dict[MemoryProvenance, float] = {
     MemoryProvenance.SYSTEM: 0.7,
     MemoryProvenance.INFERENCE: 0.6,
     MemoryProvenance.REFLECTION: 0.5,
+    MemoryProvenance.SKILL: 0.6,
+    MemoryProvenance.IMPORTED: 0.2,
 }
 
 _SECONDS_PER_DAY = 86400.0
