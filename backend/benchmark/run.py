@@ -34,10 +34,12 @@ from agents.planner_agent import PlannerAgentWrapper
 from agents.reflection_agent import ReflectionAgent
 from benchmark.suite import (
     FAULT_KINDS,
+    HARD_TIERS,
     Case,
     ci_subset,
     fault_cases,
     full_suite,
+    hard_cases,
     known_cases,
     novel_cases,
 )
@@ -52,7 +54,7 @@ from novel.safety import Constraints
 from novel.skills import SkillLibrary
 from orchestration.orchestrator import Orchestrator
 from planner.factory import create_planner
-from schemas.task import SingleTask
+from schemas.task import MultiTask, SingleTask
 
 PLANNERS = ["rule_based", "react", "behavior_tree", "htn", "novel"]
 REPO = Path(__file__).resolve().parents[2]
@@ -88,7 +90,33 @@ def reference_provider() -> ScriptedProvider:
     return ScriptedProvider({i["command"]: i["answer"] for i in commands()})
 
 
-def _memory(tmp: str) -> MemoryAgent:
+def case_scene(case: Case) -> List[Dict[str, Any]]:
+    """The benchmark home for one case: out-of-view objects and an extra, farther
+    receptacle of the same type (competing routes) when the case asks for them."""
+    objects = scene()
+    for o in objects:
+        if o["objectType"].lower() in case.hidden:
+            o["hidden"] = True
+    if case.variant.startswith("second_"):
+        kind = {"shelf": "Shelf", "table": "Table"}[case.variant.split("_", 1)[1]]
+        objects.append({"objectId": f"{kind}|2", "objectType": kind, "distance": 6.5,
+                        "visible": True, "pickupable": False})  # fmt: skip
+    return objects
+
+
+def _task(case: Case) -> Any:
+    if case.subtasks:
+        fields: List[Dict[str, Any]] = [
+            {k: v for k, v in (("goal", g), ("object", o), ("target", t)) if v}
+            for g, o, t in case.subtasks
+        ]
+        return MultiTask(subtasks=[SingleTask(**f) for f in fields])
+    return SingleTask(**case.task_fields())
+
+
+def _memory(
+    tmp: str, objects_list: Optional[List[Dict[str, Any]]] = None
+) -> MemoryAgent:
     agent = MemoryAgent.from_config(
         MemoryConfig(
             enabled=True,
@@ -96,7 +124,7 @@ def _memory(tmp: str) -> MemoryAgent:
             vector_store_path=Path(tmp) / "v",
         )
     )
-    objects = {o["objectId"]: o for o in scene()}
+    objects = {o["objectId"]: o for o in (objects_list or scene())}
     for o in objects.values():  # true facts about where things are
         parents = o.get("parentReceptacles") or []
         if o.get("pickupable") and parents:
@@ -116,8 +144,9 @@ def run_case(
     replanning: bool = True,
     recovery: bool = True,
 ) -> Dict[str, Any]:
+    objects = case_scene(case)
     sim = SyntheticSimulator(
-        scene(),
+        [dict(o) for o in objects],
         Faults(kind=case.fault, target=case.fault_target, times=case.fault_times),
     )
     execution = ExecutionAgentWrapper(sim)  # type: ignore[arg-type]
@@ -132,15 +161,13 @@ def run_case(
         orch = Orchestrator(
             wrapper,
             execution,
-            memory_agent=MemoryAgentWrapper(_memory(tmp)) if memory else None,
+            memory_agent=MemoryAgentWrapper(_memory(tmp, objects)) if memory else None,
             reflection_agent=None if reflection else NoReflection(),
         )
         with _env(
             MILO_GOAL_CHECK="enforce", MILO_INMISSION_RECOVERY="1" if recovery else "0"
         ):
-            state = orch.run(
-                SingleTask(**case.task_fields()), max_replans=2 if replanning else 0
-            )
+            state = orch.run(_task(case), max_replans=2 if replanning else 0)
         if planner == "novel":
             novel_log = novel.log
     steps = [
@@ -196,7 +223,9 @@ def run(
     provider: Optional[Provider] = (
         build_provider() if provider_name == "claude" else None
     )
-    cases = ci_subset() if subset == "ci" else full_suite() + fault_cases()
+    cases = (
+        ci_subset() if subset == "ci" else full_suite() + fault_cases() + hard_cases()
+    )
     started = time.time()
     report: Dict[str, Any] = {
         "subset": subset,
@@ -215,15 +244,23 @@ def run(
         rows = [run_case(c, planner, provider=provider) for c in todo]
         report["by_case"][planner] = rows
         report["planners"][planner] = {
-            "all": summarise(rows),
+            # The regression tier (known, novel, faults); the harder tiers are under "tiers".
+            "all": summarise([r for r in rows if r["kind"] in ("known", "novel")]),
             "known": summarise(
                 [r for r in rows if r["kind"] == "known" and r["fault"] == "none"]
             ),
             "novel": summarise([r for r in rows if r["kind"] == "novel"]),
-            "faults": summarise([r for r in rows if r["fault"] != "none"]),
+            "faults": summarise(
+                [r for r in rows if r["fault"] != "none" and r["kind"] == "known"]
+            ),
             "recovery_by_fault": {
-                f: summarise([r for r in rows if r["fault"] == f])["success"]
+                f: summarise(
+                    [r for r in rows if r["fault"] == f and r["kind"] == "known"]
+                )["success"]
                 for f in FAULT_KINDS
+            },
+            "tiers": {
+                t: summarise([r for r in rows if r["kind"] == t]) for t in HARD_TIERS
             },
         }
     if ablations and subset == "full":
@@ -278,6 +315,22 @@ def ablation_table(provider: Optional[Provider]) -> Dict[str, Any]:
             ]
         return summarise(rows)
 
+    def hard_score(
+        memory: bool = True,
+        reflection: bool = True,
+        replanning: bool = True,
+        recovery: bool = True,
+    ) -> Dict[str, Optional[float]]:
+        rows = [
+            run_case(c, "rule_based", memory=memory, reflection=reflection,
+                     replanning=replanning, recovery=recovery)
+            for c in hard_cases()
+        ]  # fmt: skip
+        return {
+            t: summarise([r for r in rows if r["kind"] == t])["success"]
+            for t in HARD_TIERS
+        }
+
     full = known_score()
     out: Dict[str, Dict[str, Any]] = {
         "full": {"known+faults success": full},
@@ -286,6 +339,10 @@ def ablation_table(provider: Optional[Provider]) -> Dict[str, Any]:
         "no_replanning": {"known+faults success": known_score(replanning=False)},
         "no_in_mission_recovery": {"known+faults success": known_score(recovery=False)},
     }
+    for name, switches in (("full", {}), ("no_memory", {"memory": False}),
+                           ("no_reflection", {"reflection": False}), ("no_replanning", {"replanning": False}),
+                           ("no_in_mission_recovery", {"recovery": False})):  # fmt: skip
+        out[name]["hard tiers"] = hard_score(**switches)
     with_skills, without = novel_score(True), novel_score(False)
     out["full"]["novel second pass"] = {
         "success": with_skills["success"],
@@ -329,8 +386,26 @@ def markdown(report: Dict[str, Any]) -> str:
             + " | ".join(pct(s["recovery_by_fault"][f]) for f in FAULT_KINDS)
             + " |"
         )
+    lines += ["", "## Harder tiers (memory, long missions, competing routes)", "",
+              "| Planner | " + " | ".join(HARD_TIERS) + " |", "|---|" + "---|" * len(HARD_TIERS)]  # fmt: skip
+    for p, s in report["planners"].items():
+        tiers = s.get("tiers", {})
+        lines.append(
+            f"| {p} | "
+            + " | ".join(pct((tiers.get(t) or {}).get("success")) for t in HARD_TIERS)
+            + " |"
+        )
     if "ablations" in report:
         a = report["ablations"]
+        lines += ["", "## Ablations on the harder tiers (rule-based)", "",
+                  "| Variant | " + " | ".join(HARD_TIERS) + " |", "|---|" + "---|" * len(HARD_TIERS)]  # fmt: skip
+        for name, v in a.items():
+            if "hard tiers" in v:
+                lines.append(
+                    f"| {name} | "
+                    + " | ".join(pct(v["hard tiers"][t]) for t in HARD_TIERS)
+                    + " |"
+                )
         lines += [
             "",
             "## Ablations",

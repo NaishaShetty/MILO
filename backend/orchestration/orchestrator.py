@@ -1366,11 +1366,19 @@ class Orchestrator:
         if mode not in ("report", "enforce"):
             return None
         try:
-            from verification.predicates import Predicate, check_all, goal_predicates
+            from verification.predicates import (
+                Predicate,
+                check_all,
+                final_state_predicates,
+                goal_predicates,
+            )
 
-            predicates = [Predicate.from_dict(p) for p in stated] or [
-                p for t in (subtasks or [task]) for p in goal_predicates(t)
-            ]
+            # Goals done in order: only each slot's last condition must hold at the end.
+            predicates = [
+                Predicate.from_dict(p) for p in stated
+            ] or final_state_predicates(
+                [goal_predicates(t) for t in (subtasks or [task])]
+            )
             if not predicates:
                 return None
             results = check_all(predicates, self._execution.get_metadata())

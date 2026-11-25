@@ -17,7 +17,7 @@ fixed fault settings, fixed seeds -- so results are reproducible run to run.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 FAULT_KINDS = [
     "blocked_path",
@@ -41,6 +41,11 @@ class Case:
     fault_target: Optional[str] = None
     fault_times: int = 1
     tags: List[str] = field(default_factory=list)
+    #: Harder tiers: objects that start out of view, an ordered list of goals for one
+    #: mission, and a scene variant (an extra, farther receptacle of the same type).
+    hidden: Tuple[str, ...] = ()
+    subtasks: Tuple[Tuple[str, Optional[str], Optional[str]], ...] = ()
+    variant: str = ""
 
     def task_fields(self) -> Dict[str, Any]:
         if self.kind == "novel":
@@ -117,6 +122,47 @@ def fault_cases(times: int = 1) -> List[Case]:
                      fault=fault, fault_target=target, fault_times=times, tags=["fault"])  # fmt: skip
             )
     return out
+
+
+def memory_cases() -> List[Case]:
+    """The object starts out of view: it can't be walked to directly and looking around
+    doesn't reveal it. Only going to where it usually is (memory) finds it."""
+    tasks = [("fetch", "mug", None), ("fetch", "book", None), ("fetch", "bottle", None),
+             ("place", "cup", "sofa"), ("place", "plate", "countertop"),
+             ("store", "tomato", "fridge"), ("store", "potato", "cabinet"), ("store", "egg", "drawer")]  # fmt: skip
+    return [Case(f"memory-{g}-{o}" + (f"-{t}" if t else ""), "memory", g, o, t, hidden=(o,))
+            for g, o, t in tasks]  # fmt: skip
+
+
+def long_cases() -> List[Case]:
+    """Several goals in one mission, in the stated order (10 to 20 steps)."""
+    chains = [
+        (("store", "apple", "fridge"), ("turn_off", "lightswitch", None), ("fetch", "mug", None)),
+        (("store", "book", "drawer"), ("turn_on", "television", None)),
+        (("place", "bowl", "shelf"), ("place", "cup", "sofa"), ("turn_on", "faucet", None)),
+        (("store", "egg", "fridge"), ("store", "cup", "cabinet")),
+        (("open", "cabinet", None), ("place", "plate", "countertop"), ("fetch", "bottle", None)),
+        (("turn_on", "television", None), ("store", "potato", "fridge"), ("place", "book", "sofa")),
+    ]  # fmt: skip
+    return [Case("long-" + "+".join(f"{g}-{o}" for g, o, _ in chain), "long", "multi", subtasks=chain)
+            for chain in chains]  # fmt: skip
+
+
+def route_cases() -> List[Case]:
+    """Competing routes: the nearest shelf/table is blocked for good; a second one, further
+    away, is clear. Success needs a planner that tries the other one."""
+    tasks = [("place", "mug", "shelf", "Shelf"), ("place", "bowl", "shelf", "Shelf"),
+             ("place", "book", "table", "Table"), ("place", "cup", "table", "Table")]  # fmt: skip
+    return [Case(f"route-{g}-{o}-{t}", "routes", g, o, t, fault="blocked_path",
+                 fault_target=f"{kind}|1", fault_times=99, variant=f"second_{t}")
+            for g, o, t, kind in tasks]  # fmt: skip
+
+
+HARD_TIERS = ("memory", "long", "routes")
+
+
+def hard_cases() -> List[Case]:
+    return memory_cases() + long_cases() + route_cases()
 
 
 def full_suite() -> List[Case]:

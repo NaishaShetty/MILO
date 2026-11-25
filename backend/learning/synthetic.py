@@ -21,7 +21,13 @@ Fault kinds (`faults.kind`):
 - `timeout`        an action raises `TimeoutError` `times` times;
 - `wrong_detection` the target is reported not visible after navigation `times` times;
 - `missing_object` the target is not in the scene at all (the executor cannot find it).
-`times=99` makes a fault effectively permanent.
+`times=99` makes a fault effectively permanent. A fault `target` is an objectType
+(lower case), or an exact objectId ("Shelf|1") to hit one object of a type.
+
+Out of view (opt-in, for the benchmark's memory tier): an object marked `"hidden": True`
+is not visible, can't be walked to directly and isn't revealed by looking around; it
+appears only when MILO walks to the receptacle it is actually on. Knowing (remembering)
+where it usually is is then the difference between finding it and not.
 """
 
 from __future__ import annotations
@@ -124,6 +130,9 @@ class SyntheticSimulator:
         if faults.kind == "missing_object" and faults.target:
             objects = [o for o in objects if o["objectType"].lower() != faults.target]
         self.objects = objects
+        for o in self.objects:
+            if o.get("hidden"):
+                o["visible"] = False
         self.inventory_objects: List[Dict[str, Any]] = []
         self.faults = faults or Faults()
         self._fault_hits = 0
@@ -142,6 +151,7 @@ class SyntheticSimulator:
             and (
                 self.faults.target is None
                 or obj["objectType"].lower() == self.faults.target
+                or obj["objectId"] == self.faults.target
             )
         )
 
@@ -191,6 +201,8 @@ class SyntheticSimulator:
         self._maybe_timeout(obj)
         if obj is None:
             return self._event(False, "object not found")
+        if obj.get("hidden"):
+            return self._event(False, "object not visible from here")
         if (
             self.faults.kind == "blocked_path"
             and self._is_fault_target(obj)
@@ -200,7 +212,11 @@ class SyntheticSimulator:
             return self._event(False, "path blocked")
         for other in self.objects:
             other["distance"] = round(abs(other["distance"] - obj["distance"]) + 1.8, 2)
-            other["visible"] = True
+            if other.get("hidden") and object_id in (
+                other.get("parentReceptacles") or []
+            ):
+                other["hidden"] = False  # walked to where it really is: now in view
+            other["visible"] = not other.get("hidden")
         obj["distance"] = 0.8
         if self._is_fault_target(obj) and self._fault_active():
             if self.faults.kind == "out_of_reach":
@@ -311,7 +327,7 @@ class SyntheticSimulator:
 
     def look_around(self) -> FakeEvent:
         for o in self.objects:
-            o["visible"] = True
+            o["visible"] = not o.get("hidden")
         return self._event(True)
 
     def drop_held_object(self) -> FakeEvent:

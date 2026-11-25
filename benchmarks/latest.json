@@ -42,6 +42,32 @@
         "timeout": 1.0,
         "wrong_detection": 0.8261,
         "missing_object": 0.0
+      },
+      "tiers": {
+        "memory": {
+          "cases": 8,
+          "success": 1.0,
+          "steps": 8.38,
+          "sim_s": 15.19,
+          "replans": 0,
+          "model_calls": 0
+        },
+        "long": {
+          "cases": 6,
+          "success": 1.0,
+          "steps": 16.17,
+          "sim_s": 28.17,
+          "replans": 0,
+          "model_calls": 0
+        },
+        "routes": {
+          "cases": 4,
+          "success": 0.0,
+          "steps": 9.75,
+          "sim_s": 26.32,
+          "replans": 2,
+          "model_calls": 0
+        }
       }
     },
     "react": {
@@ -84,6 +110,32 @@
         "timeout": 1.0,
         "wrong_detection": 0.8261,
         "missing_object": 0.0
+      },
+      "tiers": {
+        "memory": {
+          "cases": 8,
+          "success": 1.0,
+          "steps": 8.38,
+          "sim_s": 15.19,
+          "replans": 0,
+          "model_calls": 0
+        },
+        "long": {
+          "cases": 6,
+          "success": 1.0,
+          "steps": 16.17,
+          "sim_s": 28.17,
+          "replans": 0,
+          "model_calls": 0
+        },
+        "routes": {
+          "cases": 4,
+          "success": 0.0,
+          "steps": 9.75,
+          "sim_s": 26.32,
+          "replans": 2,
+          "model_calls": 0
+        }
       }
     },
     "behavior_tree": {
@@ -126,6 +178,32 @@
         "timeout": 1.0,
         "wrong_detection": 0.8261,
         "missing_object": 0.0
+      },
+      "tiers": {
+        "memory": {
+          "cases": 8,
+          "success": 0.0,
+          "steps": 8,
+          "sim_s": 27.2,
+          "replans": 2,
+          "model_calls": 0
+        },
+        "long": {
+          "cases": 6,
+          "success": 1.0,
+          "steps": 14.83,
+          "sim_s": 25.5,
+          "replans": 0,
+          "model_calls": 0
+        },
+        "routes": {
+          "cases": 4,
+          "success": 0.0,
+          "steps": 9,
+          "sim_s": 24.7,
+          "replans": 2,
+          "model_calls": 0
+        }
       }
     },
     "htn": {
@@ -168,6 +246,32 @@
         "timeout": 1.0,
         "wrong_detection": 0.8261,
         "missing_object": 0.0
+      },
+      "tiers": {
+        "memory": {
+          "cases": 8,
+          "success": 0.0,
+          "steps": 8,
+          "sim_s": 27.2,
+          "replans": 2,
+          "model_calls": 0
+        },
+        "long": {
+          "cases": 6,
+          "success": 1.0,
+          "steps": 14.83,
+          "sim_s": 25.5,
+          "replans": 0,
+          "model_calls": 0
+        },
+        "routes": {
+          "cases": 4,
+          "success": 0.0,
+          "steps": 9,
+          "sim_s": 24.7,
+          "replans": 2,
+          "model_calls": 0
+        }
       }
     },
     "novel": {
@@ -210,6 +314,32 @@
         "timeout": null,
         "wrong_detection": null,
         "missing_object": null
+      },
+      "tiers": {
+        "memory": {
+          "cases": 0,
+          "success": null,
+          "steps": null,
+          "sim_s": null,
+          "replans": null,
+          "model_calls": null
+        },
+        "long": {
+          "cases": 0,
+          "success": null,
+          "steps": null,
+          "sim_s": null,
+          "replans": null,
+          "model_calls": null
+        },
+        "routes": {
+          "cases": 0,
+          "success": null,
+          "steps": null,
+          "sim_s": null,
+          "replans": null,
+          "model_calls": null
+        }
       }
     }
   },
@@ -1744,6 +1874,186 @@
         "sim_s": 4.0,
         "replans": 0,
         "model_calls": 0
+      },
+      {
+        "case": "memory-fetch-mug",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 7,
+        "sim_s": 13.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-fetch-book",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 7,
+        "sim_s": 13.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-fetch-bottle",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 7,
+        "sim_s": 13.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-place-cup-sofa",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 8,
+        "sim_s": 15.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-place-plate-countertop",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 8,
+        "sim_s": 15.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-store-tomato-fridge",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 10,
+        "sim_s": 17.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-store-potato-cabinet",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 10,
+        "sim_s": 17.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-store-egg-drawer",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 10,
+        "sim_s": 17.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-store-apple+turn_off-lightswitch+fetch-mug",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 18,
+        "sim_s": 31.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-store-book+turn_on-television",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 11,
+        "sim_s": 18.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-place-bowl+place-cup+turn_on-faucet",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 15,
+        "sim_s": 27.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-store-egg+store-cup",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 16,
+        "sim_s": 26.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-open-cabinet+place-plate+fetch-bottle",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 18,
+        "sim_s": 33.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-turn_on-television+store-potato+place-book",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 19,
+        "sim_s": 33.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-mug-shelf",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 11,
+        "sim_s": 28.7,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-bowl-shelf",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 11,
+        "sim_s": 28.7,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-book-table",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 6,
+        "sim_s": 19.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-cup-table",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 11,
+        "sim_s": 28.7,
+        "replans": 2,
+        "model_calls": 0
       }
     ],
     "react": [
@@ -3275,6 +3585,186 @@
         "steps": 4,
         "sim_s": 4.0,
         "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-fetch-mug",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 7,
+        "sim_s": 13.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-fetch-book",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 7,
+        "sim_s": 13.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-fetch-bottle",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 7,
+        "sim_s": 13.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-place-cup-sofa",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 8,
+        "sim_s": 15.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-place-plate-countertop",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 8,
+        "sim_s": 15.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-store-tomato-fridge",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 10,
+        "sim_s": 17.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-store-potato-cabinet",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 10,
+        "sim_s": 17.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-store-egg-drawer",
+        "kind": "memory",
+        "fault": "none",
+        "success": true,
+        "steps": 10,
+        "sim_s": 17.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-store-apple+turn_off-lightswitch+fetch-mug",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 18,
+        "sim_s": 31.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-store-book+turn_on-television",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 11,
+        "sim_s": 18.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-place-bowl+place-cup+turn_on-faucet",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 15,
+        "sim_s": 27.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-store-egg+store-cup",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 16,
+        "sim_s": 26.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-open-cabinet+place-plate+fetch-bottle",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 18,
+        "sim_s": 33.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-turn_on-television+store-potato+place-book",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 19,
+        "sim_s": 33.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-mug-shelf",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 11,
+        "sim_s": 28.7,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-bowl-shelf",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 11,
+        "sim_s": 28.7,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-book-table",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 6,
+        "sim_s": 19.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-cup-table",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 11,
+        "sim_s": 28.7,
+        "replans": 2,
         "model_calls": 0
       }
     ],
@@ -4808,6 +5298,186 @@
         "sim_s": 0.0,
         "replans": 0,
         "model_calls": 0
+      },
+      {
+        "case": "memory-fetch-mug",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-fetch-book",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-fetch-bottle",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-place-cup-sofa",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-place-plate-countertop",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-store-tomato-fridge",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-store-potato-cabinet",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-store-egg-drawer",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "long-store-apple+turn_off-lightswitch+fetch-mug",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 16,
+        "sim_s": 27.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-store-book+turn_on-television",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 11,
+        "sim_s": 18.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-place-bowl+place-cup+turn_on-faucet",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 15,
+        "sim_s": 27.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-store-egg+store-cup",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 16,
+        "sim_s": 26.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-open-cabinet+place-plate+fetch-bottle",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 14,
+        "sim_s": 25.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-turn_on-television+store-potato+place-book",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 17,
+        "sim_s": 29.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-mug-shelf",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 9,
+        "sim_s": 24.7,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-bowl-shelf",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 9,
+        "sim_s": 24.7,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-book-table",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 9,
+        "sim_s": 24.7,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-cup-table",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 9,
+        "sim_s": 24.7,
+        "replans": 2,
+        "model_calls": 0
       }
     ],
     "htn": [
@@ -6340,6 +7010,186 @@
         "sim_s": 0.0,
         "replans": 0,
         "model_calls": 0
+      },
+      {
+        "case": "memory-fetch-mug",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-fetch-book",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-fetch-bottle",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-place-cup-sofa",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-place-plate-countertop",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-store-tomato-fridge",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-store-potato-cabinet",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memory-store-egg-drawer",
+        "kind": "memory",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "long-store-apple+turn_off-lightswitch+fetch-mug",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 16,
+        "sim_s": 27.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-store-book+turn_on-television",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 11,
+        "sim_s": 18.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-place-bowl+place-cup+turn_on-faucet",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 15,
+        "sim_s": 27.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-store-egg+store-cup",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 16,
+        "sim_s": 26.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-open-cabinet+place-plate+fetch-bottle",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 14,
+        "sim_s": 25.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "long-turn_on-television+store-potato+place-book",
+        "kind": "long",
+        "fault": "none",
+        "success": true,
+        "steps": 17,
+        "sim_s": 29.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-mug-shelf",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 9,
+        "sim_s": 24.7,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-bowl-shelf",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 9,
+        "sim_s": 24.7,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-book-table",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 9,
+        "sim_s": 24.7,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "route-place-cup-table",
+        "kind": "routes",
+        "fault": "blocked_path",
+        "success": false,
+        "steps": 9,
+        "sim_s": 24.7,
+        "replans": 2,
+        "model_calls": 0
       }
     ],
     "novel": [
@@ -6428,22 +7278,47 @@
   "ablations": {
     "full": {
       "known+faults success": 0.8138,
+      "hard tiers": {
+        "memory": 1.0,
+        "long": 1.0,
+        "routes": 0.0
+      },
       "novel second pass": {
         "success": 1.0,
         "model_calls": 0
       }
     },
     "no_memory": {
-      "known+faults success": 0.8138
+      "known+faults success": 0.8138,
+      "hard tiers": {
+        "memory": 0.0,
+        "long": 1.0,
+        "routes": 0.0
+      }
     },
     "no_reflection": {
-      "known+faults success": 0.2138
+      "known+faults success": 0.2138,
+      "hard tiers": {
+        "memory": 1.0,
+        "long": 1.0,
+        "routes": 0.0
+      }
     },
     "no_replanning": {
-      "known+faults success": 0.2138
+      "known+faults success": 0.2138,
+      "hard tiers": {
+        "memory": 1.0,
+        "long": 1.0,
+        "routes": 0.0
+      }
     },
     "no_in_mission_recovery": {
-      "known+faults success": 0.5655
+      "known+faults success": 0.5655,
+      "hard tiers": {
+        "memory": 1.0,
+        "long": 1.0,
+        "routes": 0.0
+      }
     },
     "no_skills": {
       "novel second pass": {
@@ -6452,5 +7327,5 @@
       }
     }
   },
-  "seconds": 10.6
+  "seconds": 20.4
 }

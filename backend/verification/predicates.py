@@ -24,7 +24,7 @@ so a planner can state them as JSON.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from execution.resolver import ObjectResolver
 
@@ -185,3 +185,29 @@ def goal_predicates(task: Any) -> List[Predicate]:
     if goal == "navigate_to" and target:
         return [Predicate("near", target)]
     return []
+
+
+def _slot(p: Predicate) -> Tuple[str, Optional[str]]:
+    """What a predicate is about: later goals overwrite earlier ones on the same slot."""
+    if p.kind in ("held", "hand_empty"):
+        return ("hand", None)
+    if p.kind in ("is_open", "is_closed"):
+        return ("open", p.object)
+    if p.kind in ("toggled_on", "toggled_off"):
+        return ("switch", p.object)
+    if p.kind == "near":
+        return ("robot", None)
+    return (p.kind, p.object)  # in_receptacle / visible: per object
+
+
+def final_state_predicates(per_goal: Sequence[Sequence[Predicate]]) -> List[Predicate]:
+    """The end state of goals done one after another: for each slot (what the hand holds,
+    where an object is, whether something is open or switched on, where the robot is) only
+    the last goal's condition counts. "Put the apple away, then fetch the mug" ends holding
+    the mug -- the first goal's "hand empty" was true when it finished, not at the end.
+    """
+    final: Dict[Tuple[str, Optional[str]], Predicate] = {}
+    for predicates in per_goal:
+        for p in predicates:
+            final[_slot(p)] = p
+    return list(final.values())

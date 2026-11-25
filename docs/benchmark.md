@@ -53,7 +53,7 @@ What each part is worth (rule-based on known + fault cases; the novel planner on
 
 **Read honestly:**
 - **ReAct is identical to rule-based here.** With no language model configured it falls back to the rule-based planner, by design.
-- **Memory is worth nothing on this suite.** Every object is in view, so remembered locations change nothing.
+- **Memory is worth nothing on this tier.** Every object is in view, so remembered locations change nothing. The memory tier below is where it counts.
 - **Reflection and replanning are worth 60 points under faults** (81% vs 21%). Without the in-mission fixes below they were worth 36 (57% vs 21%).
 - **Skills don't change success** with reference plans, but they remove the model call entirely on repeat tasks.
 - **In-mission recovery is worth 24 points** (81% vs 57%):
@@ -61,6 +61,38 @@ What each part is worth (rule-based on known + fault cases; the novel planner on
   - **What it does now** (`backend/orchestration/recovery.py`). After a "not visible" step failure it inserts `look_around` before the next attempt. After "not reachable" it inserts a fresh `navigate` to the target. A second time for the same step, it looks around and then re-approaches. Each fix is capped at two per step per mission, and `max_replans` still bounds the attempts.
   - **What's still missing.** The remaining wrong-detection failures (4 of 23) are all **find** tasks. There, no step fails: the plan "succeeds", and only the final goal check sees the object isn't visible. Failure memory (Phase 5) still fixes those on the *next* mission.
 - A missing object can't be recovered, as expected.
+
+## Harder tiers (2026-11-25, `make benchmark`, synthetic home)
+
+The tasks above stay as the regression tier. Three tiers were added where planners can
+genuinely differ (`backend/benchmark/suite.py`):
+
+- **memory** (8 cases): the object starts out of view. It can't be walked to directly, looking around doesn't reveal it, and it appears only when MILO goes to the place it is actually on (`"hidden": True` in `learning/synthetic.py`). MILO's memory holds true facts about where things usually are.
+- **long** (6 cases): two or three goals in one mission, in order, 10 to 20 steps (for example: put the apple in the fridge, switch the light off, then fetch the mug).
+- **routes** (4 cases): competing routes. The nearest shelf or table is blocked for good; a second one of the same kind, further away, is clear.
+
+| Planner | memory | long | routes |
+|---|---|---|---|
+| rule-based | 100% | 100% | 0% |
+| behaviour tree | 0% | 100% | 0% |
+| HTN | 0% | 100% | 0% |
+| ReAct | not measured (needs a model) | | |
+
+| Rule-based, ablation | memory | long | routes |
+|---|---|---|---|
+| everything on | 100% | 100% | 0% |
+| no memory | **0%** | 100% | 0% |
+| no reflection | 100% | 100% | 0% |
+| no replanning | 100% | 100% | 0% |
+| no in-mission recovery | 100% | 100% | 0% |
+
+What this shows, plainly:
+
+- **Memory finally shows an effect:** 100% with it, 0% without, on the memory tier.
+- **The planners separate on memory**, for a structural reason: only the rule-based planner uses remembered locations (`_apply_memory_hint`). The behaviour tree is always built with no memory context, and HTN has no memory-conditioned methods yet.
+- **Long missions don't separate the planners.** All three produce the same first plan for every single goal in the suite, and a long mission is those plans in sequence. Adding the tier did find a real bug: the end-of-mission goal check required every goal's conditions at once, so "put the apple away, then fetch the mug" failed on the first goal's "hand empty". Only the last goal's condition for each slot (hand, object location, open, switched on) is now checked (`verification.predicates.final_state_predicates`). Before the fix, 2 of 6 long missions failed for every planner.
+- **No planner handles competing routes (0%).** The executor always resolves "the shelf" to the nearest one, and a replan resolves it the same way, so nothing ever tries the second shelf. This is an open weakness; the world model (`docs/models/world_model.md`) is the component meant to catch it before acting.
+- These tiers run in the synthetic home. A real AI2-THOR run of the suite is the next step (`make benchmark-thor`, see `docs/local_model.md`).
 
 ## CI
 

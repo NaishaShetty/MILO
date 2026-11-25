@@ -18,6 +18,26 @@
 | htn | 100% | 100% | 100% | 100% | 83% | 0% |
 | novel | not run | not run | not run | not run | not run | not run |
 
+## Harder tiers (memory, long missions, competing routes)
+
+| Planner | memory | long | routes |
+|---|---|---|---|
+| rule_based | 100% | 100% | 0% |
+| react | 100% | 100% | 0% |
+| behavior_tree | 0% | 100% | 0% |
+| htn | 0% | 100% | 0% |
+| novel | not run | not run | not run |
+
+## Ablations on the harder tiers (rule-based)
+
+| Variant | memory | long | routes |
+|---|---|---|---|
+| full | 100% | 100% | 0% |
+| no_memory | 0% | 100% | 0% |
+| no_reflection | 100% | 100% | 0% |
+| no_replanning | 100% | 100% | 0% |
+| no_in_mission_recovery | 100% | 100% | 0% |
+
 ## Ablations
 
 | Variant | Known + faults (rule-based) | Novel 2nd pass | Model calls |
@@ -29,4 +49,4 @@
 | no_in_mission_recovery | 57% | – | – |
 | no_skills | – | 100% | 1 |
 
-Ran in 10.6 s.
+Ran in 20.4 s.
