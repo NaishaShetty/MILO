@@ -11,7 +11,7 @@
 // data source, no fictional agent: the node set is exactly
 // `AgentStatusList.tsx`'s `AGENT_LABELS` keys, which mirror the
 // backend's registered agent names.
-import { useAgents } from "../state/AgentsContext";
+import { useAgents } from "../state/useAgents";
 import type { AgentStateValue } from "../api/agentsTypes";
 
 const STATE_LABELS: Record<AgentStateValue, string> = {

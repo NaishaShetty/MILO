@@ -7,7 +7,6 @@
 // icon for the unfiltered tab and the page's toolbar glyphs (search,
 // refresh, chevron, task, clock). Purely decorative -- keyed off the
 // same `MemoryType` strings the real filter/count logic already uses.
-import type { StatusPillTone } from "./StatusPill";
 
 export type MemoryIconName =
   | "all"
@@ -37,16 +36,6 @@ const PATHS: Record<MemoryIconName, string> = {
   chevron: "M6 3.5 10.5 8 6 12.5",
   task: "M4 5.5h8v6.5H4V5.5Z M6 5.5V4a2 2 0 0 1 4 0v1.5",
   clock: "M8 4.2v4l2.6 1.5 M8 2.2a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 0 1 0-11.6Z",
-};
-
-/** Real `MemoryType` -> the accent `StatusPillTone` used for that
- * category's icon/label/border throughout the page (spec section 14). */
-export const MEMORY_CATEGORY_TONE: Record<string, StatusPillTone> = {
-  all: "accent",
-  semantic: "info",
-  episodic: "accent",
-  failure: "warning",
-  user: "success",
 };
 
 export interface MemoryIconProps {

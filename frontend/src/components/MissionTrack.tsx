@@ -2,16 +2,11 @@
 import type { PlanStep } from "../api/plannerTypes";
 import type { MiloDirection } from "../state/miloDirector";
 import { MiloActor } from "./MiloActor";
+import { trackPosition } from "./trackPosition";
 
 export interface MissionTrackProps {
   steps: PlanStep[];
   direction: MiloDirection;
-}
-
-/** 0..1 position of MILO along the track: the number of finished steps over the total. */
-export function trackPosition(steps: PlanStep[]): number {
-  if (steps.length === 0) return 0;
-  return steps.filter((s) => s.status === "completed").length / steps.length;
 }
 
 export function MissionTrack({ steps, direction }: MissionTrackProps) {

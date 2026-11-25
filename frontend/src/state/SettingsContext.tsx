@@ -9,14 +9,11 @@
 // claims to configure the server; `SettingsPage.tsx` is explicit in
 // its own copy about which sections are locally-editable vs.
 // read-only display of backend-reported values.
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { DEFAULT_SETTINGS } from "./settingsDefaults";
+
+import { SettingsContext } from "./useSettings";
 import type { ReactNode } from "react";
 
 const STORAGE_KEY = "milo:settings";
@@ -38,12 +35,6 @@ export interface MiloSettings {
     taskCompletionEnabled: boolean;
   };
 }
-
-export const DEFAULT_SETTINGS: MiloSettings = {
-  general: { nickname: "", theme: "dark", compactMode: false, startPage: "/" },
-  speech: { preferredMicDeviceId: null },
-  notifications: { taskCompletionEnabled: false },
-};
 
 function loadSettings(): MiloSettings {
   try {
@@ -69,8 +60,6 @@ export interface SettingsContextValue {
   /** Clears locally-stored settings/preferences only -- never touches backend data. */
   clearLocalData: () => void;
 }
-
-const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<MiloSettings>(() => loadSettings());
@@ -122,12 +111,4 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
-}
-
-export function useSettings(): SettingsContextValue {
-  const context = useContext(SettingsContext);
-  if (!context) {
-    throw new Error("useSettings() must be used within a <SettingsProvider>.");
-  }
-  return context;
 }

@@ -15,7 +15,7 @@
 // class attributes: "vision", "memory", "planner", "navigation",
 // "execution", "reflection", "speech" (see Session 3 audit notes) --
 // this file does not invent a name the backend doesn't register.
-import { useAgents } from "../state/AgentsContext";
+import { useAgents } from "../state/useAgents";
 
 const AGENT_LABELS: Record<string, string> = {
   vision: "Vision",

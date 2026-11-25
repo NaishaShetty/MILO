@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 
 import { ApiError } from "../api/client";
-import { useAgents } from "../state/AgentsContext";
+import { useAgents } from "../state/useAgents";
 import { ActivityPage } from "../pages/ActivityPage";
 import { isDemo } from "../api/demo";
 import { BookIcon, FlagIcon, FlaskIcon, GearIcon, PlayIcon, SparkIcon } from "./Icons";

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "../api/client";
 import { deleteSkill, editSkill, listSkills, readableWording, teachSkill } from "../api/skills";
 import type { Skill } from "../api/skills";
-import { useTask } from "../state/TaskContext";
+import { useTask } from "../state/useTask";
 
 const STATUS_LABEL: Record<Skill["status"], string> = {
   teaching: "being checked",

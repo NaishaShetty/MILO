@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { MiloRobot, poseForState, rigForPose } from "./MiloRobot";
+import { poseForState, rigForPose } from "./miloPose";
+import { MiloRobot } from "./MiloRobot";
 import type { MiloPose } from "./MiloRobot";
 
 describe("pose to rig mapping", () => {

@@ -14,10 +14,14 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AgentsProvider } from "./AgentsContext";
-import { MiloStateProvider, useMiloState } from "./MiloStateContext";
-import { SpeechProvider, useSpeech } from "./SpeechContext";
-import { TaskProvider, useTask } from "./TaskContext";
-import { VoiceProvider, useVoice } from "./VoiceContext";
+import { MiloStateProvider } from "./MiloStateContext";
+import { useMiloState } from "./useMiloState";
+import { SpeechProvider } from "./SpeechContext";
+import { useSpeech } from "./useSpeech";
+import { TaskProvider } from "./TaskContext";
+import { useTask } from "./useTask";
+import { VoiceProvider } from "./VoiceContext";
+import { useVoice } from "./useVoice";
 import * as agentsApi from "../api/agents";
 import * as speechApi from "../api/speech";
 import * as tasksApi from "../api/tasks";

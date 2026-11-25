@@ -17,11 +17,12 @@
 // timestamps, descriptions, durations, locations, or outcomes).
 import { useMemo, useState } from "react";
 
-import { ActivityIcon, ACTIVITY_CATEGORY_TONE } from "../components/ActivityIcons";
+import { ActivityIcon } from "../components/ActivityIcons";
+import { ACTIVITY_CATEGORY_TONE } from "../components/activityTones";
 import type { ActivityIconName } from "../components/ActivityIcons";
 import { GlassCard } from "../components/GlassCard";
 import { StatusPill } from "../components/StatusPill";
-import { useTask } from "../state/TaskContext";
+import { useTask } from "../state/useTask";
 import { useActivityEvents } from "../hooks/useActivityEvents";
 import { ACTIVITY_CATEGORIES, exportEventsAsJson, filterByCategory, searchEvents } from "../utils/activity";
 import type { ActivityCategory } from "../utils/activity";

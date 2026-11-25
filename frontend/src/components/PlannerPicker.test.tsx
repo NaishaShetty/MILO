@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { PlannerPicker, PLANNER_OPTIONS } from "./PlannerPicker";
+import { PlannerPicker } from "./PlannerPicker";
+import { PLANNER_OPTIONS } from "./plannerOptions";
 
 describe("PlannerPicker", () => {
   it("offers the four planners with friendly names", () => {

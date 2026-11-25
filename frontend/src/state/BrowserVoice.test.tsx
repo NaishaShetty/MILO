@@ -3,7 +3,8 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BrowserVoiceProvider, useBrowserVoice } from "./BrowserVoice";
+import { BrowserVoiceProvider } from "./BrowserVoice";
+import { useBrowserVoice } from "./useBrowserVoice";
 import { VoiceToggle } from "../components/VoiceToggle";
 import { VoiceCoach } from "../components/VoiceCoach";
 import * as tasksApi from "../api/tasks";

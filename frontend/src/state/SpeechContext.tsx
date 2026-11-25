@@ -19,7 +19,9 @@
 // Every failure mode (no `mediaDevices` API, permission denied, no
 // speech captured, a transcription/backend error) is caught and
 // mapped to a `SpeechErrorKind` -- never left to throw into the UI.
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { SpeechContext } from "./useSpeech";
 import type { ReactNode } from "react";
 
 import { getSpeechStatus, mapSpeechError, transcribeAudio } from "../api/speech";
@@ -46,8 +48,6 @@ export interface SpeechContextValue {
   markTaskCreated: () => void;
   reset: () => void;
 }
-
-const SpeechContext = createContext<SpeechContextValue | null>(null);
 
 export function SpeechProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SpeechState>("idle");
@@ -233,12 +233,4 @@ export function SpeechProvider({ children }: { children: ReactNode }) {
   );
 
   return <SpeechContext.Provider value={value}>{children}</SpeechContext.Provider>;
-}
-
-export function useSpeech(): SpeechContextValue {
-  const context = useContext(SpeechContext);
-  if (!context) {
-    throw new Error("useSpeech() must be used within a <SpeechProvider>.");
-  }
-  return context;
 }

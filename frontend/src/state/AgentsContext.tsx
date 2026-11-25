@@ -9,7 +9,9 @@
 // simulator is disabled) is surfaced as `status === "error"`, not
 // treated as a crash -- pages must render a real "agents unavailable"
 // state, never fabricate "Online".
-import { createContext, useContext, useMemo } from "react";
+import { useMemo } from "react";
+
+import { AgentsContext } from "./useAgents";
 import type { ReactNode } from "react";
 
 import { listAgents } from "../api/agents";
@@ -28,8 +30,6 @@ export interface AgentsContextValue {
   refresh: () => void;
 }
 
-const AgentsContext = createContext<AgentsContextValue | null>(null);
-
 export function AgentsProvider({ children }: { children: ReactNode }) {
   const { data, status, error, refresh } = usePolling(listAgents, {
     intervalMs: POLL_INTERVAL_MS,
@@ -42,12 +42,4 @@ export function AgentsProvider({ children }: { children: ReactNode }) {
   );
 
   return <AgentsContext.Provider value={value}>{children}</AgentsContext.Provider>;
-}
-
-export function useAgents(): AgentsContextValue {
-  const context = useContext(AgentsContext);
-  if (!context) {
-    throw new Error("useAgents() must be used within an <AgentsProvider>.");
-  }
-  return context;
 }

@@ -8,7 +8,8 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { SpeechProvider, useSpeech } from "./SpeechContext";
+import { SpeechProvider } from "./SpeechContext";
+import { useSpeech } from "./useSpeech";
 import * as speechApi from "../api/speech";
 import * as voiceApi from "../api/voice";
 

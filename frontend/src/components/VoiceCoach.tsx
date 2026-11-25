@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 import { decide } from "../api/tasks";
 import type { PendingDecision, ReplyChoice } from "../api/tasksTypes";
-import { useBrowserVoice } from "../state/BrowserVoice";
+import { useBrowserVoice } from "../state/useBrowserVoice";
 import { choiceFromSpeech, decisionFromSpeech, spokenQuestion } from "../utils/voiceAnswers";
 
 export function VoiceCoach({

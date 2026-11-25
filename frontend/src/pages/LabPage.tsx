@@ -36,9 +36,9 @@ import { MiloWordmark } from "../components/MiloWordmark";
 import { StatusPill } from "../components/StatusPill";
 import { getLabStats, listExperiments, runPerceptionExperiment, runSandbox } from "../api/lab";
 import type { ExperimentSummary, LabStatsResponse, SandboxResponse } from "../api/labTypes";
-import { useAgents } from "../state/AgentsContext";
-import { useMiloState } from "../state/MiloStateContext";
-import { useTask } from "../state/TaskContext";
+import { useAgents } from "../state/useAgents";
+import { useMiloState } from "../state/useMiloState";
+import { useTask } from "../state/useTask";
 import { usePolling } from "../hooks/usePolling";
 
 const ALL_AGENTS = ["vision", "memory", "planner", "navigation", "execution", "reflection", "speech"];

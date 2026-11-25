@@ -1,5 +1,5 @@
 // VoiceToggle.tsx -- the on/off switch for browser voice, with the fallback reason.
-import { useBrowserVoice } from "../state/BrowserVoice";
+import { useBrowserVoice } from "../state/useBrowserVoice";
 
 export function VoiceToggle() {
   const voice = useBrowserVoice();

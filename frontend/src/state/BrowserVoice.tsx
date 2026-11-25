@@ -1,7 +1,9 @@
 // BrowserVoice.tsx -- voice with the browser's own speech recognition and speech
 // synthesis (no server, no key). An on/off switch (remembered), a visible "listening"
 // state, and a plain fallback message when the browser can't do it.
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { Ctx } from "./useBrowserVoice";
 import type { ReactNode } from "react";
 
 type Recognition = {
@@ -38,8 +40,6 @@ export interface BrowserVoiceValue {
   /** Says `text` out loud (only when voice is on and supported). */
   say: (text: string) => Promise<void>;
 }
-
-const Ctx = createContext<BrowserVoiceValue | null>(null);
 
 export function BrowserVoiceProvider({ children }: { children: ReactNode }) {
   const Recog = typeof window !== "undefined" ? recognitionClass() : null;
@@ -134,19 +134,3 @@ export function BrowserVoiceProvider({ children }: { children: ReactNode }) {
 }
 
 /** Voice switched off and unavailable: what components get outside the provider. */
-const OFF: BrowserVoiceValue = {
-  enabled: false,
-  setEnabled: () => undefined,
-  canListen: false,
-  canSpeak: false,
-  unsupported: "Voice isn't available here.",
-  listening: false,
-  speaking: false,
-  listen: () => Promise.resolve(""),
-  stopListening: () => undefined,
-  say: () => Promise.resolve(),
-};
-
-export function useBrowserVoice(): BrowserVoiceValue {
-  return useContext(Ctx) ?? OFF;
-}

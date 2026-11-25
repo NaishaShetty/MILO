@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import type { PlanStep } from "../api/plannerTypes";
 import { directMilo } from "../state/miloDirector";
 import type { TaskState } from "../api/tasksTypes";
-import { MissionTrack, trackPosition } from "./MissionTrack";
+import { MissionTrack } from "./MissionTrack";
+import { trackPosition } from "./trackPosition";
 
 const step = (id: number, status: PlanStep["status"]): PlanStep => ({
   step_id: id,

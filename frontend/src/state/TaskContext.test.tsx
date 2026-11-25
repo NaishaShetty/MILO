@@ -2,7 +2,8 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { TaskProvider, useTask } from "./TaskContext";
+import { TaskProvider } from "./TaskContext";
+import { useTask } from "./useTask";
 import * as tasksApi from "../api/tasks";
 import type { CreateTaskResult, TaskState } from "../api/tasksTypes";
 

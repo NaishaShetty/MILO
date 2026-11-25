@@ -7,7 +7,7 @@
 // by CSS keyed on `data-pose` (see milo.css). Colours come from tokens.css;
 // the glow is amber. `paused` freezes every animation (used by visual
 // snapshots), and prefers-reduced-motion disables running/bouncing in CSS.
-import type { MiloState } from "../state/miloState";
+import { rigForPose } from "./miloPose";
 
 export type MiloPose =
   | "idle"
@@ -23,11 +23,6 @@ export type MiloPose =
   | "error";
 
 export type MiloRig = "front" | "side";
-
-/** The side rig is used for travel, the front rig for everything else. */
-export function rigForPose(pose: MiloPose): MiloRig {
-  return pose === "walk" || pose === "run" ? "side" : "front";
-}
 
 export interface MiloRobotProps {
   pose?: MiloPose;
@@ -250,28 +245,3 @@ export function MiloRobot({
   );
 }
 
-/** Maps the app-wide MILO state onto a drawable pose. */
-export function poseForState(state: MiloState): MiloPose {
-  switch (state) {
-    case "listening":
-      return "listening";
-    case "understanding":
-    case "thinking":
-    case "planning":
-    case "recalling_memory":
-    case "replanning":
-    case "reflecting":
-      return "thinking";
-    case "speaking":
-      return "speaking";
-    case "navigating":
-    case "executing":
-      return "run";
-    case "success":
-      return "success";
-    case "error":
-      return "error";
-    default:
-      return "idle";
-  }
-}

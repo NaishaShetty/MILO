@@ -3,8 +3,10 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TaskProvider, useTask } from "./TaskContext";
-import { VoiceProvider, useVoice } from "./VoiceContext";
+import { TaskProvider } from "./TaskContext";
+import { useTask } from "./useTask";
+import { VoiceProvider } from "./VoiceContext";
+import { useVoice } from "./useVoice";
 import * as tasksApi from "../api/tasks";
 import * as voiceApi from "../api/voice";
 

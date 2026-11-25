@@ -27,7 +27,7 @@ import type { AboutIconName } from "../components/AboutIcons";
 import { GlassCard } from "../components/GlassCard";
 import { MiloAvatar } from "../components/MiloAvatar";
 import { MiloPresence } from "../components/MiloPresence";
-import { useMiloState } from "../state/MiloStateContext";
+import { useMiloState } from "../state/useMiloState";
 import type { MiloState } from "../state/miloState";
 
 const PIPELINE_STAGES: Array<{ stage: string; icon: AboutIconName; description: string }> = [

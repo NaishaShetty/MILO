@@ -37,10 +37,10 @@ import { getSpeechStatus } from "../api/speech";
 import type { SpeechStatus } from "../api/speechTypes";
 import { getVoiceStatus } from "../api/voice";
 import type { VoiceStatus } from "../api/voiceTypes";
-import { useTask } from "../state/TaskContext";
+import { useTask } from "../state/useTask";
 import { MEMORY_CATEGORY_LABELS } from "../utils/memory";
 import type { StartPage, ThemePreference } from "../state/SettingsContext";
-import { useSettings } from "../state/SettingsContext";
+import { useSettings } from "../state/useSettings";
 
 const START_PAGE_OPTIONS: Array<{ value: StartPage; label: string }> = [
   { value: "/", label: "Home" },

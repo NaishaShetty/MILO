@@ -2,7 +2,9 @@
 import { renderHook, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { DEFAULT_SETTINGS, SettingsProvider, useSettings } from "./SettingsContext";
+import { SettingsProvider } from "./SettingsContext";
+import { DEFAULT_SETTINGS } from "./settingsDefaults";
+import { useSettings } from "./useSettings";
 
 beforeEach(() => {
   window.localStorage.clear();

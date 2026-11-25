@@ -24,19 +24,14 @@
 // simply never plays audio or shows a dialogue bubble; nothing else in
 // the app depends on it. A task that fails to be "spoken" is still
 // marked as spoken (never retried in a loop).
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { VoiceContext } from "./useVoice";
 import type { ReactNode } from "react";
 
 import { speak as speakApi } from "../api/voice";
 import { TERMINAL_TASK_STATUSES } from "../api/tasksTypes";
-import { useTask } from "./TaskContext";
+import { useTask } from "./useTask";
 
 export type VoiceOutputState = "idle" | "speaking" | "error";
 
@@ -53,8 +48,6 @@ export interface VoiceContextValue {
    */
   stop: () => void;
 }
-
-const VoiceContext = createContext<VoiceContextValue | null>(null);
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
   const { activeTask } = useTask();
@@ -146,12 +139,4 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
       />
     </VoiceContext.Provider>
   );
-}
-
-export function useVoice(): VoiceContextValue {
-  const context = useContext(VoiceContext);
-  if (!context) {
-    throw new Error("useVoice() must be used within a <VoiceProvider>.");
-  }
-  return context;
 }

@@ -15,8 +15,8 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useSpeech } from "../state/SpeechContext";
-import { useTask } from "../state/TaskContext";
+import { useSpeech } from "../state/useSpeech";
+import { useTask } from "../state/useTask";
 
 export function useSpeechToTask() {
   const speech = useSpeech();

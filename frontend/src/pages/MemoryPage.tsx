@@ -16,7 +16,7 @@ const FILTERS: Array<{ id: Filter; label: string }> = [
   { id: "oops", label: "Oops" },
 ];
 
-export function kindOf(memory: Memory): Exclude<Filter, "all"> {
+function kindOf(memory: Memory): Exclude<Filter, "all"> {
   if (memory.memory_type === "failure") return "oops";
   if (memory.memory_type === "episodic") return "moment";
   return "fact";

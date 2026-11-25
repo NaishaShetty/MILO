@@ -4,9 +4,9 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 import { MissionsPage } from "./MissionsPage";
-import * as taskContext from "../state/TaskContext";
+import * as taskContext from "../state/useTask";
 
-vi.mock("../state/TaskContext", () => ({ useTask: vi.fn() }));
+vi.mock("../state/useTask", () => ({ useTask: vi.fn() }));
 
 function task(planner: string, novel: Record<string, unknown> | null, status = "executing") {
   return {

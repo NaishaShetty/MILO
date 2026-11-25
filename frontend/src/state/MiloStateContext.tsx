@@ -40,16 +40,18 @@
 // "navigating" (action === "navigate") and "perceiving" (action ===
 // "locate") are derived from that real field instead of collapsing
 // every execution step into the same generic "executing" visual.
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import { MiloStateContext } from "./useMiloState";
 import type { ReactNode } from "react";
 
 import { ApiError } from "../api/client";
 import type { TaskState, TaskStatus } from "../api/tasksTypes";
 import { TERMINAL_TASK_STATUSES } from "../api/tasksTypes";
-import { useAgents } from "./AgentsContext";
-import { useSpeech } from "./SpeechContext";
-import { useTask } from "./TaskContext";
-import { useVoice } from "./VoiceContext";
+import { useAgents } from "./useAgents";
+import { useSpeech } from "./useSpeech";
+import { useTask } from "./useTask";
+import { useVoice } from "./useVoice";
 import type { MiloState } from "./miloState";
 
 const SUCCESS_HOLD_MS = 4000;
@@ -94,8 +96,6 @@ function stateForExecutingTask(task: TaskState): MiloState {
 export interface MiloStateContextValue {
   state: MiloState;
 }
-
-const MiloStateContext = createContext<MiloStateContextValue | null>(null);
 
 export function MiloStateProvider({ children }: { children: ReactNode }) {
   const { activeTask, activeTaskId, cancelling } = useTask();
@@ -151,12 +151,4 @@ export function MiloStateProvider({ children }: { children: ReactNode }) {
   const value = useMemo<MiloStateContextValue>(() => ({ state }), [state]);
 
   return <MiloStateContext.Provider value={value}>{children}</MiloStateContext.Provider>;
-}
-
-export function useMiloState(): MiloState {
-  const context = useContext(MiloStateContext);
-  if (!context) {
-    throw new Error("useMiloState() must be used within a <MiloStateProvider>.");
-  }
-  return context.state;
 }

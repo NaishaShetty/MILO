@@ -2,7 +2,8 @@
 // the pose chosen from the real MILO state (never a timer).
 import type { MiloState } from "../state/miloState";
 import { MILO_STATE_LABELS } from "../state/miloState";
-import { MiloRobot, poseForState } from "./MiloRobot";
+import { poseForState } from "./miloPose";
+import { MiloRobot } from "./MiloRobot";
 
 export interface MiloAvatarProps {
   state: MiloState;

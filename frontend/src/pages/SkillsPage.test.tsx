@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SkillsPage } from "./SkillsPage";
 import * as skillsApi from "../api/skills";
-import * as taskContext from "../state/TaskContext";
+import * as taskContext from "../state/useTask";
 import { ApiError } from "../api/client";
 
 vi.mock("../api/skills", async () => ({
@@ -14,7 +14,7 @@ vi.mock("../api/skills", async () => ({
   deleteSkill: vi.fn(),
   teachSkill: vi.fn(),
 }));
-vi.mock("../state/TaskContext", () => ({ useTask: vi.fn() }));
+vi.mock("../state/useTask", () => ({ useTask: vi.fn() }));
 
 const skill = (over: Partial<skillsApi.Skill> = {}): skillsApi.Skill => ({
   skill_id: "s1",

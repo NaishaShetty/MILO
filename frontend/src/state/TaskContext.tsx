@@ -24,15 +24,9 @@
 // On mount, if nothing has been explicitly selected yet and the most
 // recently created task in `history` is still in flight, this adopts it as
 // the active task -- so reloading mid-task keeps showing live progress.
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { TaskContext } from "./useTask";
 import type { ReactNode } from "react";
 
 import { ApiError } from "../api/client";
@@ -91,8 +85,6 @@ export interface TaskContextValue {
   robotStateStatus: PollingStatus;
   robotStateError: unknown;
 }
-
-const TaskContext = createContext<TaskContextValue | null>(null);
 
 function replyFrom(result: CreateTaskResult): MiloReply | null {
   switch (result.kind) {
@@ -258,12 +250,4 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   );
 
   return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;
-}
-
-export function useTask(): TaskContextValue {
-  const context = useContext(TaskContext);
-  if (!context) {
-    throw new Error("useTask() must be used within a <TaskProvider>.");
-  }
-  return context;
 }
