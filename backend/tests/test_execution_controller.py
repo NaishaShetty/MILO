@@ -256,3 +256,67 @@ def test_execute_plan_without_simulator_raises():
 
     with pytest.raises(SimulatorUnavailableError):
         controller.execute_plan(plan)
+
+
+def test_hung_simulator_call_fails_the_step_at_the_timeout_instead_of_hanging():
+    # Regression test: `_dispatch_with_timeout` used a `with
+    # ThreadPoolExecutor(...)` block whose exit waits for the worker, so
+    # a hung simulator call kept the step blocked long after
+    # `step_timeout_s` had elapsed. The dispatcher here blocks far
+    # longer than the timeout; the step must come back at ~the timeout.
+    import threading
+
+    release = threading.Event()
+    step = PlanStep(
+        step_id=1, action="navigate", target="apple", description="Navigate to apple"
+    )
+    plan = Plan(
+        plan_id="p1",
+        task_id="t1",
+        planner_type="test",
+        goal_summary={},
+        steps=[step],
+        status=PlanStatus.VALID,
+    )
+    state = WorldState.initial()
+    state.object("apple").is_located = True
+    simulator = FakeSimulator(
+        apple_and_fridge_scene(), hooks={"navigate": lambda: release.wait(30)}
+    )
+    controller = ExecutionController(simulator, step_timeout_s=0.1)
+
+    started = time.monotonic()
+    try:
+        record = controller.execute_plan(plan, state)
+        elapsed = time.monotonic() - started
+    finally:
+        release.set()  # let the abandoned worker thread finish
+
+    assert elapsed < 2.0, f"step did not return at its timeout (took {elapsed:.1f}s)"
+    assert record.status == ExecutionStatus.FAILED
+    assert record.error is not None
+    assert record.error.code == ExecutionErrorCode.ACTION_TIMEOUT
+
+
+def test_re_executing_a_plan_does_not_re_run_steps_that_already_completed():
+    # A "retry" re-executes the same Plan object after a partial run.
+    plan = _store_plan()
+    simulator = FakeSimulator(apple_and_fridge_scene(), fail_actions={"open"})
+    state = WorldState.initial()
+
+    first = ExecutionController(simulator).execute_plan(plan, state)
+    assert first.status == ExecutionStatus.FAILED
+    completed_before = [
+        s.step_id for s in plan.steps if s.status == StepStatus.COMPLETED
+    ]
+    assert completed_before  # locate/navigate/pickup/... ran
+    calls_before = len(simulator.calls)
+
+    simulator._fail_actions.discard("open")  # the transient problem is gone
+    second = ExecutionController(simulator).execute_plan(plan, state)
+
+    assert second.status == ExecutionStatus.SUCCESS
+    new_actions = [c["action"] for c in simulator.calls[calls_before:]]
+    assert "pickup" not in new_actions  # would have been rejected: already held
+    assert new_actions[0] == "open"
+    assert all(s.status == StepStatus.COMPLETED for s in plan.steps)

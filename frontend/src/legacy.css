@@ -1,0 +1,6742 @@
+/* index.css
+ *
+ * Minimal, dependency-free styling for the Vision-Language Robotics
+ * dashboard. No CSS framework is introduced -- consistent with this
+ * project's "no premature abstraction" requirement. Phase 3.7's
+ * classes (`.instruction-form*`, `.task-card*`, `.banner*`,
+ * `.diagnostics-panel*`) are unchanged below; Phase 3.x only adds new,
+ * additively-named classes (`.dashboard*`, `.camera-panel*`,
+ * `.depth-panel*`, `.object-inspector*`, `.perception-status*`,
+ * `.scene-changes*`, `.vision-prompt-form*`) and widens `.app`'s
+ * max-width to fit the new two-column layout.
+ */
+
+:root {
+  color-scheme: light;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+
+  /* ------------------------------------------------------------
+   * Phase 8.2 design tokens
+   *
+   * Additive to the existing hand-rolled BEM stylesheet below (no
+   * CSS framework introduced -- see this file's original header
+   * comment). Every new Phase 8.2 component pulls colors/spacing/
+   * radius from these custom properties instead of a fresh
+   * hardcoded literal, so the MILO visual identity (dark, near-black
+   * background; tangerine primary accent; green/red/orange/
+   * cyan semantic colors) stays consistent across every page as
+   * Stage 3 rebuilds each one. Pre-existing selectors are untouched
+   * here -- they keep their own hardcoded colors until the page/
+   * component they belong to is itself rebuilt in Stage 3.
+   * ------------------------------------------------------------ */
+
+  /* Background: dark, near-black with a faint warm undertone. */
+  --milo-bg: #FFF0D0;
+  --milo-bg-elevated: #FFF0D0;
+  --milo-bg-radial:
+    radial-gradient(ellipse 70% 50% at 82% -8%, rgba(255, 138, 43, 0.16), transparent 55%),
+    radial-gradient(ellipse 60% 45% at 8% 8%, rgba(255, 138, 43, 0.09), transparent 60%),
+    radial-gradient(ellipse 90% 60% at 50% 105%, rgba(255, 179, 71, 0.05), transparent 60%);
+
+  /* Card/panel surface -- translucent, warm border. */
+  --milo-surface: rgba(42, 24, 16, 0.03);
+  --milo-surface-hover: rgba(42, 24, 16, 0.05);
+  --milo-border: rgba(255, 138, 43, 0.18);
+  --milo-border-strong: rgba(255, 138, 43, 0.4);
+
+  /* Primary accent: tangerine -- active nav, primary buttons,
+   * MILO branding, focus states (spec section 10). */
+  --milo-accent: #FF8A2B;
+  --milo-accent-soft: rgba(255, 138, 43, 0.16);
+  --milo-accent-glow: rgba(255, 138, 43, 0.45);
+  --milo-accent-text: #FF8A2B;
+
+  /* Secondary: amber -- vision, perception, informational states. */
+  --milo-info: #38bdf8;
+  --milo-info-soft: rgba(255, 179, 71, 0.14);
+
+  /* Semantic: online/ready/success. */
+  --milo-success: #4ade80;
+  --milo-success-soft: rgba(74, 222, 128, 0.14);
+
+  /* Semantic: errors/failures/destructive. */
+  --milo-danger: #C2410C;
+  --milo-danger-soft: rgba(248, 113, 113, 0.14);
+
+  /* Semantic: warnings/important observations. */
+  --milo-warning: #B26A00;
+  --milo-warning-soft: rgba(251, 191, 36, 0.14);
+
+  /* Color-matched to the MILO reference art's own baked-in vignette
+   * (sampled ~rgb(17,17,29) across every supplied pose) -- used only to
+   * blend that art's edge into its surroundings, see MiloAvatar.tsx. */
+  --milo-art-backdrop: #11111d;
+
+  /* Text hierarchy. */
+  --milo-text: #2A1810;
+  --milo-text-muted: #6B5A4E;
+  --milo-text-faint: #6b6779;
+
+  /* Spacing scale. */
+  --milo-space-xs: 0.25rem;
+  --milo-space-sm: 0.5rem;
+  --milo-space-md: 1rem;
+  --milo-space-lg: 1.5rem;
+  --milo-space-xl: 2rem;
+
+  /* Radius/shadow. */
+  --milo-radius-sm: 8px;
+  --milo-radius-md: 14px;
+  --milo-radius-lg: 20px;
+  --milo-shadow-glow: 0 0 32px var(--milo-accent-glow);
+  --milo-shadow-card: 0 8px 24px rgba(0, 0, 0, 0.35);
+
+  /* Motion -- see the prefers-reduced-motion override just below. */
+  --milo-transition-fast: 150ms ease;
+  --milo-transition-medium: 300ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+body {
+  margin: 0;
+  background: var(--milo-bg);
+  color: var(--milo-text);
+  font-feature-settings: "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+/* Phase 3.x dashboard layout: Vision panel (camera/depth/tracking/
+ * inspector) next to the existing Language panel. Falls back to a
+ * single column on narrow viewports rather than forcing a fixed
+ * two-column layout no matter the screen size.
+ */
+.dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .dashboard {
+    grid-template-columns: 1fr;
+  }
+}
+
+.language-panel {
+  border: 1px solid #E8C98A;
+  border-radius: 10px;
+  padding: 1rem;
+  background: #FFF0D0;
+}
+
+.language-panel__title {
+  font-size: 1.1rem;
+  margin: 0 0 1rem;
+}
+
+.app__header h1 {
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.app__subtitle {
+  color: #6B5A4E;
+  margin-top: 0;
+}
+
+.instruction-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.instruction-form__label {
+  font-size: 0.85rem;
+  color: #6B5A4E;
+}
+
+.instruction-form__input {
+  font: inherit;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #E8C98A;
+  background: #FFF0D0;
+  color: inherit;
+  resize: vertical;
+}
+
+.instruction-form__submit {
+  align-self: flex-start;
+  font: inherit;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  border: none;
+  background: #FF8A2B;
+  color: white;
+  cursor: pointer;
+}
+
+.instruction-form__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.app__loading {
+  color: #6B5A4E;
+}
+
+.banner {
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.banner--clarification {
+  background: rgba(255, 196, 0, 0.12);
+  border: 1px solid rgba(255, 196, 0, 0.4);
+}
+
+.banner--error {
+  background: rgba(255, 82, 82, 0.12);
+  border: 1px solid rgba(255, 82, 82, 0.4);
+}
+
+.banner__title {
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+
+.banner__body {
+  margin: 0;
+  color: #6B5A4E;
+}
+
+.task-card {
+  border: 1px solid #E8C98A;
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  background: #FFF0D0;
+}
+
+.task-card__index {
+  font-size: 0.8rem;
+  color: #6B5A4E;
+  margin: 0 0 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.task-card__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.6rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.task-card__field {
+  margin-bottom: 0.5rem;
+}
+
+.task-card__field-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #6B5A4E;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.task-card__field-value {
+  font-size: 1rem;
+}
+
+.task-card__field-list {
+  margin: 0.15rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.task-card__status {
+  margin-top: 0.5rem;
+}
+
+.task-card__status-badge {
+  display: inline-block;
+  font-size: 0.85rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+}
+
+.task-card__status-badge--ok {
+  background: rgba(76, 217, 100, 0.15);
+  color: #16A36F;
+}
+
+.task-card__status-badge--warning {
+  background: rgba(255, 196, 0, 0.15);
+  color: #B26A00;
+}
+
+.diagnostics-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: #6B5A4E;
+}
+
+.diagnostics-panel__item {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.diagnostics-panel__item dt {
+  font-weight: 600;
+}
+
+.diagnostics-panel__item dd {
+  margin: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Phase 3.x -- Vision panel                                          */
+/* ------------------------------------------------------------------ */
+
+.vision-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.vision-prompt-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.vision-prompt-form__label {
+  display: block;
+  font-size: 0.85rem;
+  color: #6B5A4E;
+  margin-bottom: 0.35rem;
+}
+
+.vision-prompt-form__input {
+  font: inherit;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #E8C98A;
+  background: #FFF0D0;
+  color: inherit;
+  min-width: 260px;
+  flex: 1;
+}
+
+.vision-prompt-form__submit {
+  font: inherit;
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
+  border: none;
+  background: #FF8A2B;
+  color: white;
+  cursor: pointer;
+}
+
+.vision-prompt-form__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.camera-panel,
+.depth-panel,
+.perception-status,
+.object-inspector,
+.scene-changes {
+  border: 1px solid var(--milo-border);
+  border-radius: var(--milo-radius-md);
+  padding: 0.85rem;
+  background: var(--milo-surface);
+}
+
+.camera-panel {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.camera-panel__title,
+.depth-panel__title,
+.perception-status__title,
+.object-inspector__title,
+.scene-changes__title {
+  font-size: 0.85rem;
+  margin: 0 0 0.6rem;
+  color: var(--milo-text-muted);
+}
+
+/* MILO's Eyes: the camera is the primary visual (spec section 4-6) --
+ * a wide, near-full-height viewport with a small consistent inset,
+ * not a small rectangle in a mostly-empty card. */
+.camera-panel__frame {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1.55 / 1;
+  background: #05050a;
+  border-radius: 12px;
+  border: 1px solid var(--milo-border);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 0 24px rgba(255, 138, 43, 0.08);
+  overflow: hidden;
+}
+
+.camera-panel--fullscreen {
+  position: fixed;
+  inset: 4vh 4vw;
+  z-index: 200;
+}
+
+.camera-panel--fullscreen .camera-panel__frame {
+  aspect-ratio: auto;
+  height: 100%;
+}
+
+.camera-panel__placeholder {
+  color: var(--milo-text-faint);
+  padding: 2rem;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.camera-panel__image,
+.depth-panel__image {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.camera-panel__live-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.7em;
+  border-radius: 999px;
+  background: rgba(255, 246, 229, 0.65);
+  border: 1px solid rgba(42, 24, 16, 0.1);
+  backdrop-filter: blur(6px);
+  color: var(--milo-text);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.camera-panel__live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--milo-danger);
+  box-shadow: 0 0 6px var(--milo-danger);
+  animation: milo-glow-soft 1.6s ease-in-out infinite;
+}
+
+.camera-panel__expand {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--milo-radius-sm);
+  background: rgba(255, 246, 229, 0.6);
+  border: 1px solid rgba(42, 24, 16, 0.12);
+  color: var(--milo-text);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition:
+    box-shadow var(--milo-transition-fast),
+    border-color var(--milo-transition-fast);
+}
+
+.camera-panel__expand:hover {
+  border-color: var(--milo-accent);
+  box-shadow: 0 0 12px var(--milo-accent-glow);
+  color: var(--milo-accent-text);
+}
+
+.camera-panel__minimap {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+}
+
+/* Secondary vision detail (depth/status/scene changes/inspector) sits
+ * below the dominant camera, visually muted so it reads as supporting
+ * detail rather than competing with it (spec section 4/34). */
+.mission-control__eyes .depth-panel,
+.mission-control__eyes .perception-status,
+.mission-control__eyes .scene-changes,
+.mission-control__eyes .object-inspector {
+  margin-top: 0.75rem;
+  opacity: 0.85;
+  font-size: 0.9rem;
+}
+
+.depth-panel__legend {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: #6B5A4E;
+  margin: 0.6rem 0 0;
+}
+
+.depth-panel__legend-swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+}
+
+.depth-panel__legend-swatch--near {
+  background: #30cfd0;
+}
+
+.depth-panel__legend-swatch--far {
+  background: #C2410C;
+}
+
+.depth-panel__legend-spacer {
+  width: 1rem;
+}
+
+.depth-panel__legend-colormap {
+  color: #6b7078;
+}
+
+.perception-status__row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #FFF0D0;
+  font-size: 0.9rem;
+}
+
+.perception-status__row:last-child {
+  border-bottom: none;
+}
+
+.perception-status__label {
+  color: #6B5A4E;
+}
+
+.perception-status__value--ok {
+  color: #16A36F;
+}
+
+.perception-status__value--warn {
+  color: #B26A00;
+}
+
+.scene-changes__empty {
+  color: #6B5A4E;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.scene-changes__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.scene-changes__item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+}
+
+.scene-changes__icon {
+  width: 1.25rem;
+  text-align: center;
+}
+
+.scene-changes__item--new .scene-changes__icon {
+  color: #16A36F;
+}
+
+.scene-changes__item--removed .scene-changes__icon,
+.scene-changes__item--occluded .scene-changes__icon {
+  color: #B26A00;
+}
+
+.scene-changes__item--moved .scene-changes__icon,
+.scene-changes__item--reappeared .scene-changes__icon {
+  color: #FF8A2B;
+}
+
+.scene-changes__label {
+  font-weight: 600;
+}
+
+.scene-changes__detail {
+  color: #6B5A4E;
+}
+
+.object-inspector__empty {
+  color: #6B5A4E;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.object-inspector__scroll {
+  overflow-x: auto;
+}
+
+.object-inspector__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.object-inspector__table th {
+  text-align: left;
+  color: #6B5A4E;
+  font-weight: 600;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #E8C98A;
+  white-space: nowrap;
+}
+
+.object-inspector__table td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #FFF0D0;
+  white-space: nowrap;
+}
+
+.object-inspector__status {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 138, 43, 0.15);
+  color: #FF8A2B;
+}
+
+.object-inspector__status--lost {
+  background: rgba(255, 82, 82, 0.15);
+  color: #C2410C;
+}
+
+.object-inspector__status--temporarily_lost {
+  background: rgba(255, 196, 0, 0.15);
+  color: #B26A00;
+}
+
+.object-inspector__status--new {
+  background: rgba(76, 217, 100, 0.15);
+  color: #16A36F;
+}
+
+/* ------------------------------------------------------------------ */
+/* Phase 4 -- Planner panel                                           */
+/* ------------------------------------------------------------------ */
+
+.result-view__subtask-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #6B5A4E;
+  margin-top: 1rem;
+}
+
+.result-view__subtask-picker select {
+  font: inherit;
+  background: #FFF0D0;
+  color: inherit;
+  border: 1px solid #E8C98A;
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+}
+
+.planner-panel {
+  border-top: 1px solid #E8C98A;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+}
+
+.planner-panel__title {
+  font-size: 1.1rem;
+  margin: 0 0 0.75rem;
+}
+
+.planner-panel__strategy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  border: 1px solid #E8C98A;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem 0.75rem;
+  margin: 0 0 0.9rem;
+}
+
+.planner-panel__strategy legend {
+  padding: 0 0.4rem;
+  color: #6B5A4E;
+  font-size: 0.8rem;
+}
+
+.planner-panel__strategy-option {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.planner-panel__actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.planner-panel__button {
+  font: inherit;
+  padding: 0.5rem 1.1rem;
+  border-radius: 8px;
+  border: none;
+  background: #FF8A2B;
+  color: white;
+  cursor: pointer;
+}
+
+.planner-panel__button--secondary {
+  background: transparent;
+  border: 1px solid #FF8A2B;
+  color: #FF8A2B;
+}
+
+.planner-panel__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.planner-panel__section-title {
+  font-size: 0.95rem;
+  color: #6B5A4E;
+  margin: 1rem 0 0.5rem;
+}
+
+.planner-panel__fallback-note {
+  color: #B26A00;
+  font-weight: 400;
+  font-size: 0.8rem;
+}
+
+.planner-panel__error {
+  color: #C2410C;
+  font-size: 0.9rem;
+}
+
+.planner-panel__result {
+  margin-top: 0.5rem;
+}
+
+.plan-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 0.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+}
+
+.plan-steps__empty {
+  color: var(--milo-text-faint);
+  font-size: 0.9rem;
+}
+
+.plan-steps__item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.55rem 0.6rem 1.1rem 0;
+}
+
+.plan-steps__item:last-child {
+  padding-bottom: 0.55rem;
+}
+
+/* Connecting timeline rail behind each numbered icon, matching the
+ * mockup's dashed vertical line threading MILO'S PLAN's steps. */
+.plan-steps__item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 0.95rem;
+  top: 2.1rem;
+  bottom: 0;
+  width: 1px;
+  background: var(--milo-border);
+}
+
+.plan-steps__icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: var(--milo-text-muted);
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+  z-index: 1;
+}
+
+.plan-steps__item--completed .plan-steps__icon {
+  color: var(--milo-bg);
+  background: var(--milo-success);
+  border-color: var(--milo-success);
+}
+
+.plan-steps__item--running .plan-steps__icon {
+  color: var(--milo-accent-text);
+  background: var(--milo-accent-soft);
+  border-color: var(--milo-accent);
+  box-shadow: 0 0 10px var(--milo-accent-glow);
+  animation: milo-glow-active 1.4s ease-in-out infinite;
+}
+
+.plan-steps__item--failed .plan-steps__icon,
+.plan-steps__item--blocked .plan-steps__icon {
+  color: var(--milo-danger);
+  background: var(--milo-danger-soft);
+  border-color: var(--milo-danger);
+}
+
+.plan-steps__item--skipped .plan-steps__icon,
+.plan-steps__item--cancelled .plan-steps__icon {
+  color: var(--milo-text-faint);
+  opacity: 0.7;
+}
+
+.plan-steps__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-top: 0.15rem;
+}
+
+.plan-steps__description {
+  font-size: 0.92rem;
+}
+
+.plan-steps__params {
+  font-size: 0.8rem;
+  color: #6B5A4E;
+}
+
+.plan-steps__conditions {
+  font-size: 0.78rem;
+  color: #6B5A4E;
+  margin-top: 0.15rem;
+}
+
+.plan-steps__conditions summary {
+  cursor: pointer;
+}
+
+.validation-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.validation-panel__banner {
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.validation-panel__banner--valid {
+  background: rgba(76, 217, 100, 0.12);
+  border: 1px solid rgba(76, 217, 100, 0.4);
+  color: #16A36F;
+}
+
+.validation-panel__banner--invalid {
+  background: rgba(255, 82, 82, 0.12);
+  border: 1px solid rgba(255, 82, 82, 0.4);
+  color: #C2410C;
+}
+
+.validation-panel__unverifiable {
+  font-weight: 400;
+  color: #6B5A4E;
+}
+
+.validation-panel__issues {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+}
+
+.validation-panel__issues--error {
+  color: #C2410C;
+}
+
+.validation-panel__issues--warning {
+  color: #B26A00;
+}
+
+.planner-comparison {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.planner-comparison th {
+  text-align: left;
+  color: #6B5A4E;
+  font-weight: 600;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #E8C98A;
+}
+
+.planner-comparison td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #FFF0D0;
+}
+
+.planner-comparison__ok {
+  color: #16A36F;
+}
+
+.planner-comparison__fail {
+  color: #C2410C;
+}
+
+.planner-comparison__empty {
+  color: #6B5A4E;
+  font-size: 0.9rem;
+}
+
+/* Phase 5 -- Execution */
+
+.execution-panel {
+  border-top: 1px solid #E8C98A;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+}
+
+.execution-panel__title {
+  font-size: 1.1rem;
+  margin: 0 0 0.75rem;
+}
+
+.execution-panel__hint {
+  color: #6B5A4E;
+  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
+}
+
+.execution-panel__actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.execution-panel__button {
+  font: inherit;
+  padding: 0.5rem 1.1rem;
+  border-radius: 8px;
+  border: none;
+  background: #FF8A2B;
+  color: white;
+  cursor: pointer;
+}
+
+.execution-panel__button--secondary {
+  background: transparent;
+  border: 1px solid #C2410C;
+  color: #C2410C;
+}
+
+.execution-panel__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.execution-panel__error {
+  color: #C2410C;
+  font-size: 0.9rem;
+}
+
+.execution-panel__result {
+  margin-top: 0.5rem;
+}
+
+.execution-panel__section-title {
+  font-size: 0.95rem;
+  color: #6B5A4E;
+  margin: 1rem 0 0.5rem;
+}
+
+.execution-panel__status {
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  background: #FFF0D0;
+  border: 1px solid #E8C98A;
+}
+
+.execution-panel__status--running,
+.execution-panel__status--pending {
+  color: #B26A00;
+  border-color: rgba(255, 196, 0, 0.4);
+}
+
+.execution-panel__status--success {
+  color: #16A36F;
+  border-color: rgba(76, 217, 100, 0.4);
+}
+
+.execution-panel__status--failed {
+  color: #C2410C;
+  border-color: rgba(255, 82, 82, 0.4);
+}
+
+.execution-panel__status--cancelled {
+  color: #6B5A4E;
+  border-color: rgba(154, 160, 166, 0.4);
+}
+
+.execution-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.execution-steps__empty {
+  color: #6B5A4E;
+  font-size: 0.9rem;
+}
+
+.execution-steps__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  background: #FFF0D0;
+  border: 1px solid #E8C98A;
+}
+
+.execution-steps__item--completed {
+  border-color: rgba(76, 217, 100, 0.4);
+}
+
+.execution-steps__item--failed,
+.execution-steps__item--blocked {
+  border-color: rgba(255, 82, 82, 0.4);
+}
+
+.execution-steps__item--cancelled,
+.execution-steps__item--skipped {
+  opacity: 0.6;
+}
+
+.execution-steps__icon {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: #6B5A4E;
+}
+
+.execution-steps__item--completed .execution-steps__icon {
+  color: #16A36F;
+}
+
+.execution-steps__item--failed .execution-steps__icon,
+.execution-steps__item--blocked .execution-steps__icon {
+  color: #C2410C;
+}
+
+.execution-steps__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.execution-steps__label {
+  font-size: 0.92rem;
+  text-transform: capitalize;
+}
+
+.execution-steps__duration {
+  font-size: 0.78rem;
+  color: #6B5A4E;
+}
+
+.execution-steps__error {
+  font-size: 0.8rem;
+  color: #C2410C;
+}
+
+.execution-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.execution-log__empty {
+  color: #6B5A4E;
+  font-size: 0.9rem;
+}
+
+.execution-log__item {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #FFF0D0;
+}
+
+.execution-log__time {
+  color: #6B5A4E;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Session 3 (Phase 7) -- MILO application shell: top nav + seven
+ * routed pages (`App.tsx`, `NavBar.tsx`, `src/pages/*`). New,
+ * additively-named `.milo-*` classes; nothing above this point is
+ * touched, since `VisionPanel`/`ExecutionPanel`/`PlannerPanel` are
+ * reused as-is inside the new pages where they fit. Light theme is
+ * opt-in via `[data-theme="light"]` on the document root (see
+ * `SettingsContext.tsx`); the default (no attribute, or `dark`) keeps
+ * this file's existing dark palette.
+ */
+.milo-app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 1.5rem 4rem;
+  min-height: 100vh;
+  background-image: var(--milo-bg-radial);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+.milo-navbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--milo-border);
+  margin-bottom: 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(255, 246, 229, 0.72);
+  backdrop-filter: blur(14px);
+}
+
+.milo-navbar__brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+/* Shared "MILO •" brand wordmark image (135x34, transparent, dot
+ * baked in) -- nav bar on every page, MILO Lab's hero. Each caller
+ * sizes it via its own class (`.milo-navbar__title`, Lab's
+ * `.lab-page__hero-wordmark`); `width: auto` keeps the real aspect
+ * ratio at any height. */
+.milo-wordmark {
+  display: block;
+  height: 1.6rem;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px var(--milo-accent-glow));
+}
+
+.milo-navbar__title {
+  height: 1.6rem;
+}
+
+.milo-navbar__tagline {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  color: var(--milo-text-faint);
+}
+
+.milo-navbar__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.milo-navbar__link {
+  position: relative;
+  padding: 0.5rem 0.8rem;
+  border-radius: var(--milo-radius-sm);
+  color: var(--milo-text-muted);
+  text-decoration: none;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  transition:
+    color var(--milo-transition-fast),
+    background var(--milo-transition-fast);
+}
+
+.milo-navbar__link:hover {
+  color: var(--milo-text);
+  background: var(--milo-surface-hover);
+}
+
+.milo-navbar__link--active {
+  color: var(--milo-text);
+  font-weight: 600;
+  background: var(--milo-accent-soft);
+  box-shadow: 0 0 12px rgba(255, 138, 43, 0.15);
+}
+
+.milo-navbar__link--active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: var(--milo-accent);
+  box-shadow: 0 0 8px var(--milo-accent-glow);
+}
+
+.milo-navbar__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.milo-navbar__avatar {
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--milo-border-strong);
+  background: var(--milo-bg-elevated);
+}
+
+.milo-navbar__avatar .milo-avatar__image {
+  transform: scale(1.6);
+}
+
+.error-boundary {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  border: 1px solid #C2410C;
+  border-radius: 8px;
+  background: #FFF0D0;
+}
+
+.error-boundary__title {
+  margin-top: 0;
+  color: #C2410C;
+}
+
+.error-boundary__button {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #FF8A2B;
+  background: transparent;
+  color: #FF8A2B;
+  cursor: pointer;
+}
+
+:root[data-theme="light"] body {
+  background: #2A1810;
+  color: #FFF0D0;
+}
+
+:root[data-theme="light"] .milo-navbar {
+  border-bottom-color: #E8C98A;
+}
+
+:root[data-theme="light"] .milo-navbar__link {
+  color: #FFF0D0;
+}
+
+:root[data-theme="light"] .milo-navbar__link:hover {
+  background: #2A1810;
+}
+
+.milo-compact .milo-app {
+  max-width: 1000px;
+}
+
+.milo-compact .milo-navbar {
+  padding: 0.75rem 0;
+}
+
+/* Shared "Talk to MILO" input (Home + Mission Control). */
+.talk-to-milo {
+  position: relative;
+  margin: 1.5rem 0;
+  padding: var(--milo-space-lg) var(--milo-space-xl);
+  border: 1px solid var(--milo-border);
+  border-radius: var(--milo-radius-lg);
+  background: linear-gradient(180deg, rgba(42, 24, 16, 0.04), rgba(42, 24, 16, 0.01)),
+    var(--milo-bg-elevated);
+  box-shadow: var(--milo-shadow-card);
+  backdrop-filter: blur(12px);
+}
+
+.talk-to-milo__prompt {
+  margin-top: 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.talk-to-milo__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* Nested inside Mission Control's "Talk to MILO" GlassCard -- that
+ * card already supplies the border/padding/background, so drop this
+ * component's own chrome there to avoid a card-within-a-card look. */
+.mission-control__talk .talk-to-milo {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.talk-to-milo__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+/* The instruction area is a proper conversational command box (spec
+ * section 10), not a single-line input -- the mic sits inside its
+ * bottom-right corner. */
+.talk-to-milo__input-wrap {
+  position: relative;
+}
+
+.talk-to-milo__input {
+  width: 100%;
+  min-height: 116px;
+  resize: vertical;
+  padding: 0.85rem 3rem 0.85rem 0.9rem;
+  border-radius: var(--milo-radius-md);
+  border: 1px solid var(--milo-border);
+  background: var(--milo-bg);
+  color: var(--milo-text);
+  font: inherit;
+  line-height: 1.5;
+  box-sizing: border-box;
+  transition: border-color var(--milo-transition-fast);
+}
+
+.talk-to-milo__input::placeholder {
+  color: var(--milo-text-faint);
+}
+
+.talk-to-milo__input:focus {
+  outline: none;
+  border-color: var(--milo-accent);
+  box-shadow: 0 0 0 3px var(--milo-accent-soft);
+}
+
+.talk-to-milo__mic {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-border);
+  background: var(--milo-surface);
+  color: var(--milo-text);
+  cursor: pointer;
+  transition:
+    background var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.talk-to-milo__mic:hover {
+  background: var(--milo-surface-hover);
+}
+
+.talk-to-milo__mic--active {
+  background: var(--milo-danger-soft);
+  border-color: var(--milo-danger);
+  color: var(--milo-danger);
+}
+
+.talk-to-milo__send {
+  width: 100%;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  padding: 0;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-accent);
+  background: linear-gradient(135deg, rgba(255, 138, 43, 0.22), rgba(255, 138, 43, 0.14));
+  color: var(--milo-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 0 14px rgba(255, 138, 43, 0.18);
+  transition:
+    background var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.talk-to-milo__send:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(255, 138, 43, 0.34), rgba(255, 138, 43, 0.22));
+  box-shadow: 0 0 20px var(--milo-accent-glow);
+}
+
+.talk-to-milo__send-icon {
+  display: inline-flex;
+}
+
+.talk-to-milo__send:disabled,
+.talk-to-milo__mic:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.talk-to-milo__speech-status,
+.talk-to-milo__transcript {
+  font-size: 0.85rem;
+  color: var(--milo-text-muted);
+  margin: 0.5rem 0 0;
+}
+
+.talk-to-milo__error {
+  color: var(--milo-danger);
+  margin: 0.5rem 0 0;
+}
+
+.talk-to-milo__examples {
+  margin-top: 1rem;
+}
+
+.talk-to-milo__examples-label {
+  font-size: 0.8rem;
+  color: var(--milo-text-muted);
+  margin: 0 0 0.4rem;
+}
+
+/* Two mockup treatments of the same quick-example data (spec section
+ * 12 vs. Home's original inline pills): "list" is stacked full-width
+ * rows with icon/text/chevron (Mission Control); "pills" is the
+ * wrapped rounded-chip layout Home already used. */
+.talk-to-milo__examples-list--list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.talk-to-milo__examples-list--pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.talk-to-milo__example {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  border: 1px solid var(--milo-border);
+  background: var(--milo-surface);
+  color: var(--milo-text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background var(--milo-transition-fast),
+    border-color var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.talk-to-milo__example--list {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 0.85rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.talk-to-milo__example--pills {
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+
+.talk-to-milo__example:hover:not(:disabled) {
+  background: var(--milo-surface-hover);
+  border-color: var(--milo-accent);
+  box-shadow: 0 0 10px var(--milo-accent-glow);
+}
+
+.talk-to-milo__example-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--milo-accent-text);
+}
+
+.talk-to-milo__example-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.talk-to-milo__example--pills .talk-to-milo__example-text {
+  flex: initial;
+}
+
+.talk-to-milo__example-chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--milo-text-faint);
+}
+
+.talk-to-milo__example--pills .talk-to-milo__example-chevron {
+  display: none;
+}
+
+/* Home's mockup: wrapped inline pills, not a full-width row list. */
+.talk-to-milo__examples-list--pills {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.talk-to-milo__examples-list--pills .talk-to-milo__example {
+  width: auto;
+  min-height: 0;
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+}
+
+.talk-to-milo__examples-list--pills .talk-to-milo__example-chevron {
+  display: none;
+}
+
+/* Home's mockup command console: a slim single-line bar (label above,
+ * input + mic + send all in one row) instead of Mission Control's tall
+ * multi-line command box with the send button below it. */
+.talk-to-milo--compact {
+  padding: 1.05rem 1.25rem 0.9rem;
+}
+
+.talk-to-milo--compact .talk-to-milo__prompt {
+  font-size: 0.78rem;
+  font-weight: 500;
+  margin: 0 0 0.7rem;
+}
+
+.talk-to-milo--compact .talk-to-milo__form {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.talk-to-milo--compact .talk-to-milo__input-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.talk-to-milo--compact .talk-to-milo__input {
+  min-height: 0;
+  width: 100%;
+  height: 38px;
+  padding: 0 0.9rem;
+  border-radius: 10px;
+}
+
+.talk-to-milo--compact .talk-to-milo__mic--compact,
+.talk-to-milo--compact .talk-to-milo__send--compact {
+  flex-shrink: 0;
+  width: 43px;
+  height: 43px;
+  padding: 0;
+}
+
+.talk-to-milo--compact .talk-to-milo__send--compact {
+  background: #7d5de7;
+  border: none;
+  box-shadow: none;
+}
+
+.talk-to-milo--compact .talk-to-milo__send--compact:hover:not(:disabled) {
+  background: #FF8A2B;
+  box-shadow: 0 0 14px var(--milo-accent-glow);
+}
+
+/* Shared agent status list (Home / Mission Control / Lab). */
+.agent-status-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.agent-status-list__item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  background: #FFF0D0;
+  font-size: 0.85rem;
+}
+
+.agent-status-list__badge {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: #2a2e38;
+}
+
+.agent-status-list__badge--active,
+.agent-status-list__badge--thinking {
+  background: #FF8A2B;
+  color: #FFF0D0;
+}
+
+.agent-status-list__badge--error {
+  background: #C2410C;
+  color: #FFF0D0;
+}
+
+.agent-status-list__badge--unknown {
+  color: #6B5A4E;
+}
+
+.agent-status-list__unavailable {
+  color: #6B5A4E;
+  font-size: 0.85rem;
+}
+
+/* Home page */
+.home-page__hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 40fr) minmax(0, 38fr) minmax(0, 22fr);
+  align-items: center;
+  gap: var(--milo-space-lg);
+  margin: var(--milo-space-md) 0 var(--milo-space-lg);
+  min-height: 430px;
+  overflow: hidden;
+}
+
+@media (max-width: 1100px) {
+  .home-page__hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    min-height: 0;
+  }
+  .home-page__ask-panel {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 700px) {
+  .home-page__hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+.home-page__hero-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.home-page__particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--milo-accent-text);
+  opacity: 0.5;
+}
+
+.home-page__particle--1 {
+  top: 12%;
+  left: 40%;
+}
+.home-page__particle--2 {
+  top: 30%;
+  left: 92%;
+}
+.home-page__particle--3 {
+  top: 70%;
+  left: 8%;
+  width: 2px;
+  height: 2px;
+}
+.home-page__particle--4 {
+  top: 85%;
+  left: 60%;
+  width: 2px;
+  height: 2px;
+}
+
+.home-page__intro {
+  position: relative;
+  z-index: 1;
+}
+
+.home-page__cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.1rem;
+  margin-top: 2rem;
+}
+
+.home-page__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.75rem 1.5rem;
+  border-radius: 24px;
+  border: 1px solid rgba(151, 132, 205, 0.38);
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    transform var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast),
+    background var(--milo-transition-fast);
+}
+
+.home-page__cta--primary {
+  color: white;
+  background: linear-gradient(135deg, var(--milo-accent), #6d4fd6);
+  box-shadow: 0 0 18px var(--milo-accent-glow);
+}
+
+.home-page__cta--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 26px var(--milo-accent-glow);
+}
+
+.home-page__cta--secondary {
+  color: var(--milo-text);
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+}
+
+.home-page__cta--secondary:hover {
+  background: var(--milo-surface-hover);
+  border-color: var(--milo-border-strong);
+}
+
+/* `.milo-avatar--lg`'s unconditional 260x300 rule is defined later in
+ * this file than these overrides, so at equal (single-class) specificity
+ * it would otherwise win the cascade and silently cancel the larger
+ * hero sizing below every media query. Pairing both classes in the
+ * selector raises specificity so these overrides always win regardless
+ * of source order. */
+.milo-avatar--lg.home-page__avatar {
+  width: 260px;
+  height: 320px;
+}
+
+@media (min-width: 900px) {
+  .milo-avatar--lg.home-page__avatar {
+    width: 360px;
+    height: 440px;
+  }
+}
+
+@media (min-width: 1100px) {
+  .milo-avatar--lg.home-page__avatar {
+    width: 440px;
+    height: 520px;
+  }
+}
+
+.home-page__floor-rings {
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  width: 70%;
+  transform: translateX(-50%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.home-page__floor-rings span {
+  display: block;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 138, 43, 0.18);
+}
+
+.home-page__floor-rings span:nth-child(1) {
+  width: 100%;
+  height: 14px;
+}
+.home-page__floor-rings span:nth-child(2) {
+  width: 78%;
+  height: 10px;
+  margin-top: -6px;
+  opacity: 0.7;
+}
+.home-page__floor-rings span:nth-child(3) {
+  width: 56%;
+  height: 8px;
+  margin-top: -4px;
+  opacity: 0.5;
+}
+
+.home-page__ask-panel {
+  position: relative;
+  z-index: 1;
+  border: 1px solid var(--milo-border);
+  border-radius: 13px;
+  background: rgba(255, 240, 208, 0.58);
+  padding: 1.4rem 1.25rem;
+  align-self: center;
+  box-shadow: var(--milo-shadow-card);
+}
+
+.home-page__ask-panel-pointer {
+  position: absolute;
+  top: -6px;
+  left: 1.5rem;
+  width: 12px;
+  height: 12px;
+  background: var(--milo-bg-elevated);
+  border-left: 1px solid var(--milo-border);
+  border-top: 1px solid var(--milo-border);
+  transform: rotate(45deg);
+}
+
+.home-page__ask-panel-title {
+  margin: 0 0 1.1rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--milo-text-muted);
+}
+
+.home-page__ask-panel-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  font-size: 0.78rem;
+  color: #E8C98A;
+}
+
+.home-page__ask-panel-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+
+.home-page__ask-panel-more {
+  display: block;
+  margin-top: var(--milo-space-md);
+  text-align: right;
+  font-size: 0.82rem;
+  color: var(--milo-accent-text);
+  text-decoration: none;
+}
+
+.home-page__ask-panel-more:hover {
+  text-decoration: underline;
+}
+
+.home-page__try-strip {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--milo-space-lg);
+  border: 1px solid var(--milo-border);
+  border-radius: var(--milo-radius-md);
+  background: var(--milo-surface);
+  padding: var(--milo-space-lg);
+  padding-right: 11rem;
+  margin: var(--milo-space-xl) 0 0;
+  min-height: 96px;
+}
+
+@media (max-width: 700px) {
+  .home-page__try-strip {
+    flex-direction: column;
+    align-items: stretch;
+    /* The peeking avatar below drops out of absolute positioning at
+     * this width (see `.home-page__try-strip-milo .milo-avatar`), so
+     * this reserved desktop-only gutter would just leave a dead gap. */
+    padding-right: var(--milo-space-lg);
+  }
+
+  .home-page__try-strip-milo {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    row-gap: var(--milo-space-sm);
+  }
+
+  .home-page__try-strip-bubble {
+    text-align: left;
+  }
+
+  .home-page__try-strip-status {
+    text-align: left;
+  }
+
+  .home-page__try-strip-arrow {
+    display: none;
+  }
+
+  .home-page__try-strip-milo .milo-avatar {
+    position: static;
+    width: 64px;
+    height: 80px;
+  }
+}
+
+.home-page__try-strip-title {
+  margin: 0 0 var(--milo-space-sm);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--milo-text-muted);
+}
+
+.home-page__try-strip-milo {
+  display: flex;
+  align-items: center;
+  gap: var(--milo-space-md);
+  flex-shrink: 0;
+}
+
+.home-page__try-strip-bubble {
+  position: relative;
+  text-align: right;
+}
+
+.home-page__try-strip-status {
+  text-align: right;
+}
+
+.home-page__try-strip-arrow {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--milo-accent-text);
+  font-size: 1.3rem;
+  text-align: right;
+  transform: scaleY(-1) rotate(20deg);
+}
+
+.home-page__try-strip-milo .milo-avatar {
+  position: absolute;
+  right: 0.5rem;
+  bottom: -18px;
+  width: 130px;
+  height: 170px;
+  z-index: 0;
+}
+
+.home-page__greeting-eyebrow {
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
+  color: var(--milo-text-muted);
+}
+
+.home-page__greeting {
+  font-size: 3.2rem;
+  font-weight: 300;
+  letter-spacing: 0.045em;
+  line-height: 0.85;
+  margin: 0;
+  background: linear-gradient(90deg, var(--milo-text), var(--milo-accent-text));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 22px var(--milo-accent-glow));
+}
+
+@media (min-width: 1100px) {
+  .home-page__greeting {
+    font-size: 4.6rem;
+  }
+}
+
+.home-page__fullname {
+  color: var(--milo-text-muted);
+  font-size: 0.9rem;
+  margin: 1.1rem 0 1.4rem;
+}
+
+.home-page__description {
+  color: var(--milo-text-muted);
+  max-width: 34ch;
+  font-size: 0.85rem;
+  line-height: 1.8;
+}
+
+.home-page__character {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 100%;
+}
+
+.home-page__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--milo-space-lg);
+  margin: var(--milo-space-lg) 0;
+  align-items: stretch;
+}
+
+/* Grid items default to `min-width: auto`, so a fixed-width flex
+ * child inside a card (e.g. `.home-page__glance-milo`'s 96px column)
+ * can force the whole card -- and at the single-column mobile
+ * breakpoint, the page itself -- wider than the viewport instead of
+ * wrapping/shrinking. */
+.home-page__grid > * {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .home-page__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.home-page__glance-body {
+  display: flex;
+  align-items: stretch;
+  gap: var(--milo-space-md);
+}
+
+.home-page__glance-status {
+  flex: 1;
+  min-width: 0;
+}
+
+.home-page__glance-status .status-pill {
+  margin-bottom: var(--milo-space-md);
+}
+
+.home-page__glance-divider {
+  width: 1px;
+  background: var(--milo-border);
+  align-self: stretch;
+}
+
+.home-page__glance-milo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 96px;
+  text-align: center;
+}
+
+.home-page__glance-milo .milo-avatar {
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--milo-border-strong);
+}
+
+.home-page__glance-milo .milo-state-indicator {
+  align-items: center;
+  text-align: center;
+}
+
+.home-page__view-all {
+  color: var(--milo-accent-text);
+  text-decoration: none;
+  font-size: 0.82rem;
+}
+
+.home-page__view-all:hover {
+  text-decoration: underline;
+}
+
+.home-page__mission-card {
+  padding: 0.75rem 1rem;
+  border-radius: var(--milo-radius-sm);
+  background: var(--milo-surface-hover);
+  border: 1px solid var(--milo-border);
+}
+
+.home-page__mission-request {
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+
+.home-page__mission-timeline {
+  margin-top: var(--milo-space-md);
+  padding-top: var(--milo-space-sm);
+  border-top: 1px solid var(--milo-border);
+}
+
+.home-page__memory-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.home-page__memory-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--milo-radius-sm);
+  background: var(--milo-surface);
+}
+
+.home-page__memory-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--milo-accent-text);
+}
+
+.home-page__memory-content {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-page__memory-age {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--milo-text-faint);
+}
+
+/* Mission Control -- visual refinement pass: dense, asymmetric
+ * dashboard composition (spec section 34) instead of three equal
+ * columns of independent cards. The page-level <h1> is kept for
+ * accessibility only (`.sr-only`, in MissionControlPage.tsx) -- no
+ * large standalone heading renders above the grid. */
+.mission-control {
+  padding-top: 0.25rem;
+}
+
+.mission-control__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(0, 1.05fr) minmax(0, 1.25fr);
+  grid-template-areas:
+    "eyes    talk    mission"
+    "eyes    talk    status"
+    "objects plan    activity"
+    "map     plan    activity"
+    "agents  agents  agents"
+    "memory  memory  memory";
+  gap: 18px;
+  align-items: stretch;
+}
+
+.mission-control__eyes {
+  grid-area: eyes;
+}
+
+.mission-control__talk {
+  grid-area: talk;
+}
+
+.mission-control__mission {
+  grid-area: mission;
+}
+
+.mission-control__status {
+  grid-area: status;
+}
+
+.mission-control__objects {
+  grid-area: objects;
+}
+
+.mission-control__plan {
+  grid-area: plan;
+}
+
+.mission-control__activity {
+  grid-area: activity;
+}
+
+.mission-control__location {
+  grid-area: map;
+}
+
+.mission-control__agents {
+  grid-area: agents;
+}
+
+.mission-control__memory {
+  grid-area: memory;
+}
+
+/* Secondary panels (spec section 27): supporting information, not part
+ * of the reference's primary visual hierarchy -- smaller title, tighter
+ * padding, more muted border than the primary cards above them. */
+.mission-control__agents--secondary,
+.mission-control__memory--secondary {
+  padding: var(--milo-space-md);
+  background: rgba(42, 24, 16, 0.015);
+}
+
+.mission-control__agents--secondary .glass-card__title,
+.mission-control__memory--secondary .glass-card__title {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+/* Medium desktop / tablet: camera+talk/status stacked into two columns,
+ * objects/plan and map/activity paired beneath (spec section 35). */
+@media (max-width: 1300px) {
+  .mission-control__grid {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    grid-template-areas:
+      "eyes    talk"
+      "eyes    mission"
+      "eyes    status"
+      "objects plan"
+      "map     activity"
+      "agents  agents"
+      "memory  memory";
+  }
+}
+
+@media (max-width: 680px) {
+  .mission-control__grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "eyes"
+      "talk"
+      "mission"
+      "status"
+      "objects"
+      "plan"
+      "map"
+      "activity"
+      "agents"
+      "memory";
+  }
+}
+
+.mission-control__mission-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--milo-space-sm);
+  align-items: flex-start;
+  width: 100%;
+}
+
+.mission-control__mission-request {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.mission-control__mission-progress {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--milo-text-muted);
+}
+
+.mission-control__mission-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+  overflow: hidden;
+}
+
+.mission-control__mission-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--milo-accent), var(--milo-accent-text));
+  box-shadow: 0 0 8px var(--milo-accent-glow);
+  transition: width var(--milo-transition-medium);
+}
+
+.mission-control__cancel {
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-danger);
+  background: rgba(248, 113, 113, 0.06);
+  color: var(--milo-danger);
+  cursor: pointer;
+  transition:
+    background var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.mission-control__cancel:hover:not(:disabled) {
+  background: var(--milo-danger-soft);
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.3);
+}
+
+.mission-control__cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mission-control__cancelled {
+  color: var(--milo-text-muted);
+  margin-top: 0.5rem;
+}
+
+.mission-control__status-body {
+  display: flex;
+  align-items: center;
+  gap: var(--milo-space-md);
+  margin-bottom: var(--milo-space-md);
+}
+
+.mission-control__status-body .milo-avatar {
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--milo-border-strong);
+  flex-shrink: 0;
+}
+
+.mission-control__dialogue {
+  margin-top: var(--milo-space-md);
+  max-width: none;
+}
+
+/* Activity Feed: vertical timeline (spec section 24-25) -- a connector
+ * rail behind each real event's node, mirroring MILO's Plan's rail. */
+.mission-control__events {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 0.1rem;
+  display: flex;
+  flex-direction: column;
+  max-height: 420px;
+  overflow-y: auto;
+  position: relative;
+}
+
+.mission-control__event {
+  position: relative;
+  display: flex;
+  gap: 0.7rem;
+  font-size: 0.82rem;
+  padding: 0.5rem 0.5rem 0.5rem 0;
+  border-radius: var(--milo-radius-sm);
+  animation: milo-dialogue-in var(--milo-transition-medium);
+}
+
+.mission-control__event:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 0.35rem;
+  top: 1.6rem;
+  bottom: -0.1rem;
+  width: 1px;
+  background: var(--milo-border);
+}
+
+.mission-control__event-node {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+  background: var(--milo-text-faint);
+  z-index: 1;
+}
+
+.mission-control__event--latest {
+  background: var(--milo-accent-soft);
+}
+
+.mission-control__event--latest .mission-control__event-node {
+  background: var(--milo-accent);
+  box-shadow: 0 0 8px var(--milo-accent-glow);
+}
+
+.mission-control__event-time {
+  flex-shrink: 0;
+  color: var(--milo-text-faint);
+  font-variant-numeric: tabular-nums;
+  padding-top: 0.05rem;
+}
+
+.mission-control__event-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.mission-control__event-name {
+  color: var(--milo-text);
+}
+
+.mission-control__event-agent {
+  color: var(--milo-accent-text);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.mission-control__location-map {
+  margin: 0.75rem 0;
+}
+
+/* Mission Control -- visual refinement pass v2 (Phase 8.6-style
+ * mockup). Overrides/extends the block above by cascade, same trick
+ * as the Memory/Lab pages' own v2 sections. Several selectors from
+ * the source mockup targeted class names that don't exist on this
+ * page's real components (`.detected-objects-strip__item` vs the
+ * real `DetectedObjectsStrip`'s `.detected-objects__card`,
+ * `.plan-timeline__step` vs the real `PlanTimeline`'s
+ * `.plan-steps__item`, `.talk-to-milo__submit` vs the real
+ * `TalkToMilo`'s `.talk-to-milo__send`, a `.mission-control__status-
+ * avatar` wrapper and `.mission-control__location-layout` wrapper
+ * that don't exist in this page's JSX) -- those are translated below
+ * to the selectors this page's components actually render, rather
+ * than copied verbatim. This page's existing named-area responsive
+ * breakpoints (1300px/680px) are left alone for the same reason the
+ * Lab page's were: a second, differently-shaped responsive strategy
+ * would fight rather than improve them. */
+.mission-control .glass-card {
+  background: linear-gradient(145deg, rgba(15, 16, 31, 0.88), rgba(255, 246, 229, 0.76));
+  border: 1px solid rgba(151, 126, 235, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(42, 24, 16, 0.025),
+    0 18px 44px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(18px);
+}
+
+.mission-control__talk .talk-to-milo {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mission-control__talk .talk-to-milo__input {
+  border: 1px solid rgba(145, 126, 211, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 246, 229, 0.76);
+  color: #2A1810;
+}
+
+.mission-control__talk .talk-to-milo__send {
+  min-height: 48px;
+  border: 1px solid rgba(158, 111, 255, 0.75);
+  border-radius: 11px;
+  background: linear-gradient(135deg, rgba(139, 91, 235, 0.28), rgba(105, 70, 187, 0.18));
+  color: #FF8A2B;
+  box-shadow: 0 0 22px rgba(132, 86, 235, 0.1);
+}
+
+.mission-control__talk .talk-to-milo__examples-list {
+  gap: 7px;
+}
+
+.mission-control__talk .talk-to-milo__example {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid rgba(137, 119, 190, 0.14);
+  border-radius: 10px;
+  background: rgba(42, 24, 16, 0.012);
+  color: #6B5A4E;
+}
+
+.mission-control__mission-request {
+  font-size: 1.15rem;
+}
+
+.mission-control__status-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+}
+
+.mission-control__status .agent-status-list {
+  gap: 5px;
+}
+
+.mission-control__status .agent-status-list__item {
+  justify-content: space-between;
+  padding: 5px 8px;
+  border: 1px solid rgba(139, 118, 184, 0.1);
+  border-radius: 8px;
+  background: rgba(42, 24, 16, 0.012);
+  font-size: 11px;
+}
+
+.mission-control__plan .plan-steps__item {
+  min-height: 54px;
+  border-radius: 10px;
+}
+
+.mission-control__plan .plan-steps__item--running {
+  border: 1px solid rgba(153, 111, 255, 0.45);
+  background: rgba(132, 83, 229, 0.08);
+}
+
+.mission-control__event {
+  display: grid;
+  grid-template-columns: 18px 68px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.mission-control__event-time {
+  font-size: 11px;
+}
+
+.mission-control__location section[aria-label="Where Is MILO?"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.mission-control__location section[aria-label="Where Is MILO?"] > p {
+  grid-column: 1 / -1;
+  color: #6B5A4E;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 680px) {
+  .mission-control__location section[aria-label="Where Is MILO?"] {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mission-control__location-map {
+  width: 100%;
+  min-height: 190px;
+}
+
+.mission-control__location .robot-state-panel {
+  height: 100%;
+  border-radius: 12px;
+}
+
+/* RobotMiniMap -- an honest position readout, not a fabricated
+ * floorplan (see that component's own docstring). The grid background
+ * is purely decorative chrome; only the dot (when a real position
+ * exists) represents actual telemetry. */
+.robot-minimap {
+  position: relative;
+  border-radius: 10px;
+  border: 1px solid var(--milo-border);
+  background: rgba(255, 246, 229, 0.7);
+  overflow: hidden;
+}
+
+.robot-minimap--sm {
+  width: 150px;
+  height: 100px;
+}
+
+.robot-minimap--lg {
+  width: 100%;
+  height: 160px;
+}
+
+.robot-minimap__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 138, 43, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 138, 43, 0.14) 1px, transparent 1px);
+  background-size: 20% 25%;
+}
+
+.robot-minimap__dot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px;
+  border-radius: 50%;
+  background: var(--milo-accent);
+  box-shadow: 0 0 10px var(--milo-accent-glow);
+}
+
+.robot-minimap__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--milo-text-faint);
+  font-size: 0.75rem;
+}
+
+/* Detected Objects strip (spec section 19-20) -- horizontal card row
+ * of the same real SpatialObject[] VisionPanel already fetched. */
+.detected-objects {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.detected-objects__empty {
+  color: var(--milo-text-faint);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.detected-objects__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.7rem;
+  border-radius: 12px;
+  border: 1px solid var(--milo-border);
+  background: var(--milo-surface);
+  transition: border-color var(--milo-transition-fast);
+}
+
+.detected-objects__card:hover {
+  border-color: var(--milo-accent);
+}
+
+.detected-objects__thumb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--milo-accent-soft);
+  color: var(--milo-accent-text);
+  margin-bottom: 0.2rem;
+}
+
+.detected-objects__name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.detected-objects__confidence {
+  font-size: 0.75rem;
+  color: var(--milo-text-muted);
+}
+
+.detected-objects__status {
+  font-size: 0.7rem;
+  color: var(--milo-success);
+  text-transform: capitalize;
+}
+
+.detected-objects__status--lost {
+  color: var(--milo-danger);
+}
+
+.detected-objects__status--temporarily_lost {
+  color: var(--milo-warning);
+}
+
+@media (max-width: 900px) {
+  .detected-objects {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Phase 8.6: Agent Architecture Diagram (Mission Control) -- a graph
+ * layout of the same real AgentsContext data AgentStatusList renders
+ * as a flat list, so it shares that component's semantic-state colors. */
+.agent-architecture__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(48px, auto);
+  gap: var(--milo-space-sm);
+  margin-bottom: var(--milo-space-sm);
+}
+
+.agent-architecture__node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.5rem;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-border);
+  background: var(--milo-surface);
+  text-align: center;
+}
+
+.agent-architecture__node-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.agent-architecture__node-state {
+  font-size: 0.7rem;
+  color: var(--milo-text-muted);
+}
+
+.agent-architecture__node--active .agent-architecture__node-state,
+.agent-architecture__node--thinking .agent-architecture__node-state {
+  color: var(--milo-accent-text);
+}
+
+.agent-architecture__node--active,
+.agent-architecture__node--thinking {
+  border-color: var(--milo-border-strong);
+  box-shadow: 0 0 0 1px var(--milo-accent-glow) inset;
+}
+
+.agent-architecture__node--error {
+  border-color: var(--milo-danger);
+}
+
+.agent-architecture__node--error .agent-architecture__node-state {
+  color: var(--milo-danger);
+}
+
+.agent-architecture__node--unknown {
+  opacity: 0.55;
+}
+
+.agent-architecture__caption {
+  font-size: 0.78rem;
+  color: var(--milo-text-faint);
+  margin: 0;
+}
+
+.agent-architecture__unavailable {
+  color: var(--milo-text-muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .agent-architecture__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agent-architecture__node {
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+}
+
+/* Phase 8.6: Plan Timeline (Mission Control) -- extends the plain
+ * plan-steps checklist with real per-step execution timing/retry/error
+ * data from TaskState.execution_history (ExecutionRecord), when present. */
+.plan-timeline__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--milo-text-faint);
+}
+
+.plan-timeline__meta-item {
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--milo-surface-hover);
+}
+
+.plan-timeline__meta-item--retry {
+  color: var(--milo-warning);
+}
+
+.plan-timeline__meta-item--error {
+  color: var(--milo-danger);
+}
+
+/* Phase 8.6: Task Memory Panel (Mission Control) -- retrieved vs.
+ * created memory for the active task, from GET /tasks/{id}/memory. */
+.task-memory-panel__section {
+  margin-bottom: var(--milo-space-md);
+}
+
+.task-memory-panel__section:last-child {
+  margin-bottom: 0;
+}
+
+.task-memory-panel__heading {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--milo-text-faint);
+}
+
+.task-memory-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.task-memory-panel__item {
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--milo-radius-sm);
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+  font-size: 0.85rem;
+}
+
+.task-memory-panel__item-type {
+  color: var(--milo-accent-text);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-right: 0.4rem;
+}
+
+.task-memory-panel__empty {
+  color: var(--milo-text-muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* Phase 8.6: Robot State Panel (Mission Control) -- live AI2-THOR pose
+ * via GET /tasks/{id}/robot; a real "not connected" state when the
+ * simulator isn't running, never a fabricated pose. */
+.robot-state-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: var(--milo-space-sm);
+}
+
+.robot-state-panel__field {
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--milo-radius-sm);
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+}
+
+.robot-state-panel__field-label {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--milo-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.robot-state-panel__field-value {
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.robot-state-panel__visible {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.robot-state-panel__visible-item {
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: var(--milo-surface-hover);
+  font-size: 0.75rem;
+}
+
+.robot-state-panel__unavailable {
+  color: var(--milo-text-muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* Memory page -- visual refinement pass: compact header (title +
+ * real Quick Memory Search) / three-column body (Memory Types filters
+ * + summary | Memory Feed | Memory Details) / a de-emphasized real
+ * Memory Timeline / a static explanatory pipeline -- replacing the
+ * earlier marketing-style hero + flat 3-equal-card body. */
+.memory-page {
+  padding-top: 0.25rem;
+}
+
+.memory-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--milo-space-lg);
+  flex-wrap: wrap;
+  margin-bottom: var(--milo-space-md);
+}
+
+.memory-page__header-copy {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.memory-page__hero-character {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.memory-page__hero-character .milo-avatar {
+  position: relative;
+  z-index: 1;
+}
+
+.memory-page__hero-character::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--milo-accent-glow), transparent 70%);
+  filter: blur(20px);
+  opacity: 0.45;
+  animation: milo-glow-soft 5s ease-in-out infinite;
+}
+
+.memory-page__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--milo-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.memory-page__title-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--milo-accent);
+  box-shadow: 0 0 8px var(--milo-accent-glow);
+}
+
+.memory-page__subtitle {
+  margin: 0.3rem 0 0;
+  font-size: 0.9rem;
+  color: var(--milo-text-muted);
+}
+
+.memory-page__search-card {
+  width: 320px;
+  max-width: 100%;
+  align-self: flex-start;
+}
+
+.memory-page__search-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.memory-page__search-input-wrap {
+  position: relative;
+  flex: 1;
+}
+
+.memory-page__search-input-wrap input {
+  width: 100%;
+  height: 46px;
+  padding: 0 2.5rem 0 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--milo-border);
+  background: var(--milo-bg);
+  color: inherit;
+  font: inherit;
+  box-sizing: border-box;
+  transition: border-color var(--milo-transition-fast);
+}
+
+.memory-page__search-input-wrap input::placeholder {
+  color: var(--milo-text-faint);
+}
+
+.memory-page__search-input-wrap input:focus {
+  outline: none;
+  border-color: var(--milo-accent);
+  box-shadow: 0 0 0 3px var(--milo-accent-soft);
+}
+
+.memory-page__search-icon {
+  position: absolute;
+  right: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--milo-text-faint);
+  pointer-events: none;
+}
+
+.memory-page__search-submit {
+  flex-shrink: 0;
+  padding: 0 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--milo-accent);
+  background: var(--milo-accent-soft);
+  color: var(--milo-accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.memory-page__search-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.memory-page__search-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.memory-page__error {
+  margin: 0.5rem 0 0;
+  color: var(--milo-danger);
+  font-size: 0.85rem;
+}
+
+/* Three-column body: filters/summary | feed | details. */
+.memory-page__body {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(420px, 2fr) minmax(300px, 1.1fr);
+  gap: var(--milo-space-md);
+  align-items: start;
+  margin-bottom: var(--milo-space-md);
+}
+
+@media (max-width: 1300px) {
+  .memory-page__body {
+    grid-template-columns: minmax(210px, 0.8fr) minmax(0, 1fr);
+    grid-template-areas:
+      "sidebar feed"
+      "details details";
+  }
+
+  .memory-page__sidebar {
+    grid-area: sidebar;
+  }
+
+  .memory-page__feed-col {
+    grid-area: feed;
+  }
+
+  .memory-page__details-col {
+    grid-area: details;
+  }
+}
+
+@media (max-width: 780px) {
+  .memory-page__body {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "sidebar"
+      "feed"
+      "details";
+  }
+
+  .memory-page__search-card {
+    width: 100%;
+  }
+}
+
+.memory-page__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--milo-space-md);
+  min-width: 0;
+}
+
+.memory-page__feed-col,
+.memory-page__details-col {
+  min-width: 0;
+}
+
+.memory-page__categories {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.memory-page__category {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 38px;
+  padding: 0 0.65rem;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--milo-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  transition:
+    background var(--milo-transition-fast),
+    color var(--milo-transition-fast),
+    border-color var(--milo-transition-fast);
+}
+
+.memory-page__category:hover {
+  background: var(--milo-surface-hover);
+}
+
+.memory-page__category--active {
+  background: var(--milo-accent-soft);
+  border-color: var(--milo-border-strong);
+  color: var(--milo-text);
+  box-shadow: 0 0 10px rgba(255, 138, 43, 0.12);
+}
+
+.memory-page__category-icon {
+  flex-shrink: 0;
+  color: var(--milo-text-faint);
+}
+
+.memory-page__category--active .memory-page__category-icon {
+  color: var(--milo-accent-text);
+}
+
+.memory-page__category-icon--info {
+  color: var(--milo-info);
+}
+
+.memory-page__category-icon--warning {
+  color: var(--milo-warning);
+}
+
+.memory-page__category-icon--success {
+  color: var(--milo-success);
+}
+
+.memory-page__category-icon--accent {
+  color: var(--milo-accent-text);
+  opacity: 0.75;
+}
+
+.memory-page__category-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-page__category-count {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--milo-text-faint);
+}
+
+.memory-page__category--active .memory-page__category-count {
+  color: var(--milo-accent-text);
+}
+
+.memory-page__knowledge-card .glass-card__title,
+.memory-page__knowledge-card {
+  font-size: inherit;
+}
+
+.memory-page__knowledge {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--milo-text-muted);
+}
+
+.memory-page__knowledge li {
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--milo-border);
+}
+
+.memory-page__knowledge li:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.memory-page__stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.memory-page__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+}
+
+.memory-page__stat-label {
+  font-size: 0.68rem;
+  color: var(--milo-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.memory-page__stat-value {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--milo-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.memory-page__total {
+  margin: 0.6rem 0 0;
+  color: var(--milo-text-faint);
+  font-size: 0.78rem;
+}
+
+.memory-page__empty-inline {
+  color: var(--milo-text-faint);
+  font-size: 0.85rem;
+}
+
+.memory-page__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--milo-text-muted);
+}
+
+.memory-page__empty-ring {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px dashed var(--milo-border-strong);
+}
+
+.memory-page__empty-detail {
+  font-size: 0.82rem;
+  color: var(--milo-text-faint);
+  margin: 0;
+  max-width: 40ch;
+}
+
+.memory-page__refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--milo-border);
+  background: transparent;
+  color: var(--milo-text-muted);
+  cursor: pointer;
+  transition:
+    border-color var(--milo-transition-fast),
+    color var(--milo-transition-fast);
+}
+
+.memory-page__refresh:hover {
+  border-color: var(--milo-accent);
+  color: var(--milo-accent-text);
+}
+
+.memory-page__search-query {
+  margin: 0 0 var(--milo-space-sm);
+  font-size: 0.8rem;
+  color: var(--milo-text-faint);
+  font-style: italic;
+}
+
+.memory-page__feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-height: 620px;
+  overflow-y: auto;
+}
+
+.memory-page__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.7rem 0.85rem;
+  border-radius: 13px;
+  border: 1px solid var(--milo-border);
+  background: rgba(42, 24, 16, 0.015);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    border-color var(--milo-transition-fast),
+    background var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.memory-page__card:hover {
+  border-color: var(--milo-border-strong);
+}
+
+.memory-page__card--selected {
+  border-color: var(--milo-accent);
+  background: var(--milo-accent-soft);
+  box-shadow: 0 0 14px rgba(255, 138, 43, 0.14);
+}
+
+.memory-page__card--failure {
+  border-left: 2px solid var(--milo-warning);
+}
+
+.memory-page__card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.memory-page__card-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--milo-surface);
+  color: var(--milo-text-faint);
+}
+
+.memory-page__card-icon--info {
+  color: var(--milo-info);
+  background: var(--milo-info-soft);
+}
+
+.memory-page__card-icon--warning {
+  color: var(--milo-warning);
+  background: var(--milo-warning-soft);
+}
+
+.memory-page__card-icon--success {
+  color: var(--milo-success);
+  background: var(--milo-success-soft);
+}
+
+.memory-page__card-icon--accent {
+  color: var(--milo-accent-text);
+  background: var(--milo-accent-soft);
+}
+
+.memory-page__card-type {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--milo-text-muted);
+}
+
+.memory-page__card-time {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--milo-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.memory-page__card-content {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--milo-text);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.memory-page__card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  font-size: 0.72rem;
+  color: var(--milo-text-faint);
+}
+
+.memory-page__search-score {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Memory Details panel. */
+.memory-page__detail-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding-bottom: var(--milo-space-md);
+  margin-bottom: var(--milo-space-md);
+  border-bottom: 1px solid var(--milo-border);
+}
+
+.memory-page__detail-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+  color: var(--milo-text-faint);
+}
+
+.memory-page__detail-icon--info {
+  color: var(--milo-info);
+  border-color: rgba(255, 179, 71, 0.3);
+  background: var(--milo-info-soft);
+}
+
+.memory-page__detail-icon--warning {
+  color: var(--milo-warning);
+  border-color: rgba(251, 191, 36, 0.3);
+  background: var(--milo-warning-soft);
+}
+
+.memory-page__detail-icon--success {
+  color: var(--milo-success);
+  border-color: rgba(74, 222, 128, 0.3);
+  background: var(--milo-success-soft);
+}
+
+.memory-page__detail-icon--accent {
+  color: var(--milo-accent-text);
+  border-color: var(--milo-border-strong);
+  background: var(--milo-accent-soft);
+}
+
+.memory-page__detail-content {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--milo-text);
+  line-height: 1.5;
+}
+
+.memory-page__detail-list {
+  margin: 0 0 var(--milo-space-md);
+}
+
+.memory-page__detail-list dt {
+  font-size: 0.72rem;
+  color: var(--milo-text-faint);
+  margin-top: 0.55rem;
+}
+
+.memory-page__detail-list dt:first-child {
+  margin-top: 0;
+}
+
+.memory-page__detail-list dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.88rem;
+}
+
+.memory-page__detail-related {
+  margin-bottom: var(--milo-space-md);
+}
+
+.memory-page__detail-related-label {
+  font-size: 0.72rem;
+  color: var(--milo-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0 0 0.4rem;
+}
+
+.memory-page__detail-related-task {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+  color: var(--milo-accent-text);
+  font-size: 0.85rem;
+}
+
+.memory-page__payload {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--milo-border);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--milo-text-muted);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* Secondary real Memory Timeline, de-emphasized below the main grid. */
+.memory-page__timeline-card {
+  margin-bottom: var(--milo-space-md);
+  padding: var(--milo-space-md);
+  background: rgba(42, 24, 16, 0.015);
+}
+
+.memory-page__timeline-card .glass-card__title {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.memory-page__timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  color: var(--milo-text-muted);
+}
+
+.memory-page__timeline li {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.memory-page__timeline-time {
+  flex-shrink: 0;
+  color: var(--milo-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Static explanatory pipeline -- no live data, see MemoryPage.tsx's
+ * own comment on this section. */
+.memory-page__pipeline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  padding: var(--milo-space-lg);
+  text-align: center;
+  border: 1px solid var(--milo-border);
+  border-radius: var(--milo-radius-lg);
+  background:
+    radial-gradient(ellipse 60% 100% at 50% 0%, rgba(255, 138, 43, 0.08), transparent 70%),
+    var(--milo-bg-elevated);
+}
+
+.memory-page__pipeline-title {
+  margin: 0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--milo-text-faint);
+}
+
+.memory-page__pipeline-steps {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 0.85rem;
+  color: var(--milo-text-muted);
+}
+
+.memory-page__pipeline-steps span {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+  color: var(--milo-text);
+}
+
+.memory-page__pipeline-steps svg {
+  color: var(--milo-text-faint);
+  flex-shrink: 0;
+}
+
+/* Memory page -- visual refinement pass v2 (Phase 8.6-style mockup).
+ * Overrides/extends the block above rather than replacing it, same
+ * cascade trick the source mockup used ("import this after
+ * index.css") -- later declarations at equal specificity win. A few
+ * selectors here (`.memory-page__hero-wrap`, `__hero-copy-text`,
+ * `__eyebrow`, `__hero-steps`, `__suggestions`) target markup this
+ * page's JSX doesn't render yet, so they're inert until that markup
+ * pass lands; nothing below regresses what's currently on screen. */
+:root {
+  --milo-warm: #FF8A2B;
+  --milo-warm-2: #FF8A2B;
+  --milo-line: rgba(164, 145, 255, 0.14);
+}
+
+.memory-page .glass-card {
+  background: linear-gradient(145deg, rgba(18, 18, 36, 0.84), rgba(255, 246, 229, 0.74));
+  border: 1px solid var(--milo-line);
+  box-shadow:
+    inset 0 1px 0 rgba(42, 24, 16, 0.025),
+    0 20px 50px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(18px);
+}
+
+.memory-page {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding-bottom: 2rem;
+}
+
+.memory-page__header::after {
+  content: "SEE  →  UNDERSTAND  →  REMEMBER  →  ACT  →  LEARN";
+  position: absolute;
+  right: 34px;
+  bottom: 20px;
+  color: rgba(181, 169, 220, 0.38);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+}
+
+.memory-page__title::first-line {
+  color: #2A1810;
+}
+
+.memory-page__title-dot {
+  box-shadow: 0 0 18px rgba(255, 138, 43, 0.8);
+  vertical-align: middle;
+}
+
+.memory-page__category {
+  border: 1px solid transparent;
+}
+
+.memory-page__category--active {
+  background: linear-gradient(90deg, rgba(255, 138, 43, 0.18), rgba(255, 138, 43, 0.04));
+  border-color: rgba(255, 138, 43, 0.18);
+  box-shadow: inset 3px 0 0 var(--milo-warm);
+}
+
+.memory-page__feed-card {
+  min-height: 600px;
+}
+
+.memory-page__card {
+  border: 1px solid rgba(255, 138, 43, 0.08);
+  background: rgba(42, 24, 16, 0.018);
+  transition: all 0.18s ease;
+}
+
+.memory-page__card:hover,
+.memory-page__card--selected {
+  background: rgba(255, 138, 43, 0.08);
+  border-color: rgba(255, 138, 43, 0.26);
+  box-shadow: 0 0 28px rgba(129, 83, 255, 0.08);
+}
+
+.memory-page__timeline li {
+  background: rgba(42, 24, 16, 0.018);
+  border: 1px solid rgba(255, 138, 43, 0.08);
+}
+
+.memory-page__pipeline {
+  border: 1px solid rgba(255, 138, 43, 0.1);
+  background: rgba(10, 10, 22, 0.55);
+}
+
+.memory-page__pipeline-steps span:nth-of-type(4) {
+  color: var(--milo-warm-2);
+}
+
+/* Hero grid: title/search copy | character portrait | pipeline-stage
+ * rail -- `.memory-page__hero-wrap` pairs the header with the search
+ * card as two top-level columns instead of nesting search inside the
+ * header. Needs `.memory-page__hero-copy-text`, `__eyebrow`, and
+ * `__hero-steps` in the JSX to take effect (see note above). */
+.memory-page__hero-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 3.25fr) minmax(330px, 1.1fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.memory-page__header {
+  min-height: 300px;
+  margin: 0;
+  padding: 30px 34px;
+  display: block;
+  overflow: hidden;
+}
+
+.memory-page__header-copy {
+  min-height: 238px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(220px, 0.72fr) 92px;
+  align-items: start;
+  gap: 8px;
+}
+
+.memory-page__hero-copy-text {
+  padding-top: 10px;
+  position: relative;
+  z-index: 2;
+}
+
+.memory-page__eyebrow {
+  margin: 0 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: #6B5A4E;
+  font-size: 10px;
+}
+
+.memory-page__title {
+  font-size: clamp(44px, 4vw, 60px);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+  font-weight: 300;
+  margin: 0;
+}
+
+.memory-page__hero-character {
+  width: 240px;
+  height: 245px;
+  align-self: start;
+  margin-top: -10px;
+  display: grid;
+  place-items: start center;
+  position: relative;
+}
+
+.memory-page__hero-character::before {
+  content: "";
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  top: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(156, 111, 255, 0.24), transparent 68%);
+  filter: blur(8px);
+}
+
+.memory-page__hero-character .milo-avatar {
+  position: relative;
+  z-index: 1;
+  transform: scale(1.2);
+  transform-origin: top center;
+}
+
+.memory-page__hero-steps {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  color: #6B5A4E;
+  font-size: 10px;
+  padding-top: 5px;
+}
+
+.memory-page__hero-steps span.is-active {
+  color: #FF8A2B;
+  position: relative;
+}
+
+.memory-page__hero-steps span.is-active::before {
+  content: "";
+  position: absolute;
+  left: -15px;
+  top: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #FF8A2B;
+  box-shadow: 0 0 12px #FF8A2B;
+}
+
+.memory-page__search-card {
+  min-height: 300px;
+  margin: 0 !important;
+}
+
+.memory-page__search-helper {
+  margin: 9px 0 0;
+  color: #6B5A4E;
+  font-size: 13px;
+}
+
+.memory-page__search-helper--try {
+  margin-top: 15px;
+}
+
+.memory-page__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.memory-page__suggestion {
+  border: 1px solid rgba(255, 138, 43, 0.12);
+  background: rgba(42, 24, 16, 0.015);
+  color: #E8C98A;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.memory-page__suggestion:hover {
+  border-color: rgba(255, 138, 43, 0.35);
+  background: rgba(255, 138, 43, 0.07);
+}
+
+@media (max-width: 1100px) {
+  .memory-page__header {
+    grid-template-columns: 1fr;
+  }
+
+  .memory-page__body {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .memory-page__details-col {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .memory-page__header-copy {
+    align-items: flex-start;
+  }
+
+  .memory-page__hero-character {
+    display: none;
+  }
+
+  .memory-page__body {
+    grid-template-columns: 1fr;
+  }
+
+  .memory-page__sidebar,
+  .memory-page__feed-col,
+  .memory-page__details-col {
+    grid-column: auto;
+  }
+
+  .memory-page__timeline {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Activity page -- visual refinement pass: left filters/summary,
+ * center timeline, right event details (spec section 4), replacing
+ * the earlier sidebar + single main-area 2-column composition. */
+.activity-page {
+  padding-top: 0.4rem;
+}
+
+.activity-page__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--milo-space-lg);
+  flex-wrap: wrap;
+  padding-bottom: 1.3rem;
+  margin-bottom: var(--milo-space-lg);
+  border-bottom: 1px solid var(--milo-border);
+}
+
+.activity-page__title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--milo-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.activity-page__title-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--milo-accent);
+  box-shadow: 0 0 8px var(--milo-accent-glow);
+}
+
+.activity-page__subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: var(--milo-text-muted);
+}
+
+.activity-page__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.activity-page__search {
+  position: relative;
+  width: 260px;
+  max-width: 100%;
+}
+
+.activity-page__search input {
+  width: 100%;
+  height: 49px;
+  padding: 0 2.6rem 0 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--milo-border);
+  background: var(--milo-surface);
+  color: var(--milo-text);
+  font: inherit;
+  font-size: 0.85rem;
+  box-sizing: border-box;
+  transition: border-color var(--milo-transition-fast);
+}
+
+.activity-page__search input::placeholder {
+  color: var(--milo-text-faint);
+}
+
+.activity-page__search input:focus {
+  outline: none;
+  border-color: var(--milo-accent);
+  box-shadow: 0 0 0 3px var(--milo-accent-soft);
+}
+
+.activity-page__search-icon {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--milo-text-faint);
+  pointer-events: none;
+}
+
+.activity-page__search-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.activity-page__export {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  height: 49px;
+  padding: 0 1.1rem;
+  border-radius: 10px;
+  border: 1px solid var(--milo-border);
+  background: var(--milo-surface);
+  color: var(--milo-text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.activity-page__export:hover:not(:disabled) {
+  border-color: var(--milo-accent);
+  box-shadow: 0 0 12px var(--milo-accent-glow);
+}
+
+.activity-page__export:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Three-column dashboard: sidebar / timeline / details, matching the
+ * mockup's fixed-ish 296px / flexible / 426px ratio. */
+.activity-page__layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 296px) minmax(420px, 1fr) minmax(340px, 426px);
+  gap: var(--milo-space-lg);
+  align-items: start;
+}
+
+@media (max-width: 1300px) {
+  .activity-page__layout {
+    grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1fr);
+    grid-template-areas:
+      "sidebar feed"
+      "details details";
+  }
+
+  .activity-page__sidebar {
+    grid-area: sidebar;
+  }
+
+  .activity-page__feed-col {
+    grid-area: feed;
+  }
+
+  .activity-page__details-col {
+    grid-area: details;
+  }
+}
+
+@media (max-width: 780px) {
+  .activity-page__layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "sidebar"
+      "feed"
+      "details";
+  }
+
+  .activity-page__search {
+    width: 100%;
+  }
+}
+
+.activity-page__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--milo-space-md);
+}
+
+.activity-page__all-events {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 63px;
+  padding: 0 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--milo-border);
+  background: var(--milo-surface);
+  color: var(--milo-text-muted);
+}
+
+.activity-page__all-events-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--milo-text);
+}
+
+.activity-page__all-events-count {
+  margin-left: auto;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--milo-accent-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-page__filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.activity-page__filter {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  height: 32px;
+  padding: 0 0.65rem;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--milo-text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    background var(--milo-transition-fast),
+    border-color var(--milo-transition-fast);
+}
+
+.activity-page__filter:hover {
+  background: var(--milo-surface-hover);
+}
+
+.activity-page__filter--active {
+  background: linear-gradient(90deg, var(--milo-accent-soft), transparent);
+  border-color: transparent;
+  color: var(--milo-text);
+  box-shadow: inset 2px 0 0 var(--milo-accent);
+}
+
+.activity-page__filter-icon {
+  flex-shrink: 0;
+  color: var(--milo-text-faint);
+}
+
+.activity-page__filter--active .activity-page__filter-icon {
+  color: var(--milo-accent-text);
+}
+
+.activity-page__filter-icon--success {
+  color: var(--milo-success);
+}
+
+.activity-page__filter-icon--info {
+  color: var(--milo-info);
+}
+
+.activity-page__filter-icon--danger {
+  color: var(--milo-danger);
+}
+
+.activity-page__filter-icon--accent {
+  color: var(--milo-accent-text);
+  opacity: 0.75;
+}
+
+.activity-page__filter-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-page__filter-count {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--milo-text-faint);
+}
+
+.activity-page__filter--active .activity-page__filter-count {
+  color: var(--milo-accent-text);
+}
+
+.activity-page__summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin: 0;
+}
+
+.activity-page__summary-item {
+  padding: 0.9rem 0.7rem;
+  border-top: 1px solid var(--milo-border);
+}
+
+.activity-page__summary-item:nth-child(odd) {
+  border-right: 1px solid var(--milo-border);
+}
+
+.activity-page__summary-item:nth-child(-n + 2) {
+  border-top: none;
+}
+
+.activity-page__summary dt {
+  font-size: 0.68rem;
+  color: var(--milo-text-faint);
+}
+
+.activity-page__summary dd {
+  margin: 0.6rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 400;
+}
+
+/* Center timeline column. */
+.activity-page__feed-col {
+  min-width: 0;
+}
+
+.activity-page__feed-card .glass-card__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.activity-page__feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -1.5rem -1.5rem var(--milo-space-md);
+  padding: 0 1.5rem var(--milo-space-sm);
+  height: 63px;
+  border-bottom: 1px solid var(--milo-border);
+}
+
+.activity-page__feed-header-label {
+  font-size: 1.1rem;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--milo-text);
+}
+
+.activity-page__feed-header-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  height: 41px;
+  padding: 0 0.8rem;
+  border-radius: 9px;
+  border: 1px solid var(--milo-border);
+  background: var(--milo-bg-elevated);
+  font-size: 0.8rem;
+  color: var(--milo-text-muted);
+}
+
+.activity-page__loading {
+  color: var(--milo-text-faint);
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.activity-page__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--milo-text-muted);
+}
+
+.activity-page__empty-ring {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px dashed var(--milo-border-strong);
+}
+
+.activity-page__empty-detail {
+  font-size: 0.82rem;
+  color: var(--milo-text-faint);
+  margin: 0;
+}
+
+.activity-page__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 0.1rem;
+  display: flex;
+  flex-direction: column;
+  max-height: 560px;
+  overflow-y: auto;
+  position: relative;
+}
+
+.activity-page__list-item {
+  position: relative;
+}
+
+.activity-page__list-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 5.75rem;
+  top: 2.4rem;
+  bottom: 0;
+  width: 1px;
+  background: var(--milo-border);
+}
+
+.activity-page__item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: 69px;
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition:
+    border-color var(--milo-transition-fast),
+    background var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.activity-page__item:hover {
+  border-color: var(--milo-border);
+}
+
+.activity-page__item--selected {
+  border-color: rgba(151, 97, 255, 0.25);
+  background: linear-gradient(90deg, rgba(255, 138, 43, 0.18), rgba(255, 138, 43, 0.04));
+  box-shadow: none;
+}
+
+.activity-page__item-time {
+  flex-shrink: 0;
+  width: 3.8rem;
+  text-align: right;
+  font-size: 0.7rem;
+  color: var(--milo-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-page__item-node {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--milo-text-faint);
+  box-shadow: 0 0 0 4px var(--milo-bg-elevated);
+  z-index: 1;
+}
+
+.activity-page__item--selected .activity-page__item-node {
+  background: var(--milo-accent);
+  box-shadow:
+    0 0 0 4px var(--milo-bg-elevated),
+    0 0 6px var(--milo-accent-glow);
+}
+
+.activity-page__item-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+  color: var(--milo-text-faint);
+}
+
+.activity-page__item-icon--success {
+  color: var(--milo-success);
+  border-color: rgba(74, 222, 128, 0.3);
+  background: var(--milo-success-soft);
+}
+
+.activity-page__item-icon--info {
+  color: var(--milo-info);
+  border-color: rgba(255, 179, 71, 0.3);
+  background: var(--milo-info-soft);
+}
+
+.activity-page__item-icon--danger {
+  color: var(--milo-danger);
+  border-color: rgba(248, 113, 113, 0.3);
+  background: var(--milo-danger-soft);
+}
+
+.activity-page__item-icon--accent {
+  color: var(--milo-accent-text);
+  border-color: var(--milo-border-strong);
+  background: var(--milo-accent-soft);
+}
+
+.activity-page__item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.activity-page__item-event {
+  font-size: 0.88rem;
+  color: var(--milo-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-page__item-agent {
+  font-size: 0.75rem;
+  color: var(--milo-text-faint);
+}
+
+.activity-page__item-badge {
+  flex-shrink: 0;
+}
+
+/* Right details column. */
+.activity-page__details-col {
+  min-width: 0;
+}
+
+.activity-page__details-empty {
+  color: var(--milo-text-faint);
+  font-size: 0.88rem;
+}
+
+.activity-page__hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding-bottom: var(--milo-space-lg);
+  margin-bottom: var(--milo-space-md);
+  border-bottom: 1px solid var(--milo-border);
+}
+
+.activity-page__hero-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 11px;
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+  color: var(--milo-text-faint);
+}
+
+.activity-page__hero-icon--success {
+  color: var(--milo-success);
+  border-color: rgba(74, 222, 128, 0.3);
+  background: var(--milo-success-soft);
+}
+
+.activity-page__hero-icon--info {
+  color: var(--milo-info);
+  border-color: rgba(255, 179, 71, 0.3);
+  background: var(--milo-info-soft);
+}
+
+.activity-page__hero-icon--danger {
+  color: var(--milo-danger);
+  border-color: rgba(248, 113, 113, 0.3);
+  background: var(--milo-danger-soft);
+}
+
+.activity-page__hero-icon--accent {
+  color: var(--milo-accent-text);
+  border-color: var(--milo-border-strong);
+  background: var(--milo-accent-soft);
+}
+
+.activity-page__hero-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--milo-text);
+}
+
+.activity-page__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  padding-bottom: var(--milo-space-md);
+  margin-bottom: var(--milo-space-md);
+  border-bottom: 1px solid var(--milo-border);
+}
+
+.activity-page__metric {
+  padding: 0 0 0 0.8rem;
+  border-radius: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-left: 1px solid var(--milo-border);
+}
+
+.activity-page__metric:first-child {
+  padding-left: 0;
+  border-left: none;
+}
+
+.activity-page__metric dt {
+  font-size: 0.65rem;
+  color: var(--milo-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.activity-page__metric dd {
+  margin: 0.55rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--milo-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.activity-page__detail-list {
+  margin: 0 0 var(--milo-space-md);
+}
+
+.activity-page__detail-list dt {
+  font-size: 0.72rem;
+  color: var(--milo-text-faint);
+  margin-top: 0.55rem;
+}
+
+.activity-page__detail-list dt:first-child {
+  margin-top: 0;
+}
+
+.activity-page__detail-list dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.88rem;
+}
+
+.activity-page__related {
+  margin-bottom: var(--milo-space-md);
+}
+
+.activity-page__related-label {
+  font-size: 0.72rem;
+  color: var(--milo-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0 0 0.4rem;
+}
+
+.activity-page__related-task {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+  color: var(--milo-accent-text);
+  font-size: 0.85rem;
+}
+
+.activity-page__metadata-label {
+  font-size: 0.72rem;
+  color: var(--milo-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0 0 0.4rem;
+}
+
+.activity-page__payload {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--milo-border);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--milo-text-muted);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* About page */
+.about-page__hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 35fr) minmax(0, 43fr) minmax(0, 22fr);
+  align-items: center;
+  gap: var(--milo-space-lg);
+  min-height: 410px;
+  margin: var(--milo-space-lg) 0 var(--milo-space-xl);
+}
+
+@media (max-width: 1100px) {
+  .about-page__hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .about-page__traits {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 700px) {
+  .about-page__hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+.about-page__character {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.about-page__character .milo-dialogue {
+  position: absolute;
+  top: 0;
+  right: -1rem;
+}
+
+.about-page__greeting {
+  font-size: 2.6rem;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  margin: 0.5rem 0 0;
+  background: linear-gradient(90deg, var(--milo-text), var(--milo-accent-text));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.about-page__fullname {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--milo-text-muted);
+  margin: 0.3rem 0 1rem;
+}
+
+.about-page__pullquote {
+  color: var(--milo-accent-text);
+  font-size: 0.95rem;
+  font-style: italic;
+  border-left: 2px solid var(--milo-border-strong);
+  padding-left: 0.85rem;
+  margin: 0 0 1.25rem;
+  max-width: 32ch;
+}
+
+.about-page__talk-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.8rem 1.4rem;
+  border-radius: var(--milo-radius-md);
+  border: 1px solid var(--milo-border-strong);
+  background: var(--milo-accent-soft);
+  color: var(--milo-accent-text);
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    transform var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast),
+    background var(--milo-transition-fast);
+}
+
+.about-page__talk-link:hover {
+  background: var(--milo-surface-hover);
+  box-shadow: 0 0 14px var(--milo-accent-glow);
+}
+
+.about-page__traits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--milo-space-md);
+}
+
+.about-page__trait {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: var(--milo-space-sm);
+  align-items: start;
+  padding: var(--milo-space-sm) var(--milo-space-md);
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-border);
+  background: var(--milo-surface);
+}
+
+.about-page__trait-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-border);
+  background: var(--milo-bg-elevated);
+  color: var(--milo-accent-text);
+}
+
+.about-page__trait strong {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--milo-text);
+  margin-bottom: 0.2rem;
+}
+
+.about-page__trait p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--milo-text-muted);
+}
+
+.about-page__section {
+  margin: var(--milo-space-xl) 0;
+}
+
+.about-page__expressions-note {
+  color: var(--milo-text-faint);
+  font-size: 0.85rem;
+  margin: -0.5rem 0 var(--milo-space-md);
+}
+
+.about-page__pipeline {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--milo-space-md);
+}
+
+@media (max-width: 900px) {
+  .about-page__pipeline {
+    grid-template-columns: 1fr;
+  }
+}
+
+.about-page__pipeline-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-height: 122px;
+  padding: 0.9rem;
+}
+
+.about-page__pipeline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.about-page__pipeline-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--milo-radius-sm);
+  background: var(--milo-accent-soft);
+  color: var(--milo-accent-text);
+}
+
+.about-page__pipeline-index {
+  color: var(--milo-text-faint);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.about-page__pipeline-stage {
+  color: var(--milo-text);
+  font-size: 0.92rem;
+}
+
+.about-page__pipeline-description {
+  margin: 0;
+  color: var(--milo-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.about-page__expressions {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--milo-space-md);
+}
+
+@media (max-width: 700px) {
+  .about-page__expressions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.about-page__expression {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.about-page__expression-frame {
+  width: 100%;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--milo-border);
+  border-radius: var(--milo-radius-md);
+  background: var(--milo-bg-elevated);
+  overflow: hidden;
+}
+
+.about-page__expression-frame .milo-avatar {
+  width: 100%;
+  height: 100%;
+}
+
+.about-page__expression span {
+  font-size: 0.75rem;
+  color: var(--milo-text-muted);
+}
+
+.about-page__cta {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--milo-space-xl);
+  padding: var(--milo-space-xl);
+  overflow: hidden;
+}
+
+.about-page__cta::before {
+  content: "\201C";
+  position: absolute;
+  top: 0.25rem;
+  left: 1.25rem;
+  font-size: 3.5rem;
+  line-height: 1;
+  color: var(--milo-accent-text);
+  opacity: 0.35;
+}
+
+@media (max-width: 700px) {
+  .about-page__cta {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+.about-page__cta-milo {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.about-page__cta-milo .milo-avatar {
+  width: 140px;
+  height: 160px;
+}
+
+.about-page__cta-body h2 {
+  margin-top: 0;
+}
+
+.about-page__cta-body p {
+  color: var(--milo-text-muted);
+  max-width: 60ch;
+}
+
+.about-page__links {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 700px) {
+  .about-page__links {
+    justify-content: center;
+  }
+}
+
+.about-page__links a {
+  padding: 0.5rem 1rem;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-accent);
+  color: var(--milo-accent-text);
+  text-decoration: none;
+  transition: background var(--milo-transition-fast);
+}
+
+.about-page__links a:hover {
+  background: var(--milo-accent-soft);
+}
+
+/* MILO Lab page -- visual refinement pass: wide hero (character +
+ * copy + 3 action cards), then Quick Start | Recent Experiments |
+ * Sandbox/Stats, matching the Lab mockup's dense research-console
+ * composition instead of the earlier stack of equal generic cards. */
+.lab-page {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding-top: 0.25rem;
+}
+
+.lab-page__hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.85fr) minmax(0, 1.15fr) minmax(260px, 1.1fr);
+  align-items: center;
+  gap: var(--milo-space-xl);
+  margin: 0 0 1rem;
+  padding: var(--milo-space-lg) var(--milo-space-xl);
+  background:
+    radial-gradient(ellipse 60% 90% at 8% 50%, rgba(255, 138, 43, 0.16), transparent 65%),
+    var(--milo-bg-elevated);
+  border: 1px solid var(--milo-border);
+  border-radius: var(--milo-radius-lg);
+  overflow: hidden;
+}
+
+.lab-page__hero-character {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lab-page__hero-character .milo-avatar {
+  position: relative;
+  z-index: 1;
+}
+
+.lab-page__hero-title {
+  margin: 0 0 0.3rem;
+  font-size: 2.1rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--milo-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.lab-page__tagline {
+  margin: 0 0 0.5rem;
+  color: var(--milo-text);
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.lab-page__hero-description {
+  margin: 0;
+  color: var(--milo-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  max-width: 42ch;
+}
+
+.lab-page__hero-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.lab-page__hero-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.35rem;
+  padding: 0.9rem 0.7rem;
+  border-radius: 13px;
+  border: 1px solid var(--milo-border);
+  background: rgba(42, 24, 16, 0.02);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.lab-page__hero-card:hover {
+  border-color: var(--milo-accent);
+  box-shadow: 0 0 16px rgba(255, 138, 43, 0.16);
+}
+
+.lab-page__hero-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--milo-accent-soft);
+  color: var(--milo-accent-text);
+  margin-bottom: 0.15rem;
+}
+
+.lab-page__hero-card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--milo-text);
+}
+
+.lab-page__hero-card-desc {
+  font-size: 0.75rem;
+  color: var(--milo-text-muted);
+  line-height: 1.4;
+}
+
+.lab-page__hero-card-cta {
+  margin-top: 0.3rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--milo-accent-text);
+}
+
+@media (max-width: 1150px) {
+  .lab-page__hero {
+    grid-template-columns: minmax(140px, 0.7fr) minmax(0, 1fr);
+    grid-template-areas:
+      "character copy"
+      "actions actions";
+  }
+
+  .lab-page__hero-character {
+    grid-area: character;
+  }
+
+  .lab-page__hero-copy {
+    grid-area: copy;
+  }
+
+  .lab-page__hero-actions {
+    grid-area: actions;
+  }
+}
+
+@media (max-width: 700px) {
+  .lab-page__hero {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "character"
+      "copy"
+      "actions";
+    text-align: center;
+    padding: var(--milo-space-lg);
+  }
+
+  .lab-page__hero-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .lab-page__hero-description {
+    max-width: 100%;
+  }
+
+  .lab-page__hero-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Three-column main dashboard: Quick Start | Recent Experiments |
+ * Sandbox+Stats. */
+.lab-page__grid {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.85fr) minmax(420px, 2fr) minmax(300px, 1.1fr);
+  gap: var(--milo-space-md);
+  align-items: start;
+  margin-bottom: var(--milo-space-md);
+}
+
+/* Grid/flex items default to `min-width: auto`, which lets a wide
+ * child (the experiments table below) force its whole column --
+ * and the page -- wider instead of scrolling inside its own
+ * `overflow-x: auto` wrapper. `min-width: 0` lets that wrapper's
+ * scroll actually take effect. */
+.lab-page__quick-start,
+.lab-page__experiments,
+.lab-page__side {
+  min-width: 0;
+}
+
+@media (max-width: 1300px) {
+  .lab-page__grid {
+    grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1fr);
+    grid-template-areas:
+      "quick experiments"
+      "side side";
+  }
+
+  .lab-page__quick-start {
+    grid-area: quick;
+  }
+
+  .lab-page__experiments {
+    grid-area: experiments;
+  }
+
+  .lab-page__side {
+    grid-area: side;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--milo-space-md);
+  }
+}
+
+@media (max-width: 780px) {
+  .lab-page__grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "quick"
+      "experiments"
+      "side";
+  }
+
+  .lab-page__side {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lab-page__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--milo-space-md);
+}
+
+.lab-page__quick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lab-page__quick-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 62px;
+  padding: 0.55rem 0.75rem;
+  border-radius: 11px;
+  border: 1px solid var(--milo-border);
+  background: rgba(42, 24, 16, 0.015);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.lab-page__quick-item:hover {
+  border-color: var(--milo-accent);
+  box-shadow: 0 0 12px rgba(255, 138, 43, 0.14);
+}
+
+.lab-page__quick-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--milo-accent-soft);
+  color: var(--milo-accent-text);
+}
+
+.lab-page__quick-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.lab-page__quick-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--milo-text);
+}
+
+.lab-page__quick-desc {
+  font-size: 0.75rem;
+  color: var(--milo-text-faint);
+}
+
+.lab-page__quick-arrow {
+  flex-shrink: 0;
+  color: var(--milo-text-faint);
+}
+
+.lab-page__readonly-note {
+  font-size: 0.78rem;
+  color: var(--milo-text-faint);
+  font-style: italic;
+  margin-top: 0;
+}
+
+.lab-page__run-experiment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  width: 100%;
+  height: 42px;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-accent);
+  background: transparent;
+  color: var(--milo-accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: var(--milo-space-md);
+  transition:
+    background var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.lab-page__run-experiment:hover:not(:disabled) {
+  background: var(--milo-accent-soft);
+  box-shadow: 0 0 14px var(--milo-accent-glow);
+}
+
+.lab-page__run-experiment:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Recent Experiments -- compact technical table, horizontally
+ * scrollable inside its own container on narrow screens rather than
+ * squashing or overflowing the page (spec section 34). */
+.lab-page__table-wrap {
+  overflow-x: auto;
+}
+
+.lab-page__table {
+  min-width: 560px;
+  display: flex;
+  flex-direction: column;
+}
+
+.lab-page__table-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.6fr) 100px 110px minmax(120px, 1fr) 70px;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.4rem;
+  border-bottom: 1px solid var(--milo-border);
+  font-size: 0.85rem;
+}
+
+.lab-page__table-row--head {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--milo-text-faint);
+  border-bottom: 1px solid var(--milo-border-strong);
+}
+
+.lab-page__table-row:not(.lab-page__table-row--head):hover {
+  background: rgba(42, 24, 16, 0.02);
+}
+
+.lab-page__table-cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lab-page__exp-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color: var(--milo-text);
+}
+
+.lab-page__exp-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--milo-accent-soft);
+  color: var(--milo-accent-text);
+}
+
+.lab-page__exp-time,
+.lab-page__exp-result {
+  color: var(--milo-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.lab-page__table-empty {
+  padding: 2rem 0.5rem;
+  text-align: center;
+  color: var(--milo-text-faint);
+  font-size: 0.85rem;
+}
+
+/* Sandbox terminal. */
+.lab-page__reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--milo-border);
+  background: transparent;
+  color: var(--milo-accent-text);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color var(--milo-transition-fast);
+}
+
+.lab-page__reset:hover {
+  border-color: var(--milo-accent);
+}
+
+.lab-page__sandbox-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: var(--milo-space-sm);
+}
+
+.lab-page__sandbox-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.lab-page__sandbox-row input {
+  flex: 1;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-border);
+  background: var(--milo-bg);
+  color: inherit;
+  font: inherit;
+}
+
+.lab-page__sandbox-row input:focus {
+  outline: none;
+  border-color: var(--milo-accent);
+  box-shadow: 0 0 0 3px var(--milo-accent-soft);
+}
+
+.lab-page__sandbox-row button {
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-accent);
+  background: var(--milo-accent-soft);
+  color: var(--milo-accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lab-page__sandbox-row button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lab-page__terminal {
+  margin-top: var(--milo-space-md);
+  padding: 1rem;
+  border-radius: 11px;
+  border: 1px solid var(--milo-border);
+  background: rgba(0, 0, 0, 0.4);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.lab-page__terminal-line {
+  margin: 0 0 0.4rem;
+  color: #7fe0a8;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.lab-page__terminal-line:last-child {
+  margin-bottom: 0;
+}
+
+.lab-page__terminal-prefix {
+  color: var(--milo-accent-text);
+}
+
+.lab-page__terminal-line--muted {
+  color: var(--milo-text-faint);
+}
+
+.lab-page__terminal-line--error {
+  color: var(--milo-danger);
+}
+
+.lab-page__stat {
+  list-style: none;
+}
+
+.lab-page__stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.lab-page__stat-visual {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 11px;
+  background: var(--milo-surface);
+  border: 1px solid var(--milo-border);
+}
+
+.lab-page__stat-icon {
+  color: var(--milo-accent-text);
+}
+
+.lab-page__stat-label {
+  font-size: 0.7rem;
+  color: var(--milo-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.lab-page__stat-value {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--milo-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.lab-page__technical {
+  margin-bottom: var(--milo-space-md);
+}
+
+.lab-page__technical-list dt {
+  font-size: 0.75rem;
+  color: var(--milo-text-faint);
+  margin-top: 0.6rem;
+}
+
+.lab-page__technical-list dt:first-child {
+  margin-top: 0;
+}
+
+.lab-page__technical-list dd {
+  margin: 0.1rem 0 0;
+}
+
+/* Bottom CTA strip. */
+.lab-page__cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--milo-space-lg);
+  flex-wrap: wrap;
+  padding: var(--milo-space-lg);
+  border-radius: var(--milo-radius-lg);
+  border: 1px solid var(--milo-border);
+  background:
+    radial-gradient(ellipse 40% 120% at 0% 50%, rgba(255, 138, 43, 0.1), transparent 70%),
+    var(--milo-bg-elevated);
+}
+
+.lab-page__cta-copy {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.lab-page__cta-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--milo-accent-soft);
+  color: var(--milo-accent-text);
+  box-shadow: 0 0 12px var(--milo-accent-glow);
+}
+
+.lab-page__cta-title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--milo-text);
+}
+
+.lab-page__cta-desc {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--milo-text-muted);
+}
+
+.lab-page__cta-button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  height: 44px;
+  padding: 0 1.2rem;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-accent);
+  background: transparent;
+  color: var(--milo-accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.lab-page__cta-button:hover {
+  background: var(--milo-accent-soft);
+  box-shadow: 0 0 16px var(--milo-accent-glow);
+}
+
+/* MILO Lab page -- visual refinement pass v2 (Phase 8.6-style
+ * mockup). Overrides/extends the block above by cascade, same trick
+ * as the Memory page's own v2 section. Two things from the source
+ * mockup are deliberately NOT ported:
+ *  - Its responsive overrides (flat `grid-template-columns` swaps at
+ *    1100px/760px) would fight this page's existing named-area
+ *    responsive layout (1150px/700px for the hero, 1300px/780px for
+ *    the grid) -- that existing mechanism already works, so it's left
+ *    alone rather than layering a second, conflicting strategy.
+ *  - The mockup's hero title treats "MILO" as a wordmark image plus a
+ *    separate "LAB" mark (`.lab-page__hero-wordmark`, `__hero-lab`);
+ *    there's no `/assets/milo-wordmark-exact.png` in this repo (only
+ *    the MiloAvatar character art), so `.lab-page__hero-title` keeps
+ *    rendering its real text ("MILO Lab") -- only the dot's glow below
+ *    is picked up from that block. */
+.lab-page__hero {
+  min-height: 270px;
+  gap: 24px;
+  border-radius: 20px;
+  border: 1px solid var(--milo-border);
+  background:
+    radial-gradient(circle at 14% 55%, rgba(255, 138, 43, 0.2), transparent 32%),
+    linear-gradient(120deg, #FFE7C2, #FFF6E5);
+}
+
+.lab-page__hero-title {
+  font-size: 2.5rem;
+  letter-spacing: -0.035em;
+}
+
+.lab-page__hero-wordmark {
+  height: 2.1rem;
+}
+
+.lab-page__tagline {
+  font-size: 1.15rem;
+  color: #C2410C;
+}
+
+.lab-page__hero-description {
+  max-width: 460px;
+  color: #6B5A4E;
+  line-height: 1.6;
+}
+
+.lab-page__hero-actions {
+  gap: 12px;
+}
+
+.lab-page__hero-card {
+  border-radius: 15px;
+  background: rgba(42, 24, 16, 0.018);
+  border: 1px solid rgba(255, 138, 43, 0.12);
+  padding: 22px 18px;
+  transition:
+    transform var(--milo-transition-fast),
+    border-color var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.lab-page__hero-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 138, 43, 0.35);
+  box-shadow: 0 0 28px rgba(255, 138, 43, 0.14);
+}
+
+.lab-page__grid {
+  grid-template-columns: 300px minmax(0, 1fr) 320px;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.lab-page__quick-start .glass-card,
+.lab-page__experiments-card,
+.lab-page__sandbox-card,
+.lab-page__stats-card {
+  height: 100%;
+}
+
+.lab-page__quick-item {
+  min-height: 76px;
+  border-radius: 12px;
+}
+
+.lab-page__table-row {
+  min-height: 70px;
+}
+
+.lab-page__table-row--head {
+  min-height: 42px;
+}
+
+.lab-page__terminal {
+  min-height: 180px;
+  border-radius: 12px;
+  background: #05070b;
+  border: 1px solid rgba(82, 255, 133, 0.08);
+  box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.5);
+}
+
+.lab-page__stat-visual {
+  min-height: 100px;
+  border-radius: 13px;
+  justify-content: center;
+}
+
+.lab-page__cta {
+  margin-top: 16px;
+  border: 1px solid rgba(255, 138, 43, 0.13);
+  border-radius: 16px;
+  background: linear-gradient(90deg, rgba(255, 138, 43, 0.08), rgba(42, 24, 16, 0.015));
+}
+
+/* Settings page */
+.settings-page__header {
+  margin: var(--milo-space-lg) 0 var(--milo-space-xl);
+}
+
+.settings-page__header h1 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: 1.7rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.settings-page__header h1::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--milo-accent);
+  box-shadow: 0 0 8px var(--milo-accent-glow);
+}
+
+.settings-page__subtitle {
+  margin: 0.4rem 0 0;
+  color: var(--milo-text-muted);
+  font-size: 0.92rem;
+}
+
+.settings-page__layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 230px) minmax(0, 1fr);
+  gap: var(--milo-space-lg);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .settings-page__layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settings-page__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  position: sticky;
+  top: 5rem;
+  border: 1px solid var(--milo-border);
+  border-radius: var(--milo-radius-md);
+  background: var(--milo-surface);
+  padding: var(--milo-space-sm);
+}
+
+@media (max-width: 900px) {
+  .settings-page__nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    overflow-x: auto;
+  }
+}
+
+.settings-page__nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 42px;
+  padding: 0 0.75rem;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--milo-text-muted);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--milo-transition-fast),
+    color var(--milo-transition-fast),
+    border-color var(--milo-transition-fast);
+}
+
+.settings-page__nav-item:hover {
+  background: var(--milo-surface-hover);
+}
+
+.settings-page__nav-item--active {
+  background: var(--milo-accent-soft);
+  border-color: var(--milo-border-strong);
+  color: var(--milo-text);
+  box-shadow: 0 0 10px rgba(255, 138, 43, 0.12);
+}
+
+.settings-page__nav-item--active .settings-icon {
+  color: var(--milo-accent-text);
+}
+
+.settings-page__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--milo-space-lg);
+}
+
+.settings-page__anchor {
+  scroll-margin-top: 5rem;
+}
+
+.settings-page__section label {
+  display: block;
+  margin: 0.6rem 0 0.2rem;
+  font-size: 0.85rem;
+  color: var(--milo-text-muted);
+}
+
+.settings-page__section input[type="text"],
+.settings-page__section select {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
+  padding: 0.5rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid var(--milo-border);
+  background: var(--milo-bg-elevated);
+  color: var(--milo-text);
+  font: inherit;
+  transition: border-color var(--milo-transition-fast);
+}
+
+.settings-page__section input[type="text"]:focus,
+.settings-page__section select:focus {
+  outline: none;
+  border-color: var(--milo-accent);
+  box-shadow: 0 0 0 3px var(--milo-accent-soft);
+}
+
+/* Custom MILO toggle -- the underlying <input type="checkbox"> keeps its
+ * real semantics/handlers (`updateGeneral`/`updateNotifications`); only
+ * its appearance is replaced, so screen readers and existing tests
+ * (which interact via label/role, never the native visual box) are
+ * unaffected. */
+.settings-page__section label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 0 0;
+  color: var(--milo-text);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.settings-page__section input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+  margin: 0;
+  border-radius: 999px;
+  border: 1px solid var(--milo-border);
+  background: var(--milo-bg);
+  cursor: pointer;
+  transition: background var(--milo-transition-medium), border-color var(--milo-transition-medium);
+}
+
+.settings-page__section input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--milo-text-faint);
+  transition: transform var(--milo-transition-medium), background var(--milo-transition-medium);
+}
+
+.settings-page__section input[type="checkbox"]:checked {
+  background: var(--milo-accent);
+  border-color: var(--milo-accent);
+  box-shadow: 0 0 10px var(--milo-accent-glow);
+}
+
+.settings-page__section input[type="checkbox"]:checked::after {
+  transform: translateX(16px);
+  background: white;
+}
+
+.settings-page__section input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--milo-accent);
+  outline-offset: 2px;
+}
+
+.settings-page__readonly-note {
+  font-size: 0.8rem;
+  color: var(--milo-text-faint);
+  font-style: italic;
+}
+
+.settings-page__section dl {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.settings-page__section dt {
+  color: var(--milo-text-muted);
+  font-size: 0.85rem;
+}
+
+.settings-page__section dd {
+  margin: 0;
+  color: var(--milo-text);
+}
+
+.settings-page__voice-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin-top: var(--milo-space-md);
+}
+
+.settings-page__voice-status > span {
+  font-size: 0.85rem;
+  color: var(--milo-text-muted);
+}
+
+.settings-page__section button {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--milo-radius-sm);
+  border: 1px solid var(--milo-danger);
+  background: transparent;
+  color: var(--milo-danger);
+  cursor: pointer;
+}
+
+/* Settings page -- visual refinement pass v2 (Phase 8.6-style
+ * mockup). Overrides/extends the block above by cascade, same trick
+ * as the Memory/Lab/Mission Control pages' own v2 sections. The
+ * source mockup's header (`.settings-header`, `.top-nav`,
+ * `.brand`, `.ready-pill`, `.header-avatar`,
+ * `.compact-reference-header`) is deliberately NOT ported: this app
+ * has exactly one `NavBar`, mounted once in `App.tsx` above every
+ * route, so it already renders identically on all seven pages --
+ * adding a second, page-specific header here would be the one thing
+ * that actually breaks that consistency. Likewise the mockup's
+ * "MILO At a Glance" / "Quick Toggles" / save-bar / "Reset MILO"
+ * panels aren't ported: they have no backing state in
+ * `SettingsContext`/the backend (there's no memory-reset endpoint,
+ * no "always listen" flag, etc.), and this page's own rule is to
+ * never wire a control to nothing (see its file header). Only the
+ * content area's real elements (category nav, inputs, toggle,
+ * buttons) are restyled below. */
+.settings-page__nav-item--active {
+  background: linear-gradient(90deg, rgba(255, 138, 43, 0.2), rgba(255, 138, 43, 0.04));
+  border-color: transparent;
+  box-shadow: inset 3px 0 0 var(--milo-accent);
+}
+
+.settings-page__card .glass-card__title {
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+}
+
+.settings-page__section input[type="text"],
+.settings-page__section select {
+  height: 44px;
+  border-radius: 11px;
+  border-color: rgba(255, 138, 43, 0.14);
+  background: #080a13;
+}
+
+.settings-page__section input[type="checkbox"] {
+  width: 44px;
+  height: 24px;
+}
+
+.settings-page__section input[type="checkbox"]:checked {
+  background: linear-gradient(90deg, #FF8A2B, #FF8A2B);
+}
+
+.settings-page__section button {
+  border-radius: 10px;
+  border-color: rgba(169, 67, 73, 0.7);
+  background: rgba(77, 20, 24, 0.13);
+}
+
+.settings-page__section button:hover {
+  background: rgba(255, 93, 97, 0.14);
+}
+
+/* ==================================================================
+ * Phase 8.2/8.3 shared components
+ *
+ * Styles for the reusable components (MiloAvatar, MiloPresence,
+ * MiloStateIndicator, GlassCard, StatusPill, SectionHeader,
+ * MiloDialogue, VoiceButton) -- built from the --milo-* tokens defined
+ * at the top of this file. Page-specific layout for each rebuilt page
+ * lives in its own section further below.
+ * ================================================================== */
+
+/* -- MiloAvatar (Phase 8.3) ------------------------------------------
+ * Renders the real MOCKUPS/MILO reference artwork (copied into
+ * /public/assets/milo/, see that directory's own note) -- the image
+ * IS MILO's identity; everything below only adds restrained motion
+ * around it (glow pulse, breathing, bob, shake), matching each
+ * reference image's own character (calm when idle, alert when
+ * listening, mid-stride when executing, arms-up when success, etc.)
+ * rather than a generic animation swapped onto a generic robot.
+ * -------------------------------------------------------------------- */
+
+.milo-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.milo-avatar--sm {
+  width: 40px;
+  height: 40px;
+}
+
+.milo-avatar--md {
+  width: 140px;
+  height: 160px;
+}
+
+.milo-avatar--lg {
+  width: 260px;
+  height: 300px;
+}
+
+.milo-avatar__image {
+  position: relative;
+  z-index: 1;
+  max-width: 82%;
+  max-height: 88%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.5));
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* The supplied reference art is a flat (non-transparent) render with
+ * its own dark backdrop baked in -- at small sizes that backdrop reads
+ * as part of the ambient glow, but at hero scale (lg/md) its square
+ * edge becomes a visible "image box" the design spec explicitly calls
+ * out to avoid. A wide, early-starting radial mask fades most of the
+ * frame's outer field to transparent -- paired with `.milo-avatar__
+ * art-glow` (a blurred, color-matched blob sitting directly behind the
+ * image at the same tone as its baked-in vignette), so what the mask
+ * reveals is the *same* color as what it's fading from, not a hard cut
+ * to a different background. */
+.milo-avatar--lg .milo-avatar__image,
+.milo-avatar--md .milo-avatar__image {
+  /* The character fills nearly the entire supplied frame (measured
+   * bounding box ~6-94% on both axes), so a single radial/elliptical
+   * mask can't work here: its contour reaches 100% (no fade at all)
+   * exactly at each side's midpoint -- which is precisely where the
+   * frame's hard top/bottom/left/right edges sit -- so the rectangle
+   * stayed visible along the sides even as the corners softened. A
+   * rectangular vignette (independent left/right and top/bottom
+   * fades, intersected) feathers all four edges evenly instead,
+   * without eating into the character's actual silhouette. */
+  mask-image:
+    linear-gradient(to right, transparent, black 7%, black 93%, transparent),
+    linear-gradient(to bottom, transparent, black 7%, black 93%, transparent);
+  mask-composite: intersect;
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, black 7%, black 93%, transparent),
+    linear-gradient(to bottom, transparent, black 7%, black 93%, transparent);
+  -webkit-mask-composite: source-in;
+}
+
+.milo-avatar__art-glow {
+  position: absolute;
+  inset: 6%;
+  z-index: 0;
+  border-radius: 16%;
+  background: var(--milo-art-backdrop);
+  filter: blur(24px);
+  pointer-events: none;
+}
+
+.milo-avatar__glow {
+  position: absolute;
+  inset: 6%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--milo-accent-glow), transparent 70%);
+  filter: blur(16px);
+  opacity: 0.5;
+  transition:
+    opacity var(--milo-transition-medium),
+    background var(--milo-transition-medium);
+}
+
+/* Idle: calm -- slow ambient glow pulse + a very subtle float, never
+ * an aggressive movement (per the IDLE reference's restful pose). */
+.milo-avatar--state-idle .milo-avatar__glow {
+  animation: milo-glow-soft 3.6s ease-in-out infinite;
+}
+.milo-avatar--state-idle .milo-avatar__image {
+  animation: milo-float 4.8s ease-in-out infinite;
+}
+
+.milo-avatar--state-offline .milo-avatar__glow {
+  opacity: 0;
+}
+.milo-avatar--state-offline .milo-avatar__image {
+  filter: grayscale(0.6) brightness(0.55);
+}
+
+.milo-avatar--state-initializing .milo-avatar__glow {
+  animation: milo-glow-soft 1.8s ease-in-out infinite;
+}
+.milo-avatar--state-initializing .milo-avatar__image {
+  animation: milo-float 2.4s ease-in-out infinite;
+}
+
+/* Listening: active, alert -- faster glow pulse (the LISTENING
+ * reference's raised-hand/attentive pose already communicates the
+ * state; motion here just makes it feel "live"). */
+.milo-avatar--state-listening .milo-avatar__glow {
+  background: radial-gradient(circle, var(--milo-info), transparent 70%);
+  animation: milo-glow-active 1s ease-in-out infinite;
+}
+.milo-avatar--state-listening .milo-avatar__image {
+  animation: milo-sway 1.6s ease-in-out infinite;
+}
+
+/* Thinking/understanding/planning/reflecting: restrained processing
+ * feel -- gentle sway, no spinner. */
+.milo-avatar--state-thinking .milo-avatar__glow,
+.milo-avatar--state-understanding .milo-avatar__glow,
+.milo-avatar--state-planning .milo-avatar__glow,
+.milo-avatar--state-reflecting .milo-avatar__glow {
+  animation: milo-glow-soft 1.6s ease-in-out infinite;
+}
+.milo-avatar--state-thinking .milo-avatar__image,
+.milo-avatar--state-understanding .milo-avatar__image,
+.milo-avatar--state-planning .milo-avatar__image,
+.milo-avatar--state-reflecting .milo-avatar__image {
+  animation: milo-sway 2.6s ease-in-out infinite;
+}
+
+/* Recalling memory: same restrained sway as thinking, but a
+ * distinct amber tint so retrieving real memories (a genuinely
+ * different backend stage, `retrieving_memory`) reads as its own
+ * moment rather than generic "thinking". */
+.milo-avatar--state-recalling_memory .milo-avatar__glow {
+  background: radial-gradient(circle, #FFB347, transparent 70%);
+  animation: milo-glow-soft 1.6s ease-in-out infinite;
+}
+.milo-avatar--state-recalling_memory .milo-avatar__image {
+  animation: milo-sway 2.6s ease-in-out infinite;
+}
+
+/* Replanning: a real recoverable failure is being corrected -- same
+ * restrained sway as thinking, but the warning-amber tint (not the
+ * calm accent-purple) so it visibly reads as "something needs
+ * attention," without a flashing/urgent treatment. */
+.milo-avatar--state-replanning .milo-avatar__glow {
+  background: radial-gradient(circle, var(--milo-warning), transparent 70%);
+  animation: milo-glow-soft 1.6s ease-in-out infinite;
+}
+.milo-avatar--state-replanning .milo-avatar__image {
+  animation: milo-sway 2.6s ease-in-out infinite;
+}
+
+/* Perceiving: MILO's Eyes panel elsewhere already shows the live feed
+ * -- the character itself stays in its calm idle motion. */
+.milo-avatar--state-perceiving .milo-avatar__glow {
+  animation: milo-glow-soft 3.6s ease-in-out infinite;
+}
+
+/* Pausing: a real cancel request is in flight -- fading, not idle's
+ * cheerful float, so the moment MILO is winding down reads distinctly
+ * from "ready and waiting". */
+.milo-avatar--state-pausing .milo-avatar__glow {
+  animation: milo-glow-fade 1s ease-out 1;
+}
+.milo-avatar--state-pausing .milo-avatar__image {
+  animation: none;
+  opacity: 0.75;
+}
+
+/* Executing/navigating: motion, not a loading spinner -- a quick bob
+ * that reads as "in motion," echoing the EXECUTING reference's
+ * mid-stride pose and speed lines. */
+.milo-avatar--state-executing .milo-avatar__glow,
+.milo-avatar--state-navigating .milo-avatar__glow {
+  animation: milo-glow-active 0.8s ease-in-out infinite;
+}
+.milo-avatar--state-executing .milo-avatar__image,
+.milo-avatar--state-navigating .milo-avatar__image {
+  animation: milo-bob 0.6s ease-in-out infinite;
+}
+
+/* Speaking: gentle nod in time with dialogue, synchronized externally
+ * with TTS playback (VoiceContext / MiloDialogue). */
+.milo-avatar--state-speaking .milo-avatar__glow {
+  background: radial-gradient(circle, var(--milo-info), transparent 70%);
+  animation: milo-glow-active 0.7s ease-in-out infinite;
+}
+.milo-avatar--state-speaking .milo-avatar__image {
+  animation: milo-nod 0.9s ease-in-out infinite;
+}
+
+/* Success: one bounce-in celebration, then settle -- brief, not a
+ * looping animation (the reference's raised-arms pose is already the
+ * payoff; it should not endlessly bob). */
+.milo-avatar--state-success .milo-avatar__glow {
+  background: radial-gradient(circle, var(--milo-success), transparent 70%);
+  opacity: 0.7;
+}
+.milo-avatar--state-success .milo-avatar__image {
+  animation: milo-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 1;
+}
+
+/* Error: MILO's own appearance is preserved (per the reference) --
+ * one restrained shake and a single soft red pulse, never a flashing
+ * red warning treatment. */
+.milo-avatar--state-error .milo-avatar__glow {
+  background: radial-gradient(circle, var(--milo-danger), transparent 70%);
+  animation: milo-glow-error 1.8s ease-out 1;
+}
+.milo-avatar--state-error .milo-avatar__image {
+  animation: milo-shake 0.5s ease-in-out 1;
+}
+
+@keyframes milo-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes milo-sway {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-2px) rotate(-1deg);
+  }
+}
+
+@keyframes milo-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes milo-nod {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-1px) scale(1.015);
+  }
+}
+
+@keyframes milo-pop {
+  0% {
+    transform: scale(0.94);
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes milo-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes milo-glow-soft {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes milo-glow-active {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes milo-glow-error {
+  0% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes milo-glow-fade {
+  0% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0.2;
+  }
+}
+
+/* -- MiloPresence (Phase 8.3) ---------------------------------------- */
+
+.milo-presence {
+  /* Deliberately NOT `position: relative` -- `.milo-presence__dialogue`
+   * is absolutely positioned, and pages that place it (e.g. AboutPage's
+   * `.about-page__character`) already establish their own positioning
+   * context sized for the bubble. If this were the containing block
+   * instead, the bubble would be constrained to this element's own
+   * shrink-to-fit width (just the avatar's width) and wrap to a
+   * single narrow column. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--milo-space-sm);
+}
+
+.milo-presence__dialogue {
+  position: absolute;
+  top: 0.5rem;
+  left: calc(100% - 1rem);
+}
+
+@media (max-width: 640px) {
+  .milo-presence__dialogue {
+    position: static;
+  }
+}
+
+/* -- MiloStateIndicator (Phase 8.3) ----------------------------------- */
+
+.milo-state-indicator {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.milo-state-indicator__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--milo-text);
+}
+
+.milo-state-indicator__description {
+  font-size: 0.85rem;
+  color: var(--milo-text-muted);
+}
+
+.milo-state-indicator--success .milo-state-indicator__title {
+  color: var(--milo-success);
+}
+
+.milo-state-indicator--error .milo-state-indicator__title {
+  color: var(--milo-danger);
+}
+
+.milo-state-indicator--listening .milo-state-indicator__title,
+.milo-state-indicator--speaking .milo-state-indicator__title {
+  color: var(--milo-info);
+}
+
+.milo-state-indicator--thinking .milo-state-indicator__title,
+.milo-state-indicator--understanding .milo-state-indicator__title,
+.milo-state-indicator--planning .milo-state-indicator__title,
+.milo-state-indicator--reflecting .milo-state-indicator__title,
+.milo-state-indicator--executing .milo-state-indicator__title,
+.milo-state-indicator--navigating .milo-state-indicator__title,
+.milo-state-indicator--perceiving .milo-state-indicator__title {
+  color: var(--milo-accent-text);
+}
+
+.milo-state-indicator--recalling_memory .milo-state-indicator__title {
+  color: #FFB347;
+}
+
+.milo-state-indicator--replanning .milo-state-indicator__title {
+  color: var(--milo-warning);
+}
+
+.milo-state-indicator--pausing .milo-state-indicator__title {
+  color: var(--milo-text-muted);
+}
+
+/* -- GlassCard ------------------------------------------------------- */
+
+.glass-card {
+  position: relative;
+  background: linear-gradient(180deg, rgba(42, 24, 16, 0.045), rgba(42, 24, 16, 0.015)),
+    var(--milo-surface);
+  border: 1px solid var(--milo-border);
+  border-radius: var(--milo-radius-md);
+  box-shadow: var(--milo-shadow-card);
+  padding: var(--milo-space-lg);
+  backdrop-filter: blur(12px);
+  transition:
+    background var(--milo-transition-fast),
+    border-color var(--milo-transition-fast),
+    transform var(--milo-transition-fast),
+    box-shadow var(--milo-transition-fast);
+}
+
+.glass-card:hover {
+  background: linear-gradient(180deg, rgba(42, 24, 16, 0.06), rgba(42, 24, 16, 0.02)),
+    var(--milo-surface-hover);
+  border-color: var(--milo-border-strong);
+  box-shadow:
+    var(--milo-shadow-card),
+    0 0 0 1px rgba(255, 138, 43, 0.08);
+}
+
+/* -- Shared ambient/hero utilities (used by Home, About, Memory, Lab) - */
+
+.milo-glow-orb {
+  position: absolute;
+  inset: -10%;
+  z-index: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--milo-accent-glow), transparent 68%);
+  filter: blur(40px);
+  opacity: 0.55;
+  pointer-events: none;
+  animation: milo-glow-soft 5s ease-in-out infinite;
+}
+
+.milo-hero-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--milo-border);
+  border-radius: var(--milo-radius-lg);
+  background:
+    radial-gradient(ellipse 55% 75% at 54% 62%, rgba(255, 138, 43, 0.2), transparent 65%),
+    radial-gradient(ellipse 60% 50% at 78% 12%, rgba(255, 138, 43, 0.1), transparent 60%),
+    var(--milo-bg-elevated);
+  box-shadow: var(--milo-shadow-card);
+  padding: var(--milo-space-xl);
+}
+
+.milo-example-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--milo-space-sm);
+}
+
+.home-icon {
+  flex-shrink: 0;
+  color: var(--milo-accent-text);
+  opacity: 0.85;
+}
+
+.milo-example-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.5em 0.9em;
+  border-radius: 999px;
+  border: 1px solid var(--milo-border);
+  background: var(--milo-surface);
+  color: var(--milo-text-muted);
+  font-size: 0.85rem;
+}
+
+.glass-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--milo-space-md);
+}
+
+.glass-card__title {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--milo-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+}
+
+.glass-card__title::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--milo-accent);
+  opacity: 0.8;
+}
+
+.glass-card__title-action {
+  font-size: 0.85rem;
+  color: var(--milo-accent-text);
+}
+
+.glass-card__body {
+  color: var(--milo-text);
+}
+
+/* -- StatusPill -------------------------------------------------------- */
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.75em;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.status-pill__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-pill--neutral {
+  background: rgba(42, 24, 16, 0.06);
+  border-color: rgba(42, 24, 16, 0.12);
+  color: var(--milo-text-muted);
+}
+
+.status-pill--accent {
+  background: var(--milo-accent-soft);
+  border-color: var(--milo-border-strong);
+  color: var(--milo-accent-text);
+}
+
+.status-pill--success {
+  background: var(--milo-success-soft);
+  border-color: rgba(74, 222, 128, 0.35);
+  color: var(--milo-success);
+}
+
+.status-pill--danger {
+  background: var(--milo-danger-soft);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: var(--milo-danger);
+}
+
+.status-pill--warning {
+  background: var(--milo-warning-soft);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: var(--milo-warning);
+}
+
+.status-pill--info {
+  background: var(--milo-info-soft);
+  border-color: rgba(255, 179, 71, 0.35);
+  color: var(--milo-info);
+}
+
+/* -- SectionHeader ----------------------------------------------------- */
+
+.section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--milo-space-lg);
+  margin-bottom: var(--milo-space-xl);
+}
+
+.section-header__eyebrow {
+  margin: 0 0 var(--milo-space-xs);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--milo-accent-text);
+}
+
+.section-header__title {
+  margin: 0;
+  font-size: 2.25rem;
+  font-weight: 600;
+  color: var(--milo-text);
+  letter-spacing: -0.01em;
+}
+
+.section-header__description {
+  margin: var(--milo-space-sm) 0 0;
+  color: var(--milo-text-muted);
+  max-width: 60ch;
+}
+
+/* -- MiloDialogue -------------------------------------------------------- */
+
+.milo-dialogue {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--milo-space-xs);
+  /* `min-width` matters specifically when this is absolutely
+   * positioned near the right edge of a narrow containing block (e.g.
+   * MiloPresence's hero placement) -- shrink-to-fit sizing would
+   * otherwise clamp it down to whatever space is left and wrap the
+   * bubble to one word per line. Safe to overflow its container here:
+   * it's a decorative overlay, not in-flow content. */
+  min-width: 200px;
+  max-width: 320px;
+}
+
+.milo-dialogue__caption {
+  font-size: 0.8rem;
+  color: var(--milo-accent-text);
+  font-style: italic;
+}
+
+.milo-dialogue__bubble {
+  background: var(--milo-surface-hover);
+  border: 1px solid var(--milo-border-strong);
+  border-radius: var(--milo-radius-md);
+  padding: var(--milo-space-md);
+  color: var(--milo-text);
+  box-shadow: var(--milo-shadow-glow);
+  animation: milo-dialogue-in var(--milo-transition-medium);
+}
+
+@keyframes milo-dialogue-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* -- VoiceButton --------------------------------------------------------- */
+
+.voice-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--milo-border-strong);
+  background: var(--milo-surface);
+  color: var(--milo-text);
+  cursor: pointer;
+  transition:
+    background var(--milo-transition-fast),
+    color var(--milo-transition-fast),
+    border-color var(--milo-transition-fast);
+}
+
+.voice-button:hover:not(:disabled) {
+  background: var(--milo-accent-soft);
+  border-color: var(--milo-accent);
+}
+
+.voice-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.voice-button--listening {
+  background: var(--milo-accent);
+  color: #0a0a10;
+  border-color: var(--milo-accent);
+}
+
+.voice-button--error {
+  border-color: var(--milo-danger);
+  color: var(--milo-danger);
+}
+
+.voice-button__icon {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+}
+
+.voice-button__ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--milo-accent);
+  animation: milo-voice-ring 1.2s ease-out infinite;
+}
+
+@keyframes milo-voice-ring {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}

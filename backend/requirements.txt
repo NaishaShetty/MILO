@@ -110,3 +110,9 @@ httpx>=0.27
 # stub packages would fix is instead suppressed per-module in
 # pyproject.toml's [[tool.mypy.overrides]] -- see that section's
 # comment for the full story.
+
+# Language-model planner for novel tasks (0.x supports Python 3.9)
+anthropic>=0.125,<1
+
+# Learned models (outcome predictor, parser, world model); needed by their tests
+scikit-learn>=1.4

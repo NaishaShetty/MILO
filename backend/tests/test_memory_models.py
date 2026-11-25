@@ -35,11 +35,13 @@ def test_memory_provenance_covers_required_sources():
         "inference",
         "reflection",
         "system",
+        "skill",
+        "imported",
     }
 
 
-def test_memory_status_covers_active_and_archived():
-    assert {s.value for s in MemoryStatus} == {"active", "archived"}
+def test_memory_status_covers_active_archived_and_quarantined():
+    assert {s.value for s in MemoryStatus} == {"active", "archived", "quarantined"}
 
 
 def test_valid_memory_constructs_with_sensible_defaults():

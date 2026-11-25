@@ -27,7 +27,8 @@ matching label simply reports `found=False`.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+import inspect
+from typing import Any, Dict, List, Optional
 
 from agents.base import BaseAgent
 from agents.contracts import AgentError, AgentRequest, AgentResponse, AgentState
@@ -45,12 +46,64 @@ class VisionAgentWrapper(BaseAgent):
         super().__init__()
         self._vision_agent = vision_agent
 
-    def perceive(self, prompt: str) -> Scene:
+    def perceive(self, prompt: str, *, include_masks: bool = True) -> Scene:
+        """Full perception (masks included) -- what the Vision panel wants."""
         self._state = AgentState.ACTIVE
         try:
-            return self._vision_agent.perceive(prompt)
+            if include_masks or not self._supports_include_masks():
+                return self._vision_agent.perceive(prompt)
+            return self._vision_agent.perceive(prompt, include_masks=False)
         finally:
             self._state = AgentState.IDLE
+
+    def _supports_include_masks(self) -> bool:
+        """True if the wrapped agent's `perceive()` accepts `include_masks`
+        (a duck-typed/older agent may not -- it then just runs in full)."""
+        try:
+            params = inspect.signature(self._vision_agent.perceive).parameters
+        except (TypeError, ValueError):
+            return False
+        return "include_masks" in params or any(
+            p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
+        )
+
+    def observe(self, prompt: str) -> Scene:
+        """
+        Cheap perception for the planning loop: everything
+        `ground_world_state` reads (labels, depth, open/closed state)
+        without the segmenter. See `PerceptionPipeline.process`.
+        """
+        return self.perceive(prompt, include_masks=False)
+
+    def held_objects(self) -> Optional[List[str]]:
+        """
+        The simulator's own `inventoryObjects` as object types
+        (`["Apple"]`; `[]` when the hand is empty), or `None` when the
+        simulator or its metadata does not report that field -- the
+        caller should then fall back to the depth-based held-object
+        guess.
+        """
+        simulator = getattr(self._vision_agent, "simulator", None)
+        if simulator is None:
+            return None
+        try:
+            metadata = simulator.get_metadata()
+        except Exception:
+            return None
+        if not isinstance(metadata, dict) or "inventoryObjects" not in metadata:
+            return None
+        inventory = metadata.get("inventoryObjects") or []
+        held: List[str] = []
+        for item in inventory:
+            if not isinstance(item, dict):
+                continue
+            # AI2-THOR ids look like "Apple|+01.2|+00.9|-02.1".
+            name = (
+                item.get("objectType") or str(item.get("objectId") or "").split("|")[0]
+            )
+            if name:
+                held.append(str(name))
+        return held
 
     def locate(self, label: str, *, prompt: Optional[str] = None) -> Dict[str, Any]:
         """

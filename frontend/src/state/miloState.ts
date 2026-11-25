@@ -41,50 +41,6 @@ export type MiloState =
   | "error"
   | "pausing";
 
-/** The eight real asset files under /assets/milo/ (Phase 8.3). */
-export type MiloVisual =
-  | "idle"
-  | "listening"
-  | "thinking"
-  | "speaking"
-  | "executing"
-  | "success"
-  | "error";
-
-export const MILO_ASSET_SRC: Record<MiloVisual, string> = {
-  idle: "/assets/milo/milo-idle.png",
-  listening: "/assets/milo/milo-listening.png",
-  thinking: "/assets/milo/milo-thinking.png",
-  speaking: "/assets/milo/milo-speaking.png",
-  executing: "/assets/milo/milo-executing.png",
-  success: "/assets/milo/milo-success.png",
-  error: "/assets/milo/milo-error.png",
-};
-
-// Logical state -> which of the eight supplied reference images best
-// communicates it. "offline" also renders the idle pose (dimmed via
-// CSS -- see MiloAvatar.css rules -- rather than a nonexistent ninth
-// asset).
-export const VISUAL_FOR_STATE: Record<MiloState, MiloVisual> = {
-  offline: "idle",
-  initializing: "idle",
-  idle: "idle",
-  listening: "listening",
-  understanding: "thinking",
-  thinking: "thinking",
-  planning: "thinking",
-  recalling_memory: "thinking",
-  perceiving: "idle",
-  navigating: "executing",
-  executing: "executing",
-  replanning: "thinking",
-  reflecting: "thinking",
-  speaking: "speaking",
-  success: "success",
-  error: "error",
-  pausing: "idle",
-};
-
 export const MILO_STATE_LABELS: Record<MiloState, string> = {
   offline: "MILO is offline",
   initializing: "MILO is waking up",

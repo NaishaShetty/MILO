@@ -28,7 +28,8 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 
 from api.models.memory import (
     MemoryListResponse,
@@ -36,7 +37,7 @@ from api.models.memory import (
     MemorySearchResult,
 )
 from memory.agent import MemoryAgent, MemoryQueryContext
-from memory.models import MemoryType
+from memory.models import Memory, MemoryType
 
 router = APIRouter()
 
@@ -125,4 +126,92 @@ def list_memory(
         if memory_type is not None
         else all_memories
     )
-    return MemoryListResponse(memories=filtered[:limit], counts_by_type=counts_by_type)
+    from memory.trust import describe
+
+    shown = filtered[:limit]
+    return MemoryListResponse(
+        memories=shown,
+        counts_by_type=counts_by_type,
+        trust={m.memory_id: describe(m) for m in shown},
+        quarantined=sum(m.status.value == "quarantined" for m in all_memories),
+    )
+
+
+class EditMemory(BaseModel):
+    content: Optional[str] = Field(default=None, max_length=500)
+    place: Optional[str] = Field(default=None, max_length=80)
+    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    pinned: Optional[bool] = None
+    quarantined: Optional[bool] = None
+
+
+def _missing() -> HTTPException:
+    return HTTPException(
+        status_code=404,
+        detail={
+            "category": "memory_not_found",
+            "message": "I don't have a memory like that.",
+        },
+    )
+
+
+@router.patch(
+    "/{memory_id}", response_model=Memory, summary="Fix, pin, or set aside a memory"
+)
+def edit_memory(
+    memory_id: str,
+    body: EditMemory,
+    memory_agent: MemoryAgent = Depends(get_memory_agent),
+) -> Memory:
+    m: Optional[Memory] = memory_agent.get(memory_id)
+    if m is None:
+        raise _missing()
+    if body.content or body.place or body.confidence is not None:
+        m = memory_agent.edit(
+            memory_id,
+            content=body.content,
+            place=body.place,
+            confidence=body.confidence,
+        )
+    if body.pinned is not None:
+        m = memory_agent.set_pinned(memory_id, body.pinned)
+    if body.quarantined is not None:
+        m = memory_agent.set_quarantined(memory_id, body.quarantined)
+    if m is None:
+        raise _missing()
+    return m
+
+
+@router.delete("/{memory_id}", summary="Delete a memory for good")
+def delete_memory(
+    memory_id: str, memory_agent: MemoryAgent = Depends(get_memory_agent)
+) -> dict:
+    if not memory_agent.delete(memory_id):
+        raise _missing()
+    return {"deleted": memory_id}
+
+
+@router.post(
+    "/{memory_id}/forget",
+    response_model=Memory,
+    summary="Forget a memory",
+    description=(
+        "Archives the memory so MILO stops using it -- in planning, "
+        "retrieval and tidy-up -- without deleting it. Safe to call twice. "
+        'Backs the "Forget this" button on each memory card.'
+    ),
+    responses={404: {"description": "No memory with that id."}},
+)
+def forget_memory(
+    memory_id: str, memory_agent: MemoryAgent = Depends(get_memory_agent)
+) -> Memory:
+    forgotten = memory_agent.forget(memory_id)
+    if forgotten is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "category": "memory_not_found",
+                "message": "I don't have a memory like that. It may already be gone.",
+            },
+        )
+    return forgotten

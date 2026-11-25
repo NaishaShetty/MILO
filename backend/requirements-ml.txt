@@ -1,0 +1,5 @@
+# Optional ML extras (learned models). Not needed to run MILO.
+scikit-learn>=1.4
+ultralytics>=8.3
+onnx>=1.16
+onnxruntime-gpu>=1.19   # or onnxruntime for CPU only

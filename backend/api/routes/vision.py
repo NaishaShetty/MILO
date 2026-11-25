@@ -176,7 +176,11 @@ def perceive(
     body: PerceiveRequest,
     vision_system: VisionSystem = Depends(get_vision_system),
 ) -> PerceiveResponse:
-    scene = vision_system.agent.perceive(body.prompt)
+    scene = (
+        vision_system.agent.perceive(body.prompt)
+        if body.include_masks
+        else vision_system.agent.perceive(body.prompt, include_masks=False)
+    )
     image = vision_system.agent.get_rgb_image()
 
     changes = vision_system.temporal_scene.update(scene, tracker=vision_system.tracker)

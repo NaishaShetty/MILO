@@ -65,6 +65,7 @@ from __future__ import annotations
 import os
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -98,6 +99,8 @@ _DEFAULT_PROVENANCE_SCORES: Dict[MemoryProvenance, float] = {
     MemoryProvenance.SYSTEM: 0.7,
     MemoryProvenance.INFERENCE: 0.6,
     MemoryProvenance.REFLECTION: 0.5,
+    MemoryProvenance.SKILL: 0.6,
+    MemoryProvenance.IMPORTED: 0.2,
 }
 
 _SECONDS_PER_DAY = 86400.0
@@ -354,7 +357,11 @@ class RetrievalEngine:
         vector_store: VectorStore,
         embedder: Embedder,
         weights: Optional[RankingWeights] = None,
+        reranker=None,
     ) -> None:
+        #: Optional learned reranker (`learning.retrieval.reranker`) applied to the
+        #: top candidates; any failure leaves the weighted-score order untouched.
+        self._reranker = reranker
         self._manager = manager
         self._vector_store = vector_store
         self._embedder = embedder
@@ -412,8 +419,18 @@ class RetrievalEngine:
         indexed.
         """
         memories = self._manager.list()
-        for memory in memories:
-            self.index_memory(memory)
+        texts = [canonical_text(memory) for memory in memories]
+        vectors = self._embedder.embed_batch(texts) if texts else []
+        items = [
+            (memory.memory_id, vector, {"memory_type": memory.memory_type.value})
+            for memory, vector in zip(memories, vectors)
+        ]
+        upsert_many = getattr(self._vector_store, "upsert_many", None)
+        if upsert_many is not None:
+            upsert_many(items)
+        else:
+            for memory_id, vector, metadata in items:
+                self._vector_store.upsert(memory_id, vector, metadata=metadata)
         return len(memories)
 
     # -- retrieval --------------------------------------------------
@@ -445,11 +462,16 @@ class RetrievalEngine:
         )
         raw_candidates = self._vector_store.search(query_vector, top_k=pool_size)
 
+        # One batched read for the whole candidate pool, not one `get`
+        # (and one SQLite connection) per candidate.
+        qualifying = [
+            c for c in raw_candidates if c.score >= self._weights.similarity_threshold
+        ]
+        fetched = self._manager.get_many([c.memory_id for c in qualifying])
+
         results: List[MemoryResult] = []
-        for candidate in raw_candidates:
-            if candidate.score < self._weights.similarity_threshold:
-                continue
-            memory = self._manager.get(candidate.memory_id)
+        for candidate in qualifying:
+            memory = fetched.get(candidate.memory_id)
             if memory is None:
                 # Vector store and structured store have drifted (e.g.
                 # a memory was deleted via the structured store
@@ -481,6 +503,8 @@ class RetrievalEngine:
         results.sort(
             key=lambda r: (-r.final_score, -r.memory.created_at, r.memory.memory_id)
         )
+        if self._reranker is not None and len(results) > 1:
+            results = self._reranker.rescore(query, results[: max(top_k * 3, 20)])
         top_results = results[:top_k]
         for rank, result in enumerate(top_results):
             result.retrieval_metadata["rank"] = rank
@@ -568,4 +592,27 @@ def build_retrieval_engine(
         memory_config.vector_store_path / "vectors.db",
         dimension=embedder.dimension,
     )
-    return RetrievalEngine(manager, vector_store, embedder, weights=weights)
+    reranker = None
+    if os.environ.get("MEMORY_LEARNED_RERANKER", "0").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        from learning.retrieval.reranker import RetrievalReranker
+
+        reranker = RetrievalReranker.load(
+            Path(
+                os.environ.get(
+                    "MEMORY_RERANKER_PATH", "artifacts/memory_embedder/reranker.pkl"
+                )
+            )
+        )
+    engine = RetrievalEngine(
+        manager, vector_store, embedder, weights=weights, reranker=reranker
+    )
+    # A different embedder (provider switched, e.g. hashing -> learned) leaves old
+    # vectors of the wrong size behind: re-embed once so retrieval is not empty.
+    if vector_store.size == 0 and manager.list(limit=1):
+        engine.reindex_all()
+    return engine

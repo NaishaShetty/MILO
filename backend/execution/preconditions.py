@@ -46,7 +46,14 @@ from planner.state import WorldState
 # AI2-THOR objectId for their primary target. `locate` is deliberately
 # excluded -- it has no simulator-side effect (see `dispatcher.py`) and
 # so has nothing to resolve.
-_REQUIRES_RESOLVED_TARGET = {"navigate", "pickup", "open", "close"}
+_REQUIRES_RESOLVED_TARGET = {
+    "navigate",
+    "pickup",
+    "open",
+    "close",
+    "turn_on",
+    "turn_off",
+}
 
 
 class PreconditionCheckResult(BaseModel):

@@ -126,6 +126,10 @@ class MemoryProvenance(str, Enum):
     #: Written by the system itself (e.g. a default/bootstrap memory,
     #: or a migration), not attributable to any of the above.
     SYSTEM = "system"
+    #: Learned from a skill MILO saved (roadmap 2, Phase 3).
+    SKILL = "skill"
+    #: Brought in from outside (a file, another robot): trusted least.
+    IMPORTED = "imported"
 
 
 class MemoryStatus(str, Enum):
@@ -147,6 +151,9 @@ class MemoryStatus(str, Enum):
     #: automatically; it exists for a future milestone or operator
     #: action to set explicitly.
     ARCHIVED = "archived"
+    #: Suspicious (contradicts trusted memories, or reads like an instruction):
+    #: kept for the user to review, never used.
+    QUARANTINED = "quarantined"
 
 
 #: A confidence value bounded to `[0.0, 1.0]`, validated wherever it

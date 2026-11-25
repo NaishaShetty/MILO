@@ -27,7 +27,7 @@ project's general preference for failing loudly at the boundary
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
 from memory.models import Memory, MemoryProvenance, MemoryStatus, MemoryType
 
@@ -92,6 +92,48 @@ class MemoryStore(ABC):
         Filtering only, no ranking/scoring -- see this class's
         docstring.
         """
+
+    def get_many(self, memory_ids: Sequence[str]) -> Dict[str, Memory]:
+        """
+        Batched `get()`: returns `{memory_id: Memory}` for every id that
+        exists (absent ids are simply missing from the result). The
+        default just loops `get()` so any existing backend keeps
+        working; a real backend should override it with one query --
+        retrieval fetches its whole candidate pool through this instead
+        of one round trip per candidate.
+        """
+        found: Dict[str, Memory] = {}
+        for memory_id in memory_ids:
+            memory = self.get(memory_id)
+            if memory is not None:
+                found[memory_id] = memory
+        return found
+
+    def find_by_triple(
+        self,
+        memory_type: MemoryType,
+        subject: str,
+        predicate: str,
+        *,
+        status: Optional[MemoryStatus] = None,
+    ) -> List[Memory]:
+        """
+        Memories of `memory_type` whose `metadata` carries this exact
+        `subject` and `predicate` (the semantic/user-memory triple --
+        see `semantics.SemanticTriple`). Used by conflict detection so
+        a semantic write looks at the handful of memories that can
+        possibly relate to it instead of listing every semantic memory.
+        The default filters `list()` (correct, but a full scan); a real
+        backend should override it with an indexed query.
+        """
+        matches = []
+        for memory in self.list(memory_type=memory_type, status=status):
+            metadata = memory.metadata or {}
+            if metadata.get("subject") == subject and (
+                metadata.get("predicate") == predicate
+            ):
+                matches.append(memory)
+        return matches
 
 
 class VectorSearchResult:

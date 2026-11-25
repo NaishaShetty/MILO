@@ -55,7 +55,7 @@ matching `TaskRunner`'s existing "avoid memory pollution" policy
 
 from __future__ import annotations
 
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -91,6 +91,8 @@ class ReflectionResult(BaseModel):
     reason: str
     action: ReflectionAction
     store_memory: bool
+    #: A plain-language sentence for the user, set by the learned reflector.
+    explanation: Optional[str] = None
 
 
 class ReflectionAgent(BaseAgent):

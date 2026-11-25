@@ -210,3 +210,103 @@ def test_raw_completion_is_silent_at_default_warning_level(caplog):
     assert distinctive_content not in caplog.text
     # The short summary WARNING (no raw content) still fires as before.
     assert "planner.react.malformed_output" in caplog.text
+
+
+# -- several steps per call, cached memory block, one-step flag --------------
+
+
+def _batch(*steps, done=False):
+    return {
+        "steps": [{"action": a, "target": t, "parameters": p} for a, t, p in steps],
+        "done": done,
+    }
+
+
+_MUG_BATCH = _batch(
+    ("locate", "mug", {}), ("navigate", "mug", {}), ("pickup", "mug", {}), done=True
+)
+
+
+def test_one_call_can_return_the_whole_plan():
+    client = ScriptedClient([_MUG_BATCH])
+    result = ReActPlanner(llm_client=client).plan(TASK, WorldState.initial())
+
+    assert result.success
+    assert [s.action for s in result.plan.steps] == ["locate", "navigate", "pickup"]
+    assert client.calls == 1
+    assert client.requests[0].prompt_version == "planner-react-v2"
+
+
+def test_the_one_step_flag_keeps_one_action_per_call():
+    client = ScriptedClient(_VALID_SEQUENCE)
+    planner = ReActPlanner(llm_client=client, one_step_per_call=True)
+    result = planner.plan(TASK, WorldState.initial())
+
+    assert result.success
+    assert client.calls == 3
+    assert all(r.prompt_version == "planner-react-v1" for r in client.requests)
+
+
+def test_the_one_step_flag_ignores_extra_steps_in_a_batch_reply():
+    client = ScriptedClient([_MUG_BATCH, _VALID_SEQUENCE[1], _VALID_SEQUENCE[2]])
+    planner = ReActPlanner(llm_client=client, one_step_per_call=True)
+    result = planner.plan(TASK, WorldState.initial())
+
+    assert result.success
+    assert [s.action for s in result.plan.steps] == ["locate", "navigate", "pickup"]
+    assert client.calls == 3
+
+
+def test_a_batch_is_validated_in_order_and_the_valid_prefix_is_kept():
+    # Step 2 (pickup) is invalid right after `locate` -- the robot is not
+    # near the mug yet. The prefix [locate] is kept and the planner asks
+    # again from the new state instead of failing.
+    bad = _batch(("locate", "mug", {}), ("pickup", "mug", {}), done=True)
+    client = ScriptedClient(
+        [bad, _batch(("navigate", "mug", {}), ("pickup", "mug", {}), done=True)]
+    )
+    result = ReActPlanner(llm_client=client).plan(TASK, WorldState.initial())
+
+    assert result.success
+    assert [s.action for s in result.plan.steps] == ["locate", "navigate", "pickup"]
+    assert client.calls == 2
+    assert result.plan.metadata.get("react_fallback") is None
+
+
+def test_an_invalid_first_step_in_a_batch_goes_through_repair():
+    bad_first = _batch(("pickup", "mug", {}), ("locate", "mug", {}))
+    client = ScriptedClient([bad_first, _MUG_BATCH])
+    result = ReActPlanner(llm_client=client, repair_attempts=1).plan(
+        TASK, WorldState.initial()
+    )
+
+    assert result.success
+    assert client.calls == 2
+    assert "rejected" in client.requests[1].user_message
+
+
+def test_empty_steps_list_is_malformed():
+    client = ScriptedClient([{"steps": [], "done": True}])
+    planner = ReActPlanner(llm_client=client, repair_attempts=0)
+    result = planner.plan(TASK, WorldState.initial())
+    assert not result.success
+
+
+def test_memory_context_is_rendered_once_per_plan_not_per_iteration(monkeypatch):
+    import planner.react as react_module
+
+    calls = {"n": 0}
+    real = react_module._describe_memory_context
+
+    def counting(memory_context):
+        calls["n"] += 1
+        return real(memory_context)
+
+    monkeypatch.setattr(react_module, "_describe_memory_context", counting)
+    client = ScriptedClient(_VALID_SEQUENCE)
+    ReActPlanner(llm_client=client, one_step_per_call=True).plan(
+        TASK, WorldState.initial()
+    )
+
+    assert client.calls == 3
+    assert calls["n"] == 1

@@ -14,7 +14,9 @@ import { listTasks } from "../api/tasks";
 import type { TaskState } from "../api/tasksTypes";
 import { usePolling } from "./usePolling";
 
-const POLL_INTERVAL_MS = 5000;
+// A slow background refresh; `TaskContext` also refreshes it the moment the active
+// task finishes, and the live task itself is pushed over SSE.
+const POLL_INTERVAL_MS = 10000;
 
 export interface TaskHistoryResult {
   /** Newest first, per `GET /tasks`'s own ordering. Empty (not null) once loaded with no tasks. */

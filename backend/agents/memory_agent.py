@@ -26,7 +26,7 @@ agent.MemoryAgent`'s typed methods directly today.
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from typing import Dict, Optional, Sequence, Tuple
 
 from agents.base import BaseAgent
 from agents.contracts import AgentError, AgentRequest, AgentResponse, AgentState
@@ -120,6 +120,26 @@ class MemoryAgentWrapper(BaseAgent):
             )
         finally:
             self._state = AgentState.IDLE
+
+    def remember_preference(
+        self, subject: str, predicate: str, obj: str, *, confidence: float = 1.0
+    ) -> Optional[Memory]:
+        self._state = AgentState.ACTIVE
+        try:
+            return self._memory_agent.remember_preference(
+                subject, predicate, obj, confidence=confidence
+            )
+        finally:
+            self._state = AgentState.IDLE
+
+    def usual_places(self) -> Dict[str, Tuple[str, str]]:
+        """`{object: (place, relation)}` from memory -- see `memory.habits`."""
+        from memory.habits import usual_places
+
+        memories = self._memory_agent.list_memories(
+            memory_type=MemoryType.USER
+        ) + self._memory_agent.list_memories(memory_type=MemoryType.SEMANTIC)
+        return usual_places(memories)
 
     def process(self, request: AgentRequest) -> AgentResponse:
         """

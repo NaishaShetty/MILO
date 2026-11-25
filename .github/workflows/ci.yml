@@ -33,7 +33,7 @@ on:
 jobs:
   backend:
     name: Backend -- format, lint, type-check, test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -69,9 +69,17 @@ jobs:
         working-directory: backend
         run: python -m pytest tests/ -v
 
+      # Mission-level regression gate: the fixed benchmark's fast slice
+      # (backend/benchmark/suite.py::ci_subset, deterministic seeds) must not
+      # drop more than 5 points below benchmarks/ci_baseline.json for any
+      # planner. After an intended change: python -m benchmark.ci --write-baseline
+      - name: Benchmark regression gate
+        working-directory: backend
+        run: python -m benchmark.ci --margin 0.05
+
   frontend:
     name: Frontend -- lint, type-check, test, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -105,21 +113,23 @@ jobs:
       # production build (`tsc --noEmit && vite build`, package.json)
       # -- catches build-only failures (e.g. an asset path that only
       # breaks under Vite's production output) the dev server and
-      # `tsc --noEmit` alone wouldn't. Also confirms the canonical MILO
-      # assets (frontend/public/assets/milo/) land in dist/ where
-      # frontend/Dockerfile expects them.
+      # `tsc --noEmit` alone wouldn't. (MILO himself is drawn in SVG by
+      # src/components/MiloRobot.tsx since the warm redesign, so there are
+      # no character PNGs to ship any more.)
       - name: Production build
         run: npm run build
 
-      - name: Verify MILO character assets are in the production build
+      # Demo mode replays recorded missions from public/demo/ with no
+      # backend: the hosted UI is useless without them, so check they ship.
+      - name: Verify demo-mode recordings are in the production build
         run: |
-          for f in idle listening thinking speaking executing success error; do
-            test -f "dist/assets/milo/milo-$f.png" || { echo "missing milo-$f.png in dist/"; exit 1; }
-          done
+          test -f dist/demo/missions.json || { echo "missing dist/demo/missions.json"; exit 1; }
+          n=$(ls dist/demo/traces/*.json 2>/dev/null | wc -l)
+          test "$n" -ge 1 || { echo "no recorded traces in dist/demo/traces/"; exit 1; }
 
   e2e:
     name: Frontend -- browser E2E (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [frontend]
     defaults:
       run:
@@ -167,7 +177,7 @@ jobs:
 
   docker:
     name: Docker -- build backend and frontend images
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [backend, frontend]
     steps:
       - name: Check out repository

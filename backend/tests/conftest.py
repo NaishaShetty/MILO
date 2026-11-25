@@ -40,3 +40,13 @@ opt-in gate and never depended on `VISION_ENABLE_SIMULATOR` at all.
 import os
 
 os.environ["VISION_ENABLE_SIMULATOR"] = "false"
+
+# Mission traces from API tests go to a throwaway file, never data/traces.db.
+import tempfile  # noqa: E402
+
+os.environ.setdefault(
+    "MILO_TRACE_DB", os.path.join(tempfile.mkdtemp(prefix="milo-trace-"), "t.db")
+)
+
+# A risky step or plan preview nobody answers in a test is skipped quickly, not after 5 min.
+os.environ.setdefault("MILO_APPROVAL_TIMEOUT", "2")

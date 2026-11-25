@@ -54,6 +54,7 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, Optional
 
 from execution.models import Action, ActionType
+from execution.resolver import HOME_OBJECT_ID
 from simulator.simulator import Simulator
 
 
@@ -85,9 +86,7 @@ class ActionDispatcher:
             ActionType.ROTATE_RIGHT: lambda a: self._simulator.turn_right(),
             ActionType.LOOK_UP: lambda a: self._simulator.look_up(),
             ActionType.LOOK_DOWN: lambda a: self._simulator.look_down(),
-            ActionType.NAVIGATE: lambda a: self._simulator.navigate_to(
-                self._require_object_id(a)
-            ),
+            ActionType.NAVIGATE: self._navigate,
             ActionType.PICKUP: lambda a: self._simulator.pickup_object(
                 self._require_object_id(a)
             ),
@@ -100,8 +99,26 @@ class ActionDispatcher:
             ActionType.CLOSE: lambda a: self._simulator.close_object(
                 self._require_object_id(a)
             ),
+            ActionType.TURN_ON: lambda a: self._simulator.toggle_object_on(
+                self._require_object_id(a)
+            ),
+            ActionType.TURN_OFF: lambda a: self._simulator.toggle_object_off(
+                self._require_object_id(a)
+            ),
+            ActionType.DROP: lambda a: self._simulator.drop_held_object(),
+            ActionType.PUSH: lambda a: self._simulator.push_object(
+                self._require_object_id(a)
+            ),
+            ActionType.LOOK_AROUND: lambda a: self._simulator.look_around(),
             ActionType.LOCATE: lambda a: None,
         }
+
+    def _navigate(self, action: Action) -> Any:
+        object_id = self._require_object_id(action)
+        if object_id == HOME_OBJECT_ID:
+            # "Bring it back to me": return to where the robot started.
+            return self._simulator.navigate_home()
+        return self._simulator.navigate_to(object_id)
 
     @staticmethod
     def _require_object_id(action: Action) -> str:

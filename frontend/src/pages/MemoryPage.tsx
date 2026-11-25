@@ -1,432 +1,210 @@
-// MemoryPage.tsx
-//
-// Purpose
-// -------
-// "What does MILO remember?" -- wired to the real Memory API
-// (`GET /api/v1/memory`, `GET /api/v1/memory/search`,
-// `backend/api/routes/memory.py`): "Quick Memory Search" asks the real
-// MemoryAgent directly (no throwaway task creation), and every
-// category count/listing/timeline entry comes from the real
-// persistent memory store (`useMemoryList`) -- every memory MILO has
-// ever stored, not just ones this browser session happened to poll
-// into task history.
-//
-// Visual refinement pass: header (title + real search) / three-column
-// body (Memory Types filters+summary | Memory Feed | Memory Details)
-// / a de-emphasized real Memory Timeline / a static "How MILO
-// Remembers" explanatory diagram (no live data, see its own comment).
-// The category filter tabs now actually filter the feed (client-side,
-// over the same already-loaded `memories` array -- no new fetch) and
-// selecting a card populates the new Memory Details panel from that
-// same real `Memory` object; every other string a test asserts on
-// ("Things I Know"/"Experiences"/"Things That Went Wrong"/"Your
-// Preferences", "No memories yet.", "Semantic: 1", "Failures: 1", the
-// "My Knowledge" region, "Ask MILO about its memory", the "<provenance>
-// created a <type> memory" timeline sentence) is unchanged.
-import { useMemo, useState } from "react";
-import type { FormEvent } from "react";
+// MemoryPage.tsx -- "MILO's scrapbook": search, filters, Fact / Moment / Oops
+// cards, a legend, and a "Forget this" button on every card.
+import { useState } from "react";
 
-import { GlassCard } from "../components/GlassCard";
-import { MemoryIcon, MEMORY_CATEGORY_TONE } from "../components/MemoryIcons";
-import type { MemoryIconName } from "../components/MemoryIcons";
-import { MiloAvatar } from "../components/MiloAvatar";
-import { StatusPill } from "../components/StatusPill";
-import { searchMemory } from "../api/memory";
-import type { Memory, MemorySearchResult } from "../api/memoryTypes";
+import { deleteMemory, editMemory, forgetMemory } from "../api/memory";
+import type { Memory, MemoryTrust } from "../api/memoryTypes";
+import { MiloRobot } from "../components/MiloRobot";
 import { useMemoryList } from "../hooks/useMemoryList";
-import { useMiloState } from "../state/MiloStateContext";
-import { useTask } from "../state/TaskContext";
-import { MEMORY_CATEGORY_LABELS } from "../utils/memory";
+import { relativeDay, sureness } from "../utils/friendly";
 
-const CATEGORY_ORDER = ["semantic", "episodic", "failure", "user"];
-const FILTER_TABS = [{ id: "all", label: "All" }, ...CATEGORY_ORDER.map((id) => ({ id, label: MEMORY_CATEGORY_LABELS[id] }))];
+type Filter = "all" | "moment" | "fact" | "oops";
+const FILTERS: Array<{ id: Filter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "moment", label: "Moments" },
+  { id: "fact", label: "Facts" },
+  { id: "oops", label: "Oops" },
+];
 
-type SearchState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "success"; query: string; results: MemorySearchResult[] }
-  | { status: "error"; message: string };
+export function kindOf(memory: Memory): Exclude<Filter, "all"> {
+  if (memory.memory_type === "failure") return "oops";
+  if (memory.memory_type === "episodic") return "moment";
+  return "fact";
+}
 
-function formatTimestamp(unixSeconds: number): string {
-  return new Date(unixSeconds * 1000).toLocaleString();
+const SOURCE_LABEL: Record<MemoryTrust["source"], string> = {
+  user: "you told me",
+  observation: "I saw it",
+  skill: "I worked it out",
+  imported: "imported",
+};
+
+type Act = (fn: () => Promise<unknown>) => void;
+
+function Card({ memory, trust, onForget, act }: { memory: Memory; trust?: MemoryTrust; onForget: (m: Memory) => void; act: Act }) {
+  const kind = kindOf(memory);
+  const [fixing, setFixing] = useState(false);
+  const [place, setPlace] = useState("");
+  const meta = memory.metadata as Record<string, unknown>;
+  const sure = sureness(memory.confidence);
+  const label = { fact: "Fact", moment: "Moment", oops: "Oops" }[kind];
+  return (
+    <article className={`scrap scrap--${kind}`}>
+      <div className="scrap__top">
+        <span className="pill">{label}</span>
+        {trust && <span className="tag">{SOURCE_LABEL[trust.source]}</span>}
+        {trust?.pinned && <span className="tag">pinned</span>}
+        {trust?.quarantined && <span className="tag">set aside</span>}
+        <span className="muted">{relativeDay(memory.created_at)}</span>
+      </div>
+      {trust?.quarantined && (
+        <p className="notice" role="note">
+          I'm not using this because {trust.quarantine_reason ?? "it looked suspicious"}.
+        </p>
+      )}
+      {kind === "fact" && typeof meta.subject === "string" ? (
+        <div>
+          <span className="tag">{String(meta.subject).replace(/_/g, " ")}</span>{" "}
+          <span className="muted">{String(meta.predicate ?? "is").replace(/_/g, " ")}</span>{" "}
+          <span className="tag">{String(meta.object ?? "").replace(/_/g, " ")}</span>
+        </div>
+      ) : (
+        <h3>{memory.content}</h3>
+      )}
+      {kind === "fact" && (
+        <span className="muted" title={`${Math.round(memory.confidence * 100)}% sure`}>
+          {sure.label} {"●".repeat(sure.dots)}
+          {"○".repeat(5 - sure.dots)}
+        </span>
+      )}
+      {kind === "oops" && <span className="muted">Learned: this kind of thing can go wrong, so MILO is more careful.</span>}
+      {fixing && (
+        <span className="ask__row">
+          <input className="input" aria-label="Correct place" value={place} placeholder="the right place" onChange={(e) => setPlace(e.target.value)} />
+          <button type="button" className="btn btn--go" onClick={() => { act(() => editMemory(memory.memory_id, { place })); setFixing(false); }}>
+            Save
+          </button>
+        </span>
+      )}
+      <div className="filters">
+        {kind === "fact" && typeof meta.subject === "string" && !fixing && (
+          <button type="button" className="filter" onClick={() => setFixing(true)}>
+            Fix the place
+          </button>
+        )}
+        <button type="button" className="filter" onClick={() => act(() => editMemory(memory.memory_id, { pinned: !trust?.pinned }))}>
+          {trust?.pinned ? "Unpin" : "Pin"}
+        </button>
+        <button
+          type="button"
+          className="filter"
+          onClick={() => act(() => editMemory(memory.memory_id, { quarantined: !trust?.quarantined }))}
+        >
+          {trust?.quarantined ? "Use it again" : "Set aside"}
+        </button>
+        <button type="button" className="btn" onClick={() => onForget(memory)} aria-label={`Forget this: ${memory.content}`}>
+          Forget this
+        </button>
+        <button
+          type="button"
+          className="filter"
+          onClick={() => {
+            if (window.confirm("Delete this memory for good? This can't be undone.")) act(() => deleteMemory(memory.memory_id));
+          }}
+        >
+          Delete
+        </button>
+      </div>
+    </article>
+  );
 }
 
 export function MemoryPage() {
-  const { memories, countsByType, status: listStatus, refresh } = useMemoryList();
-  const { history } = useTask();
-  const miloState = useMiloState();
-  const [question, setQuestion] = useState("");
-  const [activeCategory, setActiveCategory] = useState<string>("all");
-  const [search, setSearch] = useState<SearchState>({ status: "idle" });
-  const [selected, setSelected] = useState<Memory | null>(null);
+  const { memories, status, error, refresh, trust, quarantined } = useMemoryList();
+  const [filter, setFilter] = useState<Filter>("all");
+  const [query, setQuery] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
 
-  const knowledge = useMemo(
-    () => memories.filter((entry) => entry.memory_type === "semantic"),
-    [memories],
-  );
-
-  const filteredMemories = useMemo(
-    () => (activeCategory === "all" ? memories : memories.filter((m) => m.memory_type === activeCategory)),
-    [memories, activeCategory],
-  );
-
-  const totalMemories = memories.length;
-  const selectedTask = selected?.task_id ? history.find((t) => t.task_id === selected.task_id) ?? null : null;
-
-  async function handleSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmed = question.trim();
-    if (!trimmed || search.status === "loading") return;
-    setSearch({ status: "loading" });
+  async function forget(memory: Memory) {
     try {
-      const response = await searchMemory(trimmed);
-      setSearch({ status: "success", query: response.query, results: response.results });
-    } catch (error) {
-      setSearch({
-        status: "error",
-        message: error instanceof Error ? error.message : "Memory search failed.",
-      });
+      await forgetMemory(memory.memory_id);
+      setProblem(null);
+      refresh();
+    } catch {
+      setProblem("I couldn't forget that one. Please try again in a moment.");
     }
   }
 
-  function selectFromSearch(result: MemorySearchResult) {
-    setSelected(result.memory);
-  }
+  const act: Act = (fn) => {
+    fn()
+      .then(() => {
+        setProblem(null);
+        refresh();
+      })
+      .catch(() => setProblem("That didn't work. Please try again in a moment."));
+  };
+
+  const q = query.trim().toLowerCase();
+  const shown = memories
+    .filter((m) => m.status !== "archived")
+    .filter((m) => filter === "all" || kindOf(m) === filter)
+    .filter((m) => !q || `${m.content} ${JSON.stringify(m.metadata)}`.toLowerCase().includes(q));
 
   return (
-    <main aria-label="Memory" className="memory-page">
-      <h1 className="sr-only">Memory</h1>
-
-      <header className="memory-page__header">
-        <div className="memory-page__header-copy">
-          <div className="memory-page__hero-character" aria-hidden="true">
-            <MiloAvatar state={miloState} size="sm" />
-          </div>
-          <div>
-            <p className="memory-page__title">
-              Memory <span className="memory-page__title-dot" aria-hidden="true" />
-            </p>
-            <p className="memory-page__subtitle">What MILO remembers, learns, and retrieves.</p>
+    <div>
+      <div className="mission-head">
+        <div>
+          <h1 className="scrapbook-title">
+            MILO's <em>scrapbook</em>
+          </h1>
+          <p className="muted">Everything MILO remembers from past missions. The more it remembers, the fewer steps it wastes.</p>
+        </div>
+        <MiloRobot pose="speaking" size={110} />
+      </div>
+      <div className="filters">
+        <input
+          className="input"
+          type="search"
+          aria-label="Search memories"
+          placeholder="Search an object or a place..."
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          style={{ maxWidth: 320 }}
+        />
+        {FILTERS.map((f) => (
+          <button key={f.id} type="button" className="filter" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+      {problem && <div className="notice notice--error" role="alert">{problem}</div>}
+      {quarantined > 0 && (
+        <div className="notice" role="status">
+          I've set aside {quarantined} {quarantined === 1 ? "memory" : "memories"} that looked wrong or suspicious. Look for "set aside"
+          below: use them again or delete them.
+        </div>
+      )}
+      <div className="memory-layout">
+        <div>
+          {status === "loading" && <div className="card empty">Flipping through the scrapbook...</div>}
+          {status === "error" && (
+            <div className="notice notice--error" role="alert">
+              I couldn't open the scrapbook{error instanceof Error ? ` (${error.message})` : ""}. Check that MILO's server is running, then try again.
+              <p><button type="button" className="btn" onClick={refresh}>Try again</button></p>
+            </div>
+          )}
+          {status === "success" && shown.length === 0 && (
+            <div className="card empty">
+              {memories.length === 0 ? "Nothing here yet. MILO writes a page after every mission." : "No pages match. Try a different word or filter."}
+            </div>
+          )}
+          <div className="scrap-grid">
+            {shown.map((memory) => (
+              <Card key={memory.memory_id} memory={memory} trust={trust[memory.memory_id]} onForget={forget} act={act} />
+            ))}
           </div>
         </div>
-
-        <GlassCard className="memory-page__search-card">
-          <section aria-label="Quick Memory Search">
-            <form onSubmit={handleSearch} className="memory-page__search-form">
-              <label htmlFor="memory-search-input" className="memory-page__search-label">
-                Ask MILO about its memory
-              </label>
-              <div className="memory-page__search-row">
-                <div className="memory-page__search-input-wrap">
-                  <input
-                    id="memory-search-input"
-                    type="text"
-                    placeholder="Search memories..."
-                    value={question}
-                    onChange={(event) => setQuestion(event.target.value)}
-                    disabled={search.status === "loading"}
-                  />
-                  <MemoryIcon name="search" className="memory-page__search-icon" />
-                </div>
-                <button
-                  type="submit"
-                  className="memory-page__search-submit"
-                  disabled={search.status === "loading" || question.trim().length === 0}
-                >
-                  {search.status === "loading" ? "Asking..." : "Ask"}
-                </button>
-              </div>
-            </form>
-            {search.status === "error" && (
-              <p className="memory-page__error" role="alert">
-                {search.message}
-              </p>
-            )}
-          </section>
-        </GlassCard>
-      </header>
-
-      <div className="memory-page__body">
-        <aside className="memory-page__sidebar">
-          <GlassCard title="Memory Types">
-            <div className="memory-page__categories" role="tablist" aria-label="Memory Categories">
-              {FILTER_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeCategory === tab.id}
-                  className={
-                    "memory-page__category" + (activeCategory === tab.id ? " memory-page__category--active" : "")
-                  }
-                  onClick={() => setActiveCategory(tab.id)}
-                >
-                  <MemoryIcon
-                    name={tab.id as MemoryIconName}
-                    className={`memory-page__category-icon memory-page__category-icon--${
-                      MEMORY_CATEGORY_TONE[tab.id] ?? "neutral"
-                    }`}
-                  />
-                  <span className="memory-page__category-label">{tab.label}</span>
-                  <span className="memory-page__category-count">
-                    {tab.id === "all" ? totalMemories : countsByType[tab.id] ?? 0}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </GlassCard>
-
-          <GlassCard title="My Knowledge" className="memory-page__knowledge-card">
-            <section aria-label="My Knowledge">
-              {knowledge.length === 0 ? (
-                <p className="memory-page__empty-inline">No knowledge yet.</p>
-              ) : (
-                <ul className="memory-page__knowledge">
-                  {knowledge.slice(0, 6).map((entry) => (
-                    <li key={entry.memory_id}>{entry.content}</li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </GlassCard>
-
-          <GlassCard title="Summary">
-            <section aria-label="Memory Statistics" className="memory-page__summary">
-              <div className="memory-page__stat-grid">
-                <div className="memory-page__stat">
-                  <span className="memory-page__stat-label">Semantic</span>
-                  <span className="memory-page__stat-value">{countsByType.semantic ?? 0}</span>
-                  <span className="sr-only">Semantic: {countsByType.semantic ?? 0}</span>
-                </div>
-                <div className="memory-page__stat">
-                  <span className="memory-page__stat-label">Episodic</span>
-                  <span className="memory-page__stat-value">{countsByType.episodic ?? 0}</span>
-                  <span className="sr-only">Episodic: {countsByType.episodic ?? 0}</span>
-                </div>
-                <div className="memory-page__stat">
-                  <span className="memory-page__stat-label">Failure</span>
-                  <span className="memory-page__stat-value">{countsByType.failure ?? 0}</span>
-                  <span className="sr-only">Failures: {countsByType.failure ?? 0}</span>
-                </div>
-                <div className="memory-page__stat">
-                  <span className="memory-page__stat-label">User</span>
-                  <span className="memory-page__stat-value">{countsByType.user ?? 0}</span>
-                  <span className="sr-only">Preferences: {countsByType.user ?? 0}</span>
-                </div>
-              </div>
-              <p className="memory-page__total">{totalMemories} memories total.</p>
-            </section>
-          </GlassCard>
-        </aside>
-
-        <section className="memory-page__feed-col">
-          <GlassCard
-            title={search.status === "success" ? "Search Results" : "Memory Feed"}
-            titleAction={
-              <button
-                type="button"
-                className="memory-page__refresh"
-                onClick={() => refresh()}
-                aria-label="Refresh memories"
-                title="Refresh memories"
-              >
-                <MemoryIcon name="refresh" />
-              </button>
-            }
-            className="memory-page__feed-card"
-          >
-            <section aria-label="Recent Memories">
-              {search.status === "success" ? (
-                <>
-                  <p className="memory-page__search-query">&ldquo;{search.query}&rdquo;</p>
-                  {search.results.length === 0 ? (
-                    <p className="memory-page__empty-inline">No memories match your search.</p>
-                  ) : (
-                    <ul className="memory-page__feed" aria-live="polite">
-                      {search.results.map((result) => (
-                        <li key={result.memory.memory_id}>
-                          <button
-                            type="button"
-                            className={
-                              "memory-page__card" +
-                              (selected?.memory_id === result.memory.memory_id ? " memory-page__card--selected" : "")
-                            }
-                            onClick={() => selectFromSearch(result)}
-                          >
-                            <span className="memory-page__card-header">
-                              <span
-                                className={`memory-page__card-icon memory-page__card-icon--${
-                                  MEMORY_CATEGORY_TONE[result.memory.memory_type] ?? "neutral"
-                                }`}
-                              >
-                                <MemoryIcon name={result.memory.memory_type as MemoryIconName} />
-                              </span>
-                              <span className="memory-page__card-type">
-                                {MEMORY_CATEGORY_LABELS[result.memory.memory_type] ?? result.memory.memory_type}
-                              </span>
-                              <StatusPill tone="info" className="memory-page__search-score">
-                                {Math.round(result.final_score * 100)}% match
-                              </StatusPill>
-                            </span>
-                            <p className="memory-page__card-content">{result.memory.content}</p>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </>
-              ) : (
-                <>
-                  {listStatus === "loading" && memories.length === 0 && (
-                    <p className="memory-page__empty-inline">Loading...</p>
-                  )}
-                  {listStatus !== "loading" && memories.length === 0 && (
-                    <div className="memory-page__empty">
-                      <span className="memory-page__empty-ring" aria-hidden="true" />
-                      <p>No memories yet.</p>
-                      <p className="memory-page__empty-detail">
-                        MILO will build memory as it perceives, acts, and learns from experience.
-                      </p>
-                    </div>
-                  )}
-                  {listStatus !== "loading" && memories.length > 0 && filteredMemories.length === 0 && (
-                    <p className="memory-page__empty-inline">No {activeCategory} memories yet.</p>
-                  )}
-                  {filteredMemories.length > 0 && (
-                    <ul className="memory-page__feed">
-                      {filteredMemories.slice(0, 30).map((entry) => (
-                        <li key={entry.memory_id}>
-                          <button
-                            type="button"
-                            className={
-                              "memory-page__card" +
-                              (selected?.memory_id === entry.memory_id ? " memory-page__card--selected" : "") +
-                              (entry.memory_type === "failure" ? " memory-page__card--failure" : "")
-                            }
-                            onClick={() => setSelected(entry)}
-                          >
-                            <span className="memory-page__card-header">
-                              <span
-                                className={`memory-page__card-icon memory-page__card-icon--${
-                                  MEMORY_CATEGORY_TONE[entry.memory_type] ?? "neutral"
-                                }`}
-                              >
-                                <MemoryIcon name={entry.memory_type as MemoryIconName} />
-                              </span>
-                              <span className="memory-page__card-type">
-                                {MEMORY_CATEGORY_LABELS[entry.memory_type] ?? entry.memory_type}
-                              </span>
-                              <span className="memory-page__card-time">{formatTimestamp(entry.created_at)}</span>
-                            </span>
-                            <p className="memory-page__card-content">{entry.content}</p>
-                            <span className="memory-page__card-meta">
-                              <span className="memory-page__card-meta-item">Source: {entry.provenance}</span>
-                              <span className="memory-page__card-meta-item">
-                                Confidence: {entry.confidence.toFixed(2)}
-                              </span>
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </>
-              )}
-            </section>
-          </GlassCard>
-        </section>
-
-        <aside className="memory-page__details-col">
-          <GlassCard title="Memory Details" className="memory-page__details-card">
-            <section aria-label="Memory Details">
-              {!selected && (
-                <p className="memory-page__empty-inline">Select a memory to inspect its details.</p>
-              )}
-              {selected && (
-                <>
-                  <div className="memory-page__detail-hero">
-                    <span
-                      className={`memory-page__detail-icon memory-page__detail-icon--${
-                        MEMORY_CATEGORY_TONE[selected.memory_type] ?? "neutral"
-                      }`}
-                    >
-                      <MemoryIcon name={selected.memory_type as MemoryIconName} />
-                    </span>
-                    <p className="memory-page__detail-content">{selected.content}</p>
-                  </div>
-
-                  <dl className="memory-page__detail-list">
-                    <dt>Type</dt>
-                    <dd>{MEMORY_CATEGORY_LABELS[selected.memory_type] ?? selected.memory_type}</dd>
-                    <dt>Created</dt>
-                    <dd>{formatTimestamp(selected.created_at)}</dd>
-                    <dt>Source</dt>
-                    <dd>{selected.provenance}</dd>
-                    <dt>Confidence</dt>
-                    <dd>{selected.confidence.toFixed(2)}</dd>
-                  </dl>
-
-                  {selected.task_id && (
-                    <div className="memory-page__detail-related">
-                      <p className="memory-page__detail-related-label">Related Task</p>
-                      <div className="memory-page__detail-related-task">
-                        <MemoryIcon name="task" />
-                        <span>{selectedTask ? selectedTask.user_request : selected.task_id}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {Object.keys(selected.metadata).length > 0 && (
-                    <div className="memory-page__detail-metadata">
-                      <p className="memory-page__detail-related-label">Metadata</p>
-                      <pre className="memory-page__payload">{JSON.stringify(selected.metadata, null, 2)}</pre>
-                    </div>
-                  )}
-                </>
-              )}
-            </section>
-          </GlassCard>
+        <aside className="legend card" aria-label="Three kinds of memory">
+          <h2>Three kinds of memory</h2>
+          <div className="legend__item" style={{ background: "var(--peach)" }}><strong>Moments</strong><span className="muted">What happened in a mission</span></div>
+          <div className="legend__item" style={{ background: "var(--apricot)" }}><strong>Facts</strong><span className="muted">Where things usually are</span></div>
+          <div className="legend__item" style={{ background: "var(--coral)" }}><strong>Oops notes</strong><span className="muted">What went wrong and what helped</span></div>
+          <div className="notice">
+            <strong>Tidy up</strong>
+            <p>Old or wrong memories can be forgotten so MILO stops using them. Press "Forget this" on any card.</p>
+          </div>
         </aside>
       </div>
-
-      <GlassCard title="Memory Timeline" className="memory-page__timeline-card">
-        <section aria-label="Memory Timeline">
-          {memories.length === 0 ? (
-            <p className="memory-page__empty-inline">No memory activity yet.</p>
-          ) : (
-            <ol className="memory-page__timeline">
-              {memories.slice(0, 12).map((entry) => (
-                <li key={entry.memory_id}>
-                  <span className="memory-page__timeline-time">{formatTimestamp(entry.created_at)}</span>
-                  <span>
-                    {entry.provenance} created a {entry.memory_type} memory
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
-      </GlassCard>
-
-      {/* Static explanatory diagram, not a live pipeline -- no per-stage
-       * data exists to show real-time here, so this is only ever a
-       * fixed description of the real memory lifecycle (see
-       * backend/memory/agent.py's perceive -> reflect -> store -> retrieve
-       * flow), never an animated/fabricated "memory being created now". */}
-      <section className="memory-page__pipeline" aria-label="How MILO Remembers">
-        <p className="memory-page__pipeline-title">How MILO Remembers</p>
-        <div className="memory-page__pipeline-steps">
-          <span>Perceive</span>
-          <MemoryIcon name="chevron" />
-          <span>Experience</span>
-          <MemoryIcon name="chevron" />
-          <span>Reflect</span>
-          <MemoryIcon name="chevron" />
-          <span>Remember</span>
-          <MemoryIcon name="chevron" />
-          <span>Retrieve</span>
-        </div>
-      </section>
-    </main>
+    </div>
   );
 }

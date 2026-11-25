@@ -130,6 +130,10 @@ export interface TaskState {
   target: string | null;
   current_location: string | null;
   current_plan: Plan | null;
+  /** Set while MILO waits for an approve / skip / edit answer. */
+  pending_decision?: PendingDecision | null;
+  /** The user's own words, when the task came from a sentence. */
+  instruction?: string | null;
   current_step: number | null;
   observations: Record<string, unknown>[];
   known_objects: string[];
@@ -142,6 +146,98 @@ export interface TaskState {
   latencies_ms: TaskLatenciesMs;
   created_memories: TaskMemoryEntry[];
   metrics: TaskMetrics;
+  /** A plain-language result beyond "it worked" (where a find found it, "The table is already clear."). */
+  answer?: string | null;
+  /** The single-object sub-goals a multi-object task ran, in order. */
+  sub_goals?: SubGoal[];
+  /** What MILO learned from the mission, as sentences. */
+  learned?: string[];
+  /** The planner that ran: rule_based | react | behavior_tree | htn, or "novel" when MILO worked the task out itself. */
+  planner?: PlannerChoice | "novel" | null;
+  /** Set when the planner did not do exactly what was asked (e.g. fell back). */
+  planner_note?: string | null;
+  cancel_requested?: boolean;
+  cancel_summary?: string | null;
+  /** MILO's running commentary, oldest first. */
+  thoughts?: TaskThought[];
+  created_at?: number;
+}
+
+export type PlannerChoice = "rule_based" | "react" | "behavior_tree" | "htn";
+
+export interface SubGoal {
+  goal: string | null;
+  object: string | null;
+  target: string | null;
+}
+
+export type ThoughtKind = "memory" | "planner" | "eyes" | "hands" | "reflect";
+
+export interface TaskThought {
+  kind: ThoughtKind;
+  text: string;
+  at: number;
+  step_id: number | null;
+}
+
+/** One row of `GET /tasks/stream` -- enough for a recent-missions card. */
+export interface TaskSummary {
+  task_id: string;
+  user_request: string;
+  goal: string | null;
+  status: TaskStatus;
+  planner: PlannerChoice | "novel" | null;
+  current_step: number | null;
+  answer: string | null;
+  cancel_requested: boolean;
+  success: boolean;
+  created_at: number;
+  steps: number;
+  completed_steps: number;
+  memories_used: number;
+  replans: number;
+  total_ms: number | null;
+}
+
+/**
+ * What `POST /tasks` answers. A request becomes a running task (`kind:
+ * "task"`, plus the usual TaskState), or MILO replies without starting
+ * anything: `answer` (a question or help), `remembered` (a preference),
+ * `clarify` (a question back), or `unsupported` (a plain reason).
+ */
+export type CreateTaskResult =
+  | (TaskState & { kind: "task"; understood_as: string })
+  | { kind: "answer"; answer: string; understood_as?: string; library?: TaskKind[] }
+  | { kind: "remembered" | "not_remembered"; message: string; understood_as?: string }
+  | { kind: "clarify" | "unsupported"; message: string; details?: Record<string, unknown>; choices?: ReplyChoice[] };
+
+/** A tappable answer to MILO's question: send `instruction` (pinned to `object_id`). */
+export interface ReplyChoice {
+  label: string;
+  instruction: string;
+  object_id?: string;
+}
+
+/** What MILO is waiting for the user to decide (a risky step, or a plan it worked out). */
+export interface PendingDecision {
+  kind: "step" | "plan";
+  why: string;
+  step_id?: number;
+  action?: string;
+  target?: string | null;
+  text?: string;
+  steps?: Array<{ step_id: number; action: string; target: string | null; container?: string | null; text: string }>;
+  asked_at?: number;
+}
+
+/** One entry of the task library (`GET /tasks/library`). */
+export interface TaskKind {
+  id: string;
+  title: string;
+  summary: string;
+  examples: string[];
+  goals: string[];
+  composite: boolean;
 }
 
 // `GET /{task_id}/memory`'s response shape.
@@ -153,6 +249,9 @@ export interface TaskMemoryResponse {
 export interface CreateTaskRequestBody {
   instruction: string;
   input_source?: InputSource;
+  planner?: PlannerChoice;
+  /** The answer to "which one?": pins the object to one simulator id. */
+  object_id?: string;
 }
 
 // `GET /{task_id}/robot`'s response shape -- a curated view of AI2-THOR's

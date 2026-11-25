@@ -117,27 +117,33 @@ from pathlib import Path
 from typing import AsyncIterator
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from agents.memory_agent import MemoryAgentWrapper
 from agents.speech_agent import SpeechAgent
 from agents.vision_agent import VisionAgentWrapper
 from agents.voice_agent import VoiceAgent
 from api.routes.agents import router as agents_router
+from api.routes.benchmark import router as benchmark_router
 from api.routes.execution import router as execution_router
 from api.routes.health import router as health_router
 from api.routes.lab import router as lab_router
 from api.routes.language import router as language_router
 from api.routes.memory import router as memory_router
 from api.routes.planner import router as planner_router
+from api.routes.scene_map import router as scene_map_router
+from api.routes.skills import router as skills_router
 from api.routes.speech import router as speech_router
 from api.routes.tasks import build_orchestrator
 from api.routes.tasks import router as tasks_router
+from api.routes.traces import router as traces_router
 from api.routes.vision import router as vision_router
 from api.routes.voice import router as voice_router
+from api.security import rate_limit, require_api_key
 from language.agent import LanguageAgent
 from language.config import LanguageRuntimeConfig
 from memory.agent import MemoryAgent
@@ -273,6 +279,61 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # `backend/tests/test_api_vision.py`).
     app.state.simulator = None
     app.state.vision_system = None
+    # Owned here for the whole lifespan and stopped in the `finally`
+    # at the bottom, whichever way this function exits. It is also kept
+    # as a local so a simulator that started but then failed to be
+    # wired up (and so never reached `app.state`) is still stopped --
+    # previously the startup `except` below dropped it on the floor and
+    # leaked a Unity subprocess.
+    simulator = None
+    try:
+        simulator = _start_vision_and_tasks(app)
+        yield
+    finally:
+        _stop_simulator(app.state.simulator or simulator)
+        app.state.simulator = None
+
+
+def _planner_llm_client(language_config):
+    """The language-model client the `react` planner uses, or `None` when
+    none can be built (no key configured) -- `react` then falls back to the
+    rule-based planner and says so on the task."""
+    try:
+        from language.provider_factory import create_llm_client
+
+        return create_llm_client(language_config.llm)
+    except Exception:
+        logger.info("api.react_planner_llm_unavailable", exc_info=True)
+        return None
+
+
+def _stop_simulator(simulator) -> None:
+    """
+    Stops `simulator` if there is one. Never raises: it runs during
+    teardown and error handling, where a second exception must not mask
+    the first or stop the app from shutting down. `Simulator.stop()` is
+    idempotent (see `AI2ThorEnv`), so calling it for a simulator that
+    never fully started is safe.
+    """
+    if simulator is None:
+        return
+    try:
+        simulator.stop()
+    except Exception:
+        logger.warning("api.simulator_stop_failed", exc_info=True)
+
+
+def _start_vision_and_tasks(app: FastAPI):
+    """
+    Starts the opt-in simulator and everything that needs it, filling
+    `app.state.simulator`/`vision_system`. Returns the started
+    simulator (or `None`) -- *including* when a later step failed and
+    the simulator was already stopped here, so the caller can always
+    call `_stop_simulator()` on whatever this returns. Never raises:
+    any failure degrades to "vision unavailable" (see this module's
+    docstring).
+    """
+    simulator = None
     if os.environ.get("VISION_ENABLE_SIMULATOR", "false").strip().lower() in (
         "1",
         "true",
@@ -324,6 +385,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                 simulator,
                 memory_agent=MemoryAgentWrapper(app.state.memory_agent),
                 vision_agent=vision_agent,
+                llm_client=_planner_llm_client(app.state.language_config),
             )
             if orchestrator.registry is not None:
                 orchestrator.registry.register(app.state.speech_agent)
@@ -335,26 +397,18 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
                 "api.vision_system_unavailable",
                 extra={"exception_type": type(exc).__name__},
             )
+            # The simulator may already be running (the failure came
+            # after `start()`): stop it now rather than leaking a Unity
+            # subprocess that nothing will ever reference again.
+            _stop_simulator(simulator)
+            simulator = None
             app.state.simulator = None
             app.state.vision_system = None
-
-    yield
     # `LanguageAgent`'s collaborators hold no network connections or
     # file handles that outlive a single call, so no teardown is needed
-    # for it. The simulator is different: `Simulator.start()` (via
-    # `AI2ThorEnv.start()`) launches a real Unity subprocess, and the OS
-    # does NOT reliably reclaim it the moment this process exits --
-    # under `uvicorn --reload`, the *same* process keeps running across
-    # reloads, so skipping this call is exactly what let old Unity
-    # instances pile up (see the startup comment above). The FastAPI
-    # lifespan is this simulator's owner for its entire lifetime, so it
-    # is also responsible for explicitly releasing it here, every time,
-    # regardless of how shutdown was triggered.
-    if app.state.simulator is not None:
-        try:
-            app.state.simulator.stop()
-        finally:
-            app.state.simulator = None
+    # for it. The simulator is different -- `_lifespan`'s `finally`
+    # stops it on every exit path (see there).
+    return simulator
 
 
 app = FastAPI(
@@ -387,42 +441,101 @@ app.add_middleware(
     allow_origins=_allowed_origins(),
     allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "X-API-Key"],
     # `POST /api/v1/voice/speak` (routes/voice.py) returns MILO's
     # spoken response text in this header alongside the audio body --
     # browsers hide all but a small "safe" set of response headers
     # from JS by default, so it must be explicitly exposed here or the
     # dialogue bubble could never read it.
-    expose_headers=["X-Milo-Response-Text"],
+    expose_headers=["X-Milo-Response-Text", "Retry-After"],
 )
 
 app.include_router(health_router)
-app.include_router(lab_router, prefix="/api/v1/lab", tags=["lab"])
+# Optional guards (off unless API_KEY / RATE_LIMIT_PER_MINUTE are set) on the
+# routers that run jobs or change things -- see `api/security.py`.
+_GUARDED = [Depends(require_api_key), Depends(rate_limit)]
+
+app.include_router(
+    lab_router, prefix="/api/v1/lab", tags=["lab"], dependencies=_GUARDED
+)
 app.include_router(language_router, prefix="/api/v1/language", tags=["language"])
-app.include_router(memory_router, prefix="/api/v1/memory", tags=["memory"])
+app.include_router(
+    memory_router,
+    prefix="/api/v1/memory",
+    tags=["memory"],
+    dependencies=[Depends(require_api_key)],
+)
 app.include_router(planner_router, prefix="/api/v1/planner", tags=["planner"])
 app.include_router(vision_router, prefix="/api/v1/vision", tags=["vision"])
 app.include_router(execution_router, prefix="/api/v1/execution", tags=["execution"])
-app.include_router(tasks_router, prefix="/api/v1/tasks", tags=["tasks"])
+app.include_router(
+    tasks_router, prefix="/api/v1/tasks", tags=["tasks"], dependencies=_GUARDED
+)
 app.include_router(speech_router, prefix="/api/v1/speech", tags=["speech"])
 app.include_router(voice_router, prefix="/api/v1/voice", tags=["voice"])
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["agents"])
+app.include_router(
+    traces_router, prefix="/api/v1/traces", tags=["traces"], dependencies=_GUARDED
+)
+app.include_router(
+    skills_router, prefix="/api/v1/skills", tags=["skills"], dependencies=_GUARDED
+)
+app.include_router(benchmark_router, prefix="/api/v1/benchmark", tags=["benchmark"])
+app.include_router(scene_map_router, prefix="/api/v1/scene", tags=["scene"])
 
 
-@app.exception_handler(HTTPException)
-async def _handle_http_exception(request: Request, exc: HTTPException) -> JSONResponse:
-    # `routes/language.py`'s error mapper always raises `HTTPException`
-    # with `detail={"category": ..., "message": ...}` (matching
-    # `api/models/language.py`'s `ErrorResponse`). This handler flattens
-    # that dict to the top level of the response body instead of
-    # FastAPI's default `{"detail": {...}}` wrapping, so every error
-    # response -- validation or runtime -- has the exact same shape a
-    # client can rely on.
+_STATUS_MESSAGES = {
+    404: "I couldn't find that. Check the address and try again.",
+    405: "That isn't something I can do at this address.",
+}
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _handle_http_exception(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
+    # Routes raise `HTTPException` with `detail={"category": ..., "message":
+    # ...}` (matching `api/models/language.py`'s `ErrorResponse`). This
+    # handler flattens that dict to the top level of the response body
+    # instead of FastAPI's default `{"detail": {...}}` wrapping, so every
+    # error response -- validation or runtime -- has the exact same shape
+    # a client can rely on. It also catches Starlette's own 404/405, which
+    # would otherwise be a bare `{"detail": "Not Found"}`.
     if isinstance(exc.detail, dict) and "category" in exc.detail:
         content = exc.detail
     else:
-        content = {"category": "internal_error", "message": str(exc.detail)}
-    return JSONResponse(status_code=exc.status_code, content=content)
+        content = {
+            "category": "internal_error",
+            "message": _STATUS_MESSAGES.get(exc.status_code, str(exc.detail)),
+        }
+    return JSONResponse(
+        status_code=exc.status_code, content=content, headers=exc.headers
+    )
+
+
+def _friendly_validation_message(errors: list) -> str:
+    """One sentence a person can act on, from pydantic's first error."""
+    if not errors:
+        return "The request isn't quite right. Please check it and try again."
+    first = errors[0]
+    loc = [str(part) for part in first.get("loc", ()) if part != "body"]
+    field = loc[-1] if loc else "request"
+    kind = first.get("type", "")
+    msg = first.get("msg", "")
+    if field == "instruction" and kind in ("string_too_short", "missing"):
+        return "Please tell MILO what to do -- the instruction can't be empty."
+    if field == "instruction" and kind == "string_too_long":
+        return "That instruction is too long. Please keep it under 2000 characters."
+    if field == "planner":
+        return (
+            "I don't know that planner. Choose one of: rule_based, react, "
+            "behavior_tree, htn."
+        )
+    if kind == "missing":
+        return f"Something is missing: '{field}' is required."
+    if msg.startswith("Value error, "):
+        return msg[len("Value error, ") :]
+    return f"There's a problem with '{field}': {msg}"
 
 
 @app.exception_handler(RequestValidationError)
@@ -432,16 +545,16 @@ async def _handle_validation_error(
     # Overrides FastAPI's default `{"detail": [...]}` shape (a raw list
     # of pydantic error dicts) with this API's `ErrorResponse` shape
     # (`api/models/language.py`) so every error response -- request
-    # validation or runtime failure -- looks the same to a client.
-    # Safe to include pydantic's own message text here: it describes
-    # the *request body's* shape (e.g. "instruction must not be empty
-    # or whitespace-only"), never anything from the LLM provider or a
-    # credential.
-    first_error = exc.errors()[0] if exc.errors() else {}
-    message = first_error.get("msg", "The request body is invalid.")
+    # validation or runtime failure -- looks the same to a client, and
+    # the message is a sentence the UI can show as-is. Safe to build from
+    # pydantic's own text: it describes the *request's* shape, never
+    # anything from the LLM provider or a credential.
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"category": "invalid_request", "message": message},
+        content={
+            "category": "invalid_request",
+            "message": _friendly_validation_message(list(exc.errors())),
+        },
     )
 
 
@@ -460,6 +573,6 @@ async def _handle_unexpected_error(request: Request, exc: Exception) -> JSONResp
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "category": "internal_error",
-            "message": "An unexpected error occurred. Please try again later.",
+            "message": "Something went wrong on my side. Please try again in a moment.",
         },
     )

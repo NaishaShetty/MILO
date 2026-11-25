@@ -64,11 +64,13 @@ isTerminal pattern rather than introducing a new transport.
 See [`docs/screenshots/README.md`](../screenshots/README.md) for the
 full breakdown. Short version: `docs/screenshots/demo/live-*.png` were
 captured against a real running backend + real AI2-THOR; everything
-else in `docs/screenshots/` was captured by
-`frontend/tests/e2e/screenshots.spec.ts` against the same
+else in `docs/screenshots/` is a pre-redesign capture from the retired
+`frontend/tests/e2e/screenshots.spec.ts`, taken against the same
 `page.route()`-mocked backend the rest of the Playwright E2E suite uses
 — real frontend code, deterministic fixture data, never presented as a
-live MILO run.
+live MILO run. The current look of each page is pinned by
+`frontend/tests/e2e/visual.spec.ts` and its baselines in
+`visual.spec.ts-snapshots/`.
 
 ## Mock/test-data boundaries
 

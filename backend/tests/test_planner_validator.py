@@ -136,8 +136,8 @@ def test_duplicate_consecutive_step_flagged_as_warning_not_error():
     assert result.valid
 
 
-def test_goal_with_no_registered_check_is_unverifiable_not_invalid():
-    task = SingleTask(goal="turn_on", object="lamp")
+def test_a_step_the_executor_cannot_run_makes_the_plan_invalid():
+    task = SingleTask(goal="clean", object="lamp")
     steps = [
         PlanStep(step_id=1, action="locate", target="lamp", description="Locate lamp"),
         PlanStep(
@@ -147,10 +147,10 @@ def test_goal_with_no_registered_check_is_unverifiable_not_invalid():
             step_id=3,
             action="act",
             target="lamp",
-            parameters={"action": "turn_on"},
+            parameters={"action": "clean"},
             description="Act",
         ),
     ]
     result = VALIDATOR.validate(_plan(steps), task, WorldState.initial())
-    assert result.valid
-    assert result.goal_satisfied is None
+    assert not result.valid
+    assert [i.code for i in result.issues] == ["not_executable"]

@@ -37,13 +37,25 @@ shared domain this slice covers.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
-from planner.actions import CLOSE, LOCATE, NAVIGATE, OPEN, PICKUP, PLACE
-from planner.exceptions import InvalidTaskError, UnsupportedGoalError
-from planner.models import PlanStep
+from planner.actions import (
+    CLOSE,
+    LOCATE,
+    NAVIGATE,
+    OPEN,
+    PICKUP,
+    PLACE,
+    TURN_OFF,
+    TURN_ON,
+    get_action_spec,
+)
+from planner.exceptions import InvalidTaskError, PlanningError, UnsupportedGoalError
+from planner.models import PlanningResult, PlanStep
 from planner.planner import Planner
+from planner.progress import prune_satisfied_steps
 from planner.state import WorldState
 from schemas.task import SingleTask
 
@@ -185,7 +197,33 @@ def _close_object_method(args: Dict[str, Any]) -> List[Task]:
     return [CompoundTask("LocateObject", {"obj": obj}), PrimitiveTask(CLOSE, obj)]
 
 
+def _fetch_object_method(args: Dict[str, Any]) -> List[Task]:
+    """Fetch/deliver: acquire the object, then go to the destination --
+    `user` (the robot's start pose) when none was given."""
+    obj, destination = args["obj"], args["destination"]
+    return [
+        CompoundTask("AcquireObject", {"obj": obj}),
+        CompoundTask("LocateObject", {"obj": destination}),
+    ]
+
+
+def _toggle_object_method(args: Dict[str, Any]) -> List[Task]:
+    obj = args["obj"]
+    action = TURN_ON if args["on"] else TURN_OFF
+    return [CompoundTask("LocateObject", {"obj": obj}), PrimitiveTask(action, obj)]
+
+
+def _do_all_method(args: Dict[str, Any]) -> List[Task]:
+    """Multi-object tasks ("clear the table", "tidy up"): the sub-goals'
+    own root tasks, in order -- each is decomposed against the state the
+    previous ones have already advanced."""
+    return list(args["children"])
+
+
 METHOD_LIBRARY: Dict[str, List[Method]] = {
+    "FetchObject": [Method("fetch_object", _always, _fetch_object_method)],
+    "ToggleObject": [Method("toggle_object", _always, _toggle_object_method)],
+    "DoAll": [Method("do_all", _always, _do_all_method)],
     "LocateObject": [Method("locate_object", _always, _locate_object_method)],
     "AcquireObject": [Method("acquire_object", _always, _acquire_object_method)],
     "DepositObject": [
@@ -266,7 +304,40 @@ def _root_close(task: SingleTask) -> Task:
     return CompoundTask("CloseObject", {"obj": obj})
 
 
+def _root_fetch(task: SingleTask) -> Task:
+    obj = _require(task.object, task.goal or "fetch", "object")
+    destination = task.target or task.target_location or "user"
+    return CompoundTask("FetchObject", {"obj": obj, "destination": destination})
+
+
+def _root_deliver(task: SingleTask) -> Task:
+    obj = _require(task.object, task.goal or "deliver", "object")
+    destination = _require(
+        task.target or task.target_location, task.goal or "deliver", "target"
+    )
+    return CompoundTask("FetchObject", {"obj": obj, "destination": destination})
+
+
+def _root_toggle(on: bool) -> Callable[[SingleTask], Task]:
+    def build(task: SingleTask) -> Task:
+        obj = _require(
+            _primary_reference(task),
+            task.goal or ("turn_on" if on else "turn_off"),
+            "object or target",
+        )
+        return CompoundTask("ToggleObject", {"obj": obj, "on": on})
+
+    return build
+
+
 HTN_GOAL_TASKS: Dict[str, Callable[[SingleTask], Task]] = {
+    "fetch": _root_fetch,
+    "deliver": _root_deliver,
+    "turn_on": _root_toggle(True),
+    "turn_off": _root_toggle(False),
+    "navigate_to": _root_locate,
+    "follow": _root_locate,
+    "return_to": _root_locate,
     "find": _root_locate,
     "search_for": _root_locate,
     "locate": _root_locate,
@@ -328,6 +399,13 @@ class _StepBuilder:
 
 
 def _decompose(task: Task, state: WorldState, builder: _StepBuilder) -> None:
+    """See `_decompose_into`; `state` is advanced by every primitive
+    emitted so a later sibling task's method choice sees the effects of
+    the earlier ones (essential for multi-object plans)."""
+    _decompose_into(task, state, builder)
+
+
+def _decompose_into(task: Task, state: WorldState, builder: _StepBuilder) -> None:
     """Recursive task-network expansion: a primitive is emitted
     directly; a compound task selects its first applicable method (in
     `METHOD_LIBRARY[task.name]` order) and recurses into that method's
@@ -336,6 +414,9 @@ def _decompose(task: Task, state: WorldState, builder: _StepBuilder) -> None:
     domain never needs backtracking across method choices."""
     if isinstance(task, PrimitiveTask):
         builder.add(task.action, task.target, task.parameters)
+        spec = get_action_spec(task.action)
+        if spec is not None:
+            spec.apply_effect(state, task.target, task.parameters)
         return
 
     methods = METHOD_LIBRARY.get(task.name)
@@ -346,7 +427,7 @@ def _decompose(task: Task, state: WorldState, builder: _StepBuilder) -> None:
     for method in methods:
         if method.precondition(state, task.args):
             for subtask in method.decompose(task.args):
-                _decompose(subtask, state, builder)
+                _decompose_into(subtask, state, builder)
             return
     raise UnsupportedGoalError(
         f"No applicable method for compound task {task.name!r} given current state."
@@ -354,11 +435,86 @@ def _decompose(task: Task, state: WorldState, builder: _StepBuilder) -> None:
 
 
 class HTNPlanner(Planner):
-    """Hierarchical Task Network planning strategy -- slice 1. See
+    """Hierarchical Task Network planning strategy. See
     `docs/architecture/planning.md`'s "HTN planner" section for the
-    full design and this module's docstring for scope."""
+    full design and this module's docstring for scope.
+
+    `fallback_planner` (optional, typically a `RuleBasedPlanner`): a goal
+    this network has no method for is handed to it instead of failing,
+    and the resulting plan says so in `metadata["planner_fallback"]` --
+    a plain-language reason, never a silent substitution.
+    """
 
     planner_type = "htn"
+
+    def __init__(
+        self, validator=None, fallback_planner: Optional[Planner] = None
+    ) -> None:
+        super().__init__(validator=validator)
+        self._fallback_planner = fallback_planner
+
+    def plan(self, task, state, memory_context=None):  # type: ignore[no-untyped-def]
+        goal = (task.goal or "").strip().lower()
+        if self._fallback_planner is not None and goal and goal not in HTN_GOAL_TASKS:
+            reason = (
+                f"The HTN planner has no method for '{goal}' yet, so the "
+                f"{self._fallback_planner.planner_type.replace('_', '-')} planner "
+                "made this plan instead."
+            )
+            result = self._fallback_planner.plan(task, state, memory_context)
+            if result.plan is not None:
+                result.plan.metadata["planner_fallback"] = {
+                    "requested": self.planner_type,
+                    "used": self._fallback_planner.planner_type,
+                    "reason": reason,
+                }
+            return result
+        return super().plan(task, state, memory_context)
+
+    def plan_multi(  # type: ignore[no-untyped-def]
+        self, tasks, state, memory_context=None, *, task_id="", goal="multi_step"
+    ):
+        """Composes the sub-goals' root tasks under one `DoAll` compound
+        task and decomposes it as a single network -- when every
+        sub-goal is one this planner knows. Otherwise the generic
+        sequential `Planner.plan_multi` (which honours the fallback)."""
+        goals = [(t.goal or "").strip().lower() for t in tasks]
+        if not tasks or any(g not in HTN_GOAL_TASKS for g in goals):
+            return super().plan_multi(
+                tasks, state, memory_context, task_id=task_id, goal=goal
+            )
+        started_at = time.monotonic()
+        try:
+            root = CompoundTask(
+                "DoAll",
+                {"children": [HTN_GOAL_TASKS[g](t) for g, t in zip(goals, tasks)]},
+            )
+            builder = _StepBuilder()
+            _decompose(root, state.clone(), builder)
+        except PlanningError as exc:
+            return PlanningResult(
+                success=False,
+                plan=None,
+                validation=None,
+                errors=[str(exc)],
+                planner_type=self.planner_type,
+                latency_ms=(time.monotonic() - started_at) * 1000.0,
+            )
+        steps, skipped = prune_satisfied_steps(builder.steps, state)
+        header = SingleTask(goal=goal, task_id=task_id or None)
+        result = self._finalize(header, state, steps, started_at, memory_context)
+        if result.plan is not None:
+            result.plan.metadata["sub_goals"] = [
+                {
+                    "goal": t.goal,
+                    "object": t.object,
+                    "target": t.target or t.target_location,
+                }
+                for t in tasks
+            ]
+            if skipped:
+                result.plan.metadata["skipped_steps"] = skipped
+        return result
 
     def _generate_steps(
         self,
@@ -376,11 +532,12 @@ class HTNPlanner(Planner):
         root_builder = HTN_GOAL_TASKS.get(goal)
         if root_builder is None:
             raise UnsupportedGoalError(
-                f"HTNPlanner (slice 1) has no coverage for goal '{goal}'. "
-                "Supported goals: " + ", ".join(sorted(HTN_GOAL_TASKS))
+                f"The HTN planner doesn't know how to '{goal}' yet. "
+                "It can plan: " + ", ".join(sorted(HTN_GOAL_TASKS)) + ". "
+                "Try the rule-based planner for this one."
             )
 
         root_task = root_builder(task)
         builder = _StepBuilder()
-        _decompose(root_task, state, builder)
+        _decompose(root_task, state.clone(), builder)
         return builder.steps

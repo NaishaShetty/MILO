@@ -129,3 +129,7 @@ frontend/.vercel/
 frontend/playwright-report/
 frontend/test-results/
 frontend/blob-report/
+
+# Learned-model data (episode logs, datasets, trained artifacts)
+backend/data/
+backend/artifacts/

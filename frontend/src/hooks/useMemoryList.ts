@@ -20,6 +20,8 @@ const POLL_INTERVAL_MS = 5000;
 export interface MemoryListResult {
   memories: MemoryListResponse["memories"];
   countsByType: MemoryListResponse["counts_by_type"];
+  trust: NonNullable<MemoryListResponse["trust"]>;
+  quarantined: number;
   status: "idle" | "loading" | "success" | "error";
   error: unknown;
   refresh: () => void;
@@ -34,6 +36,8 @@ export function useMemoryList(enabled = true): MemoryListResult {
   return {
     memories: data?.memories ?? [],
     countsByType: data?.counts_by_type ?? {},
+    trust: data?.trust ?? {},
+    quarantined: data?.quarantined ?? 0,
     status,
     error,
     refresh,

@@ -15,9 +15,8 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # The canonical MILO character assets (frontend/public/assets/milo/,
-    # copied verbatim into the build -- see src/state/miloState.ts) and
-    # every other hashed build asset: served directly, long-cached.
+    # Vite's hashed build assets (JS, CSS, fonts): their names change with
+    # their content, so they are served directly and cached for a year.
     location /assets/ {
         try_files $uri =404;
         add_header Cache-Control "public, max-age=31536000, immutable";

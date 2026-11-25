@@ -42,11 +42,11 @@ const DEFAULT_ERROR_MESSAGE = "The vision service could not be reached. Please t
  * failure (`fetch` rejecting) propagate as-is, same distinction
  * `parseInstruction` makes -- see `language.ts`.
  */
-export async function perceive(prompt: string): Promise<PerceiveResponse> {
+export async function perceive(prompt: string, includeMasks = true): Promise<PerceiveResponse> {
   const response = await fetch("/api/v1/vision/perceive", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify(includeMasks ? { prompt } : { prompt, include_masks: false }),
   });
 
   if (!response.ok) {

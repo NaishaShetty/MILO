@@ -10,7 +10,12 @@
 // backend route did not exist before Phase 8.2.
 
 import { ApiError, request } from "./client";
-import type { MemoryListResponse, MemorySearchResponse, MemoryType } from "./memoryTypes";
+import type {
+  Memory,
+  MemoryListResponse,
+  MemorySearchResponse,
+  MemoryType,
+} from "./memoryTypes";
 
 export { ApiError as MemoryApiError };
 
@@ -27,4 +32,27 @@ export async function listMemory(memoryType?: MemoryType, limit = 200): Promise<
     params.set("memory_type", memoryType);
   }
   return request<MemoryListResponse>(`/api/v1/memory?${params.toString()}`);
+}
+
+/** `POST /api/v1/memory/{id}/forget` -- archives the memory so MILO stops using it. */
+export async function forgetMemory(memoryId: string): Promise<Memory> {
+  return request<Memory>(`/api/v1/memory/${encodeURIComponent(memoryId)}/forget`, {
+    method: "POST",
+  });
+}
+
+/** `PATCH /api/v1/memory/{id}` -- fix the place / text, pin, or set aside for review. */
+export async function editMemory(
+  memoryId: string,
+  change: { place?: string; content?: string; pinned?: boolean; quarantined?: boolean },
+): Promise<Memory> {
+  return request<Memory>(`/api/v1/memory/${encodeURIComponent(memoryId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(change),
+  });
+}
+
+/** `DELETE /api/v1/memory/{id}` -- remove it for good. */
+export async function deleteMemory(memoryId: string): Promise<void> {
+  await request(`/api/v1/memory/${encodeURIComponent(memoryId)}`, { method: "DELETE" });
 }

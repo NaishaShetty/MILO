@@ -17,7 +17,9 @@ import type { AgentSummary } from "../api/agentsTypes";
 import type { PollingStatus } from "../hooks/usePolling";
 import { usePolling } from "../hooks/usePolling";
 
-const POLL_INTERVAL_MS = 3000;
+// Agent status changes rarely and the active task's own stream already carries
+// `agent_states`, so this only needs a slow background refresh.
+const POLL_INTERVAL_MS = 10000;
 
 export interface AgentsContextValue {
   agents: AgentSummary[];

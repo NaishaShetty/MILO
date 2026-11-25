@@ -19,6 +19,49 @@ export interface ApiErrorBody {
   message: string;
 }
 
+const API_KEY_STORAGE = "milo.apiKey";
+
+/**
+ * The optional API key (`API_KEY` on the backend). Read from localStorage
+ * (set it in Settings) or the build-time `VITE_API_KEY`; `null` when none
+ * is configured, in which case no header is sent.
+ */
+export function getApiKey(): string | null {
+  try {
+    const stored = window.localStorage.getItem(API_KEY_STORAGE);
+    if (stored) return stored;
+  } catch {
+    // localStorage unavailable (private mode, tests) -- fall through.
+  }
+  const built = import.meta.env.VITE_API_KEY as string | undefined;
+  return built ? built : null;
+}
+
+export function setApiKey(key: string | null): void {
+  try {
+    if (key) window.localStorage.setItem(API_KEY_STORAGE, key);
+    else window.localStorage.removeItem(API_KEY_STORAGE);
+  } catch {
+    // Nothing to do: the key just won't persist.
+  }
+}
+
+function authHeaders(): Record<string, string> {
+  const key = getApiKey();
+  return key ? { "X-API-Key": key } : {};
+}
+
+/**
+ * Adds `?api_key=` to a *stream* URL. `EventSource` cannot set headers, so
+ * the two `/stream` routes accept the key as a query parameter; every
+ * other request uses the `X-API-Key` header via `request()`.
+ */
+export function withApiKey(url: string): string {
+  const key = getApiKey();
+  if (!key) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}api_key=${encodeURIComponent(key)}`;
+}
+
 const DEFAULT_ERROR_MESSAGE = "The backend could not be reached. Please try again.";
 
 /** Thrown by `request()`/`requestForm()` for any non-2xx response. */
@@ -55,8 +98,8 @@ async function safeReadErrorBody(response: Response): Promise<ApiErrorBody> {
  */
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...init?.headers },
   });
 
   if (!response.ok) {
@@ -77,7 +120,11 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
  * which it only does when `fetch` is not given one explicitly.
  */
 export async function requestForm<T>(path: string, form: FormData): Promise<T> {
-  const response = await fetch(path, { method: "POST", body: form });
+  const key = getApiKey();
+  const response = await fetch(
+    path,
+    key ? { method: "POST", body: form, headers: authHeaders() } : { method: "POST", body: form },
+  );
 
   if (!response.ok) {
     throw new ApiError(response.status, await safeReadErrorBody(response));

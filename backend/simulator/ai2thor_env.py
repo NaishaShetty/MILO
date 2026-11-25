@@ -109,6 +109,8 @@ class AI2ThorEnv:
         self.platform = platform
 
         self.controller = None
+        # Where the agent started the episode -- see `navigate_home()`.
+        self._home_pose = None
 
     ####################################################
 
@@ -135,6 +137,18 @@ class AI2ThorEnv:
             renderDepthImage=self.render_depth,
             platform=self.platform,
         )
+        self._home_pose = self._read_pose(self.controller.last_event)
+
+    @staticmethod
+    def _read_pose(event):
+        agent = ((event.metadata if event is not None else None) or {}).get("agent")
+        if not agent or not agent.get("position") or agent.get("rotation") is None:
+            return None
+        return {
+            "position": dict(agent["position"]),
+            "rotation": dict(agent["rotation"]),
+            "horizon": agent.get("cameraHorizon", 0),
+        }
 
     ####################################################
 
@@ -147,6 +161,7 @@ class AI2ThorEnv:
         if self.controller is not None:
             self.controller.stop()
             self.controller = None
+            self._home_pose = None
 
     ####################################################
 
@@ -291,6 +306,64 @@ class AI2ThorEnv:
     def close_object(self, object_id):
         """Closes the object with the given AI2-THOR `objectId`."""
         return self._step(CLOSE_OBJECT, objectId=object_id, forceAction=True)
+
+    ####################################################
+
+    def drop_held_object(self):
+        """Drops whatever the agent is holding (used to leave a clean state
+        after a cancelled task)."""
+        return self._step(DROP_HAND_OBJECT, PUSH_OBJECT, forceAction=True)
+
+    ####################################################
+
+    def push_object(self, object_id, force=50.0):
+        """Pushes the object (AI2-THOR `PushObject`, `force` in newtons)."""
+        return self._step(
+            PUSH_OBJECT, objectId=object_id, moveMagnitude=force, forceAction=True
+        )
+
+    ####################################################
+
+    def look_around(self):
+        """Turns a full circle in 90-degree steps; returns the last event."""
+        event = None
+        for _ in range(4):
+            event = self._step(TURN_RIGHT)
+        return event
+
+    ####################################################
+
+    def toggle_object_on(self, object_id):
+        """Switches the object with the given `objectId` on (lights, tap,
+        toaster, ...). `forceAction=True` for the same reason as
+        `open_object()`."""
+        return self._step(TOGGLE_OBJECT_ON, objectId=object_id, forceAction=True)
+
+    ####################################################
+
+    def toggle_object_off(self, object_id):
+        """Switches the object with the given `objectId` off."""
+        return self._step(TOGGLE_OBJECT_OFF, objectId=object_id, forceAction=True)
+
+    ####################################################
+
+    def navigate_home(self):
+        """
+        Teleports the agent back to the pose it started the episode in
+        ("bring it to me"). The pose is captured lazily from the first
+        metadata read after `start()`; if none was ever captured the
+        current pose is used, which makes this a harmless no-op.
+        """
+        pose = self._home_pose
+        if pose is None:
+            return self._step("Pass")
+        return self._step(
+            TELEPORT_FULL,
+            position=pose["position"],
+            rotation={"x": 0, "y": pose["rotation"]["y"], "z": 0},
+            horizon=pose["horizon"],
+            standing=True,
+        )
 
     ####################################################
 

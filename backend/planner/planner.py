@@ -59,8 +59,10 @@ import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, ClassVar, List, Optional
 
+from planner.actions import get_action_spec
 from planner.exceptions import PlanningError
 from planner.models import Plan, PlanningResult, PlanStep
+from planner.progress import prune_satisfied_steps
 from planner.state import WorldState
 from planner.validator import PlanValidator
 from schemas.task import SingleTask
@@ -132,7 +134,79 @@ class Planner(ABC):
                 planner_type=self.planner_type,
                 latency_ms=elapsed_ms,
             )
-        return self._finalize(task, state, steps, started_at, memory_context)
+        # Resumable planning: a replan after partial progress (or a goal
+        # that is already half-true) must not re-emit work the state
+        # already satisfies -- see `planner/progress.py`.
+        steps, skipped = prune_satisfied_steps(steps, state)
+        result = self._finalize(task, state, steps, started_at, memory_context)
+        if skipped and result.plan is not None:
+            result.plan.metadata["skipped_steps"] = skipped
+        return result
+
+    def plan_multi(
+        self,
+        tasks: List[SingleTask],
+        state: WorldState,
+        memory_context: "Optional[PlannerMemoryContext]" = None,
+        *,
+        task_id: str = "",
+        goal: str = "multi_step",
+    ) -> PlanningResult:
+        """
+        Plans several sub-goals (a `MultiTask`: "clear the table", "tidy
+        up", "put the apple in the fridge and the mug on the shelf") as
+        ONE plan, in order. Each sub-goal is planned by this strategy's
+        own `plan()` against a working state that the previous
+        sub-goals' effects have already advanced -- so the second
+        object's plan sees an empty hand, an already-open fridge, etc.
+        -- and the resulting steps are concatenated and renumbered.
+
+        A sub-goal that cannot be planned fails the whole plan with a
+        plain-language reason naming it; nothing is half-planned.
+        """
+        started_at = time.monotonic()
+        working = state.clone()
+        steps: List[PlanStep] = []
+        skipped: List[str] = []
+        for index, sub in enumerate(tasks, start=1):
+            result = self.plan(sub, working, memory_context)
+            if not result.success or result.plan is None:
+                reason = "; ".join(result.errors) or (
+                    "its plan was not valid"
+                    if result.validation is not None
+                    else "it could not be planned"
+                )
+                return PlanningResult(
+                    success=False,
+                    plan=None,
+                    validation=result.validation,
+                    errors=[f"Step {index} of {len(tasks)} ({sub.goal}): {reason}"],
+                    planner_type=self.planner_type,
+                    latency_ms=(time.monotonic() - started_at) * 1000.0,
+                )
+            for step in result.plan.steps:
+                spec = get_action_spec(step.action)
+                if spec is not None:
+                    spec.apply_effect(working, step.target, step.parameters)
+                steps.append(step)
+            skipped.extend(result.plan.metadata.get("skipped_steps", []))
+        for new_id, step in enumerate(steps, start=1):
+            step.step_id = new_id
+
+        header = SingleTask(goal=goal, task_id=task_id or None)
+        merged = self._finalize(header, state, steps, started_at, memory_context)
+        if merged.plan is not None:
+            merged.plan.metadata["sub_goals"] = [
+                {
+                    "goal": t.goal,
+                    "object": t.object,
+                    "target": t.target or t.target_location,
+                }
+                for t in tasks
+            ]
+            if skipped:
+                merged.plan.metadata["skipped_steps"] = skipped
+        return merged
 
     @abstractmethod
     def _generate_steps(
@@ -213,7 +287,9 @@ class Planner(ABC):
             success=validation.valid,
             plan=plan,
             validation=validation,
-            errors=[],
+            # A step the executor cannot run is the one reason the user should
+            # hear in words ("I don't have a way to do 'clean' yet").
+            errors=[i.message for i in validation.issues if i.code == "not_executable"],
             planner_type=self.planner_type,
             latency_ms=elapsed_ms,
         )

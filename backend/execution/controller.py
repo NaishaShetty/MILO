@@ -71,9 +71,10 @@ from __future__ import annotations
 import logging
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from execution.dispatcher import ActionDispatcher
 from execution.errors import ExecutionError, ExecutionErrorCode
@@ -124,7 +125,12 @@ _ACTION_NAME_TO_TYPE = {
     "pickup": ActionType.PICKUP,
     "open": ActionType.OPEN,
     "close": ActionType.CLOSE,
+    "turn_on": ActionType.TURN_ON,
+    "turn_off": ActionType.TURN_OFF,
     "place": ActionType.PUT,
+    "put_down": ActionType.DROP,
+    "push": ActionType.PUSH,
+    "look_around": ActionType.LOOK_AROUND,
 }
 
 
@@ -144,6 +150,7 @@ class ExecutionController:
         *,
         max_step_retries: int = 0,
         step_timeout_s: Optional[float] = None,
+        step_listener: Optional[Callable[[PlanStep, str], None]] = None,
     ) -> None:
         self._simulator = simulator
         self._dispatcher = (
@@ -154,6 +161,11 @@ class ExecutionController:
         self._result_validator = ResultValidator()
         self._max_step_retries = max_step_retries
         self._step_timeout_s = step_timeout_s
+        # Called as `listener(step, status)` for every step event
+        # ("started", "success", "failed", "blocked", "skipped",
+        # "cancelled", "already_done") so a caller can narrate progress
+        # live. Exceptions in it never affect execution.
+        self._step_listener = step_listener
         self._cancelled = threading.Event()
 
     def load_plan(self, plan: Plan) -> ExecutionRecord:
@@ -255,6 +267,18 @@ class ExecutionController:
                 self._emit(record, step, "skipped")
                 continue
 
+            if step.status == StepStatus.COMPLETED:
+                # A retry (`Orchestrator`'s "retry" verdict) re-executes
+                # the *same* `Plan` object, whose steps were mutated in
+                # place by the previous attempt. A step that already
+                # succeeded must not run again: its effect is already
+                # on `state` (and in the simulator), and re-running e.g.
+                # `pickup` while holding the object would be rejected
+                # and turn a one-step hiccup into a whole-plan failure.
+                step_result.status = StepStatus.COMPLETED
+                self._emit(record, step, "already_done")
+                continue
+
             result = self.execute_step(plan, step, state, record)
             if not result.success:
                 halted = True
@@ -299,6 +323,18 @@ class ExecutionController:
         step_result = next(s for s in record.step_results if s.step_id == step.step_id)
         step_result.status = StepStatus.RUNNING
         self._emit(record, step, "started")
+        if step.parameters.get("skip_requested"):
+            # The user said "skip" when asked to approve this step.
+            step.status = StepStatus.SKIPPED
+            step_result.status = StepStatus.SKIPPED
+            self._emit(record, step, "skipped")
+            return ActionResult(
+                success=True,
+                action=step.action,
+                action_id=str(uuid.uuid4()),
+                step_id=step.step_id,
+                metadata={"skipped_by_user": True},
+            )
 
         if self._simulator is None or self._dispatcher is None:
             raise SimulatorUnavailableError(
@@ -400,7 +436,7 @@ class ExecutionController:
     def _build_action(
         self, step: PlanStep, object_id: Optional[str], container_id: Optional[str]
     ) -> Action:
-        action_type = _ACTION_NAME_TO_TYPE.get(step.action, ActionType.LOCATE)
+        action_type = _ACTION_NAME_TO_TYPE[step.action]
         parameters: Dict[str, Any] = {}
         if object_id is not None:
             parameters["object_id"] = object_id
@@ -523,9 +559,22 @@ class ExecutionController:
         if self._step_timeout_s is None:
             return self._dispatcher.dispatch(action)
 
-        with ThreadPoolExecutor(max_workers=1) as pool:
+        # Deliberately NOT `with ThreadPoolExecutor(...) as pool:` --
+        # that context manager's `__exit__` calls `shutdown(wait=True)`,
+        # which blocks until the worker finishes, so a hung simulator
+        # call would keep this method (and the whole step) stuck long
+        # after `future.result(timeout=...)` had already raised. Shut
+        # the pool down without waiting instead: the timeout error
+        # propagates immediately, queued-but-unstarted work is cancelled,
+        # and the one hung worker thread is simply abandoned (a Python
+        # thread cannot be killed; it ends whenever the simulator call
+        # finally returns).
+        pool = ThreadPoolExecutor(max_workers=1)
+        try:
             future = pool.submit(self._dispatcher.dispatch, action)
             return future.result(timeout=self._step_timeout_s)
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
 
     def _emit(
         self,
@@ -548,3 +597,8 @@ class ExecutionController:
             message=error.message if error is not None else None,
         )
         record.events.append(event)
+        if self._step_listener is not None:
+            try:
+                self._step_listener(step, status)
+            except Exception:
+                logger.warning("execution.step_listener_failed", exc_info=True)

@@ -37,6 +37,10 @@ class PlannerAgentWrapper(BaseAgent):
         super().__init__()
         self._planner = planner
 
+    @property
+    def planner_type(self) -> str:
+        return self._planner.planner_type
+
     def plan(
         self,
         task: SingleTask,
@@ -57,6 +61,28 @@ class PlannerAgentWrapper(BaseAgent):
     ) -> PlanningResult:
         """Same call as `plan()` -- see module docstring for why."""
         return self.plan(task, state, memory_context)
+
+    def plan_multi(
+        self,
+        tasks,
+        state: WorldState,
+        memory_context: Optional[PlannerMemoryContext] = None,
+        *,
+        task_id: str = "",
+        goal: str = "multi_step",
+    ) -> PlanningResult:
+        """Plans several sub-goals as one plan -- `Planner.plan_multi`."""
+        self._state = AgentState.THINKING
+        try:
+            return self._planner.plan_multi(
+                tasks, state, memory_context, task_id=task_id, goal=goal
+            )
+        finally:
+            self._state = AgentState.IDLE
+
+    def replan_multi(self, tasks, state, memory_context=None, **kwargs):  # type: ignore[no-untyped-def]
+        """Same call as `plan_multi()` -- the state already reflects progress."""
+        return self.plan_multi(tasks, state, memory_context, **kwargs)
 
     def process(self, request: AgentRequest) -> AgentResponse:
         return AgentResponse(

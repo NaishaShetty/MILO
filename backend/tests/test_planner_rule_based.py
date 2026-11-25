@@ -170,10 +170,11 @@ def test_store_goal_does_not_reopen_an_already_open_container():
     assert "close" not in [s.action for s in result.plan.steps]
 
 
-def test_generic_fallback_goal_still_produces_a_plan():
-    result = _plan(goal="turn_on", object="lamp")
-    assert result.success
+def test_generic_fallback_goal_is_refused_because_nothing_can_execute_it():
+    result = _plan(goal="clean", object="lamp")
+    assert not result.success
     assert result.plan.steps[-1].action == "act"
+    assert result.errors == ["I don't have a way to do 'clean' yet."]
 
 
 def test_invalid_task_missing_object_for_store_goal():

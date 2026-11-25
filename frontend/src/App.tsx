@@ -1,27 +1,3 @@
-// App.tsx
-//
-// Purpose
-// -------
-// Top-level component for the MILO application (Session 3 / Phase 7).
-// Supersedes the earlier single-page Vision+Language dashboard (see
-// git history / the old `App.test.tsx`) with the seven routed MILO
-// pages the spec requires -- no Mission Detail page, exactly these
-// seven: Home, Mission Control, Memory, Activity, About MILO, MILO
-// Lab, Settings. The Vision/Language/Planner/Execution components and
-// API modules this replaced are not deleted -- they're still used
-// where they fit inside the new pages (e.g. `VisionPanel` inside
-// Mission Control's "MILO's Eyes"/"Detected Objects"); only this
-// top-level composition changes, per Session 3's explicit brief.
-//
-// Provider order (outermost first): Settings (theme must be known
-// before anything renders), Agents, Task, Speech, Voice (Phase 8.2) --
-// Speech/Voice are innermost since both only ever call into Task
-// (`submitInstruction`, `useTask()`) from page code/other providers,
-// never the reverse. `MiloStateProvider` (Phase 8.3) is innermost of
-// all: it reads Agents/Task/Speech/Voice to derive the one canonical
-// `MiloState`, so it must sit inside every context it reads from.
-// `ErrorBoundary` wraps `<Routes>` only, not the providers themselves,
-// so a render crash inside one page can't take down navigation.
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -33,16 +9,26 @@ import { SpeechProvider } from "./state/SpeechContext";
 import { TaskProvider } from "./state/TaskContext";
 import { VoiceProvider } from "./state/VoiceContext";
 import { AboutPage } from "./pages/AboutPage";
-import { ActivityPage } from "./pages/ActivityPage";
-import { HomePage } from "./pages/HomePage";
+import { ModelsPanel } from "./components/ModelsPanel";
 import { LabPage } from "./pages/LabPage";
 import { MemoryPage } from "./pages/MemoryPage";
-import { MissionControlPage } from "./pages/MissionControlPage";
+import { SkillsPage } from "./pages/SkillsPage";
+import { LeaderboardPage } from "./pages/LeaderboardPage";
+import { DemoPage } from "./pages/DemoPage";
+import { isDemo } from "./api/demo";
+import { ReplayPage } from "./pages/ReplayPage";
+import { ObservabilityPanel } from "./components/ObservabilityPanel";
+import { MissionsPage } from "./pages/MissionsPage";
+import { PlayPage } from "./pages/PlayPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { BrowserVoiceProvider } from "./state/BrowserVoice";
 
+// Four friendly spaces -- Play, Missions, Memory, Lab -- plus About and
+// Settings under the gear and Activity as a drawer (see NavBar).
 export default function App() {
   return (
     <SettingsProvider>
+      <BrowserVoiceProvider>
       <AgentsProvider>
         <TaskProvider>
           <SpeechProvider>
@@ -53,13 +39,18 @@ export default function App() {
                     <NavBar />
                     <ErrorBoundary>
                       <Routes>
-                        <Route path="/" element={<HomePage />} />
-                        <Route path="/mission-control" element={<MissionControlPage />} />
+                        <Route path="/" element={isDemo() ? <DemoPage /> : <PlayPage />} />
+                        <Route path="/demo" element={<DemoPage />} />
+                        <Route path="/missions" element={<MissionsPage />} />
+                        <Route path="/mission-control" element={<Navigate to="/missions" replace />} />
                         <Route path="/memory" element={<MemoryPage />} />
-                        <Route path="/activity" element={<ActivityPage />} />
-                        <Route path="/about" element={<AboutPage />} />
-                        <Route path="/lab" element={<LabPage />} />
-                        <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/skills" element={<SkillsPage />} />
+                        <Route path="/leaderboard" element={<LeaderboardPage />} />
+                        <Route path="/replay" element={<ReplayPage />} />
+                        <Route path="/replay/:missionId" element={<ReplayPage />} />
+                        <Route path="/lab" element={<div className="legacy-page"><ModelsPanel /><ObservabilityPanel /><LabPage /></div>} />
+                        <Route path="/about" element={<div className="legacy-page"><AboutPage /></div>} />
+                        <Route path="/settings" element={<div className="legacy-page"><SettingsPage /></div>} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                       </Routes>
                     </ErrorBoundary>
@@ -70,6 +61,7 @@ export default function App() {
           </SpeechProvider>
         </TaskProvider>
       </AgentsProvider>
+      </BrowserVoiceProvider>
     </SettingsProvider>
   );
 }

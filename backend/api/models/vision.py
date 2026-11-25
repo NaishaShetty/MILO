@@ -57,6 +57,11 @@ class PerceiveRequest(BaseModel):
         "'chair. table. mug. apple. bottle. refrigerator.'.",
         examples=["chair. table. mug. apple. bottle. refrigerator."],
     )
+    include_masks: bool = Field(
+        default=True,
+        description="Run segmentation (SAM2) so the camera image shows "
+        "object masks. Set false for a faster, boxes-only view.",
+    )
 
 
 class SpatialObject(BaseModel):

@@ -10,9 +10,8 @@
 # Two stages: (1) install deps and produce a real Vite production
 # build (`npm run build` -- the same `tsc --noEmit && vite build` used
 # in CI/locally, so a broken build fails here too, not just in CI),
-# (2) serve the built static assets (including the canonical MILO
-# character PNGs under /assets/milo/, copied verbatim by Vite from
-# public/ -- see frontend/src/state/miloState.ts) from nginx.
+# (2) serve the built static assets (including public/demo/, the
+# recorded missions demo mode replays) from nginx.
 #
 # Why the frontend still only ever calls relative URLs
 # ------------------------------------------------------

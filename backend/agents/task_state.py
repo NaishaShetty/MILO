@@ -39,6 +39,7 @@ file to exist, per this phase's "reuse, don't duplicate" rule.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -105,6 +106,44 @@ class TaskState:
     #: Distinct from `retrieved_memories` (memory read *before*
     #: planning); this is memory written *after* the task concluded.
     created_memories: List[Dict[str, Any]] = field(default_factory=list)
+    #: A plain-language result to show the user, when the task has one
+    #: beyond "it worked" -- where a `find` found the thing, why a
+    #: composite task had nothing to do ("The table is already clear.").
+    answer: Optional[str] = None
+    #: The single-object sub-goals a composite/multi task ran, in order:
+    #: `{"goal", "object", "target"}` each. Empty for a plain task.
+    sub_goals: List[Dict[str, Any]] = field(default_factory=list)
+    #: What MILO learned from this mission, as sentences ("The apple goes
+    #: in the fridge."). Written to memory too; shown in the Missions page.
+    learned: List[str] = field(default_factory=list)
+    #: Which planning strategy this task used ("rule_based", "react",
+    #: "behavior_tree", "htn") -- the one actually requested.
+    planner: Optional[str] = None
+    #: A plain-language note when the planner did not do exactly what was
+    #: asked (e.g. HTN handed an unknown goal to the rule-based planner).
+    planner_note: Optional[str] = None
+    #: True from the moment a cancel is requested until the task stops --
+    #: lets a UI show "Stopping..." while the current step finishes.
+    cancel_requested: bool = False
+    #: What MILO did to leave things tidy after a cancel ("I put down the
+    #: apple.").
+    cancel_summary: Optional[str] = None
+    #: MILO's running commentary, oldest first: `{"kind", "text", "at",
+    #: "step_id"}` where kind is memory | planner | eyes | hands | reflect.
+    thoughts: List[Dict[str, Any]] = field(default_factory=list)
+    #: Success-predicate results checked against the simulator at the end
+    #: (`verification.predicates`): [{kind, object, text, ok, reason}, ...].
+    verification: List[Dict[str, Any]] = field(default_factory=list)
+    #: What MILO is waiting for the user to decide (a risky step or a plan preview);
+    #: None when it isn't waiting (`oversight.gate`).
+    pending_decision: Optional[Dict[str, Any]] = None
+    #: Each completed step with the state just before it, for undo (`oversight.undo`).
+    undo_log: List[Dict[str, Any]] = field(default_factory=list)
+    #: The user's own words, when the task came from a sentence.
+    instruction: Optional[str] = None
+    #: When the task was created (epoch seconds) -- for "yesterday"-style
+    #: labels on recent missions.
+    created_at: float = field(default_factory=time.time)
 
     def metrics(self) -> Dict[str, Any]:
         """
@@ -159,7 +198,20 @@ class TaskState:
             "retrieved_memories": self.retrieved_memories,
             "agent_states": {k: v.value for k, v in self.agent_states.items()},
             "status": self.status.value,
+            "verification": self.verification,
+            "pending_decision": self.pending_decision,
+            "undo_log": self.undo_log,
+            "instruction": self.instruction,
             "latencies_ms": self.latencies_ms,
             "created_memories": self.created_memories,
+            "answer": self.answer,
+            "sub_goals": self.sub_goals,
+            "learned": self.learned,
+            "planner": self.planner,
+            "planner_note": self.planner_note,
+            "cancel_requested": self.cancel_requested,
+            "cancel_summary": self.cancel_summary,
+            "thoughts": self.thoughts,
+            "created_at": self.created_at,
             "metrics": self.metrics(),
         }

@@ -126,6 +126,26 @@ class VisionSystem:
     temporal_scene: TemporalScene
 
 
+def _maybe_fast_detector(slow):
+    """The lightweight detector (ONNX, Grounding DINO fallback) for the cheap
+    observe path -- only if `MILO_FAST_DETECTOR=1` and its model loads."""
+    import os
+    from pathlib import Path
+
+    if os.environ.get("MILO_FAST_DETECTOR", "0").strip().lower() not in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        return None
+    from learning.detector.fast_detector import build_fast_detector
+
+    return build_fast_detector(
+        Path(os.environ.get("MILO_DETECTOR_DIR", "artifacts/detector")), slow
+    )
+
+
 def build_vision_system(
     simulator: Simulator,
     depth_source: str = DEPTH_SOURCE_GROUND_TRUTH,
@@ -169,8 +189,10 @@ def build_vision_system(
     tracker = IoUTracker()
     scene_graph = HeuristicSceneGraph()
 
+    fast_detector = _maybe_fast_detector(detector)
     agent = VisionAgent(
         simulator,
+        fast_detector=fast_detector,
         detector=detector,
         segmenter=segmenter,
         depth=depth,

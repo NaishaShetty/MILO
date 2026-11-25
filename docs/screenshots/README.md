@@ -23,8 +23,13 @@ table and how to reproduce this yourself.
 
 ## `ui/`, `agents/`, `planning/`, `memory/`, `robotics/` — mocked API, real UI
 
-Everything else was captured by `frontend/tests/e2e/screenshots.spec.ts`
-(`npm run test:e2e -- screenshots.spec.ts`), which uses the same
+Everything else is a **pre-redesign** capture from
+`frontend/tests/e2e/screenshots.spec.ts`, since retired: the warm redesign
+replaced Mission Control's agent diagram, plan timeline, task memory and
+robot state panels, so the spec no longer had anything to capture, and its
+page shots duplicated `visual.spec.ts`. For the current look of each page,
+see the baselines in `frontend/tests/e2e/visual.spec.ts-snapshots/`. The
+retired spec used the same
 `page.route()` backend-mocking helper (`tests/e2e/utils/mockApi.ts`) the
 rest of the Playwright E2E suite uses. The React components, CSS, and
 rendering are 100% real (this is a real browser rendering the real built
@@ -51,11 +56,13 @@ above are the ones that make that claim.
 
 ## Regenerating
 
+The mocked-source folders above are frozen. To refresh the current page
+snapshots instead:
+
 ```bash
 cd frontend
-npm run test:e2e -- screenshots.spec.ts
+npx playwright test visual.spec.ts --update-snapshots
 ```
 
-Screenshots are captured at a fixed 1440x900 desktop viewport for
-consistency. This command does not touch `demo/` — those require a real
-backend + AI2-THOR run (see `docs/architecture/demo_and_visualization.md`).
+`demo/` needs a real backend + AI2-THOR run (see
+`docs/architecture/demo_and_visualization.md`).

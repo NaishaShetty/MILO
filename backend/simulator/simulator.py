@@ -124,5 +124,24 @@ class Simulator:
     def close_object(self, object_id):
         return self.env.close_object(object_id)
 
+    def drop_held_object(self):
+        return self.env.drop_held_object()
+
+    def push_object(self, object_id):
+        return self.env.push_object(object_id)
+
+    def look_around(self):
+        return self.env.look_around()
+
+    def toggle_object_on(self, object_id):
+        return self.env.toggle_object_on(object_id)
+
+    def toggle_object_off(self, object_id):
+        return self.env.toggle_object_off(object_id)
+
     def navigate_to(self, object_id):
         return self.env.navigate_to(object_id)
+
+    def navigate_home(self):
+        """Returns to the pose the episode started in ("bring it to me")."""
+        return self.env.navigate_home()

@@ -97,6 +97,7 @@ class VisionAgent:
         depth=None,
         tracker=None,
         scene_graph=None,
+        fast_detector=None,
     ):
         """Initializes the agent and builds its perception pipeline.
 
@@ -111,6 +112,9 @@ class VisionAgent:
             tracker: Optional tracking stage (reserved; no
                 implementation exists yet).
             scene_graph: Optional `BaseSceneGraph` implementation.
+            fast_detector: Optional lightweight detector (with Grounding DINO
+                fallback) used INSTEAD of `detector` on the cheap observe path
+                (`include_masks=False`); the full pipeline is unchanged.
         """
 
         self.simulator = simulator
@@ -122,6 +126,17 @@ class VisionAgent:
             depth=depth,
             tracker=tracker,
             scene_graph=scene_graph,
+        )
+        self.fast_pipeline = (
+            PerceptionPipeline(
+                detector=fast_detector,
+                segmenter=None,
+                depth=depth,
+                tracker=tracker,
+                scene_graph=scene_graph,
+            )
+            if fast_detector is not None
+            else None
         )
 
     # ----------------------------------------------------------------
@@ -169,7 +184,7 @@ class VisionAgent:
     # Avoid breaking changes unless absolutely necessary.
     # --------------------------------------------------------------------
 
-    def perceive(self, prompt):
+    def perceive(self, prompt, *, include_masks=True):
         """Runs the full perception pipeline on the current frame.
 
         Acquires the simulator's current RGB frame, seeds a fresh
@@ -183,6 +198,9 @@ class VisionAgent:
                 e.g. `"chair. table. mug. refrigerator."`. Stored at
                 `scene.metadata[SceneMetadata.DETECTION_PROMPT]` for
                 the configured detector to read.
+            include_masks: `False` skips the segmenter (SAM2) -- the
+                cheap path the planning loop uses. Defaults to `True`
+                so every existing caller is unchanged.
 
         Returns:
             The `Scene` produced for this frame, enriched by every
@@ -205,4 +223,6 @@ class VisionAgent:
 
         scene.metadata[SceneMetadata.DETECTION_PROMPT] = prompt
 
-        return self.pipeline.process(image, scene)
+        if not include_masks and self.fast_pipeline is not None:
+            return self.fast_pipeline.process(image, scene, include_masks=False)
+        return self.pipeline.process(image, scene, include_masks=include_masks)

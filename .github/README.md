@@ -110,6 +110,44 @@ method calls through a single `Orchestrator`), no ORM.
 
 Full stack detail: [`docs/application/tech_stack.md`](../docs/application/tech_stack.md).
 
+## What's New: Friendly MILO (task library, planner choice, live updates, new look)
+
+**Task library.** MILO does fetch, deliver, put in/on, open/close, turn on/off, find (and says where), clear a table and tidy up (using what it remembers). Ask in plain words ("could you grab me the mug", "is the fridge open?"); questions are answered without moving, and vague or impossible requests get a clear question or reason. `GET /api/v1/tasks/library` lists everything with examples.
+
+**Planner choice.** `POST /api/v1/tasks` accepts `planner`: `rule_based` (default), `react`, `behavior_tree` or `htn`. The choice is validated and reported on the task (`planner`, plus `planner_note` if a planner fell back).
+
+**Live updates (SSE).** `GET /api/v1/tasks/{id}/stream` pushes task state and events (`GET /api/v1/tasks/stream` for all tasks); the UI falls back to polling if the stream fails. `POST /api/v1/tasks/{id}/cancel` stops between steps and puts down whatever MILO holds.
+
+**API key and limits (optional).** Set `API_KEY` to require an `X-API-Key` header on task, lab and memory routes (the two `/stream` routes also accept `?api_key=`). Set `RATE_LIMIT_PER_MINUTE=N` to rate-limit per caller, and `SPEECH_MAX_UPLOAD_BYTES` to cap audio uploads (default 10 MB). In the UI, store the key with `VITE_API_KEY` or in browser storage under `milo.apiKey`.
+
+**Memory.** "Forget this" archives a memory (`POST /api/v1/memory/{id}/forget`). Each mission writes what it learned; tell MILO preferences like "the mug goes on the shelf".
+
+**New design.** Four spaces (Play, Missions, Memory, Lab), About/Settings under the gear, Activity as a drawer, and a bottom tab dock on phones. Design tokens are in `frontend/src/tokens.css`; MILO is the layered SVG `MiloRobot` (front and side rigs), driven by real task state through `state/miloDirector.ts`. Visual snapshots: `npx playwright test visual.spec.ts`.
+
+**Measured (Phase 1; RTX 4050 laptop, 25 interleaved runs, real simulator).**
+
+| Metric | Before | After |
+|---|---|---|
+| Observe per planning loop, mean | 2720 ms (full pipeline) | 2066 ms (no SAM2 masks) |
+| SAM2 stage alone | 117 ms median | skipped on the planning path |
+| Vector search at 5,000 memories | 59 ms | 6.9 ms (one run; later runs 0.1-0.7 ms) |
+
+Grounding DINO's time swung between 0.5 and 4 s on this machine and was not root-caused, so treat the observe mean as indicative and the SAM2 figure as solid. Reproduce with `python -m scripts.measure_observe_cost` and `pytest tests/test_memory_scaling_benchmark.py -s`.
+
+## Models (learned components)
+
+All learned components are **off by default** and fall back to the rule-based behaviour if a model is missing, slow, unsure or the inputs drift. See `docs/models/` for model cards.
+
+| Model | What it does | Data | Held-out result | Flag |
+|---|---|---|---|---|
+| Step outcome predictor | Per-step success / retry / failure-type / duration; drives per-step confidence, a learned reflector and plan ranking | 28,896 labelled steps, 6,000 synthetic episodes, 50 scenes (2026-11-24, seed 0) | AUROC 0.968, ECE 0.005 (rules: 0.661); online 600 episodes: success 0.717 -> 0.783, wasted steps 1.94 -> 1.22 | `MILO_LEARNED_REFLECTOR=off\|shadow\|on`, `MILO_PLAN_RANKING=1` |
+
+| Lightweight detector | Fast ONNX object detector for the planning loop's observe step, Grounding DINO as fallback | 21,777 real AI2-THOR frames, 119 scenes, ground-truth boxes (2026-11-24) | Held-out scenes: mAP@0.5 0.567 vs 0.315 for zero-shot Grounding DINO; 5.9 ms vs 547 ms per frame; real missions (30 per mode): success 0.90 both, observe time 1.37 s -> 0.07 s | `MILO_FAST_DETECTOR=1`, `MILO_DETECTOR_FALLBACK=confidence\|target` |
+
+**Pipeline.** `make data` (resumable episode generator with failure injection) -> `make dataset` (scene-held-out splits + report) -> `make train-outcome` -> `make eval-outcome` -> `make promote-outcome` (only promotes a model that wins; keeps the previous for rollback). Trained artifacts and data live in `backend/artifacts/` and `backend/data/` (not in git); `registry.json` records name, version, data hash, metrics and date. The Lab page has a Models panel with a per-model toggle.
+
+**Honest status.** The data is synthetic (a fast simulator with injected faults), so the online gain is not yet shown on AI2-THOR: keep the reflector at `shadow` until real episodes are logged and compared.
+
 ## Architecture
 
 ```mermaid

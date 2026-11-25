@@ -85,6 +85,20 @@ def _goal_close(task: SingleTask, state: WorldState) -> bool:
     return state.object(ref).is_open is False
 
 
+def _goal_turn_on(task: SingleTask, state: WorldState) -> bool:
+    ref = _norm(task.object) or _norm(task.target)
+    if ref is None:
+        return False
+    return state.object(ref).is_on is True
+
+
+def _goal_turn_off(task: SingleTask, state: WorldState) -> bool:
+    ref = _norm(task.object) or _norm(task.target)
+    if ref is None:
+        return False
+    return state.object(ref).is_on is False
+
+
 def _goal_locate(task: SingleTask, state: WorldState) -> bool:
     ref = _norm(task.object) or _norm(task.target)
     if ref is None:
@@ -112,6 +126,8 @@ GOAL_CHECKS: Dict[str, GoalCheck] = {
     "deliver": _goal_pickup,
     "open": _goal_open,
     "close": _goal_close,
+    "turn_on": _goal_turn_on,
+    "turn_off": _goal_turn_off,
     "find": _goal_locate,
     "search_for": _goal_locate,
     "locate": _goal_locate,
@@ -152,6 +168,15 @@ class PlanValidator:
                 )
                 previous_signature = None
                 continue
+            if not spec.executable:
+                issues.append(
+                    ValidationIssue(
+                        step_id=step.step_id,
+                        code="not_executable",
+                        message=f"I don't have a way to do '{step.parameters.get('action') or step.action}' yet.",
+                        severity="error",
+                    )
+                )
 
             if spec.requires_target and not step.target:
                 issues.append(

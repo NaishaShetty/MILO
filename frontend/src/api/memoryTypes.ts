@@ -11,10 +11,10 @@
 export type MemoryType = "semantic" | "episodic" | "failure" | "user";
 
 // Mirrors `backend/memory/models.py`'s `MemoryProvenance`.
-export type MemoryProvenance = "observation" | "execution" | "user_input" | "inference" | "reflection" | "system";
+export type MemoryProvenance = "observation" | "execution" | "user_input" | "inference" | "reflection" | "system" | "skill" | "imported";
 
 // Mirrors `backend/memory/models.py`'s `MemoryStatus`.
-export type MemoryStatusValue = "active" | "archived";
+export type MemoryStatusValue = "active" | "archived" | "quarantined";
 
 export interface Memory {
   memory_id: string;
@@ -43,7 +43,20 @@ export interface MemorySearchResponse {
   results: MemorySearchResult[];
 }
 
+export interface MemoryTrust {
+  source: "user" | "observation" | "skill" | "imported";
+  trust: number;
+  effective_confidence: number;
+  pinned: boolean;
+  quarantined: boolean;
+  quarantine_reason?: string | null;
+  contradicted: number;
+}
+
 export interface MemoryListResponse {
   memories: Memory[];
   counts_by_type: Record<string, number>;
+  /** Per memory id: where it came from, how much MILO trusts it, review state. */
+  trust?: Record<string, MemoryTrust>;
+  quarantined?: number;
 }

@@ -1,0 +1,39 @@
+# Voice (roadmap 2, Phase 8)
+
+MILO can listen and talk using the **browser's own** speech recognition and speech synthesis: no server and no key. Code: `frontend/src/state/BrowserVoice.tsx`, `components/VoiceToggle.tsx`, `components/VoiceCoach.tsx`, `utils/voiceAnswers.ts`.
+
+- **On/off switch:** "Talk with MILO" on the Play page. It's off by default and remembered between visits.
+- **Listening:** with voice on, the microphone button uses browser recognition. While it listens MILO switches to his listening pose ("I'm listening...") and a "Listening..." badge shows. What was heard is sent as the instruction. With voice off or unsupported, the button uses the existing record-and-transcribe path through the server.
+- **Spoken questions:** when MILO asks something back ("I can see 2 cups. Which one do you mean?"), it says the question aloud and listens for the answer. Saying the words of a choice ("the one on the table") picks it, matched by shared words.
+- **Spoken approvals:** when MILO waits for an OK on a risky step, it says the step and why, then listens.
+  - "Yes / go ahead / do it" approves.
+  - "No / skip" skips the step.
+  - "Cancel / never mind" cancels.
+
+  For a plan preview, "yes" goes ahead and "no" or "cancel" stops. The on-screen buttons keep working the whole time.
+- **Fallback:** if the browser can't listen or speak, the switch is disabled and says so in plain words: "This browser can't listen or speak. Type to MILO instead." It handles listen-only and speak-only browsers too, and everything stays usable by typing and tapping.
+
+## MILO's states
+
+MILO now has a distinct pose for each moment the UI rules list, chosen from the real task state (`state/miloDirector.ts`):
+
+| Moment | Pose |
+|---|---|
+| Listening to voice | listening (amber sound wave by his ear) |
+| Figuring something out / showing a plan to approve | thinking |
+| Asking a question back | **asking**: a question-mark bubble above his head |
+| Waiting for approval of a risky step | **waiting**: a small clock above his head |
+| Recovering after a failure (reflecting or replanning with failures) | **recovering**: a bobbing sweat drop |
+
+The new marks animate gently and respect `prefers-reduced-motion`.
+
+Tests (`frontend/src/state/BrowserVoice.test.tsx`, with stand-in speech APIs):
+- the fallback message and disabled switch;
+- the remembered on/off setting;
+- listening, with its visible state;
+- an approval spoken aloud and approved on "yes";
+- a clarifying question answered by voice;
+- the yes/skip/cancel and choice matching;
+- the pose for each state.
+
+**Not verified:** real speech recognition in a real browser. jsdom has no speech engine, and recognition quality depends on the browser (Chrome and Edge ship `webkitSpeechRecognition`; Firefox doesn't).
