@@ -167,7 +167,11 @@ class ClaudeProvider:
             raise ProviderError("my language model declined to plan this")
         if response.stop_reason == "max_tokens":
             raise ProviderError("my language model's answer was cut off")
-        text = next((b.text for b in response.content if b.type == "text"), "")
+        # getattr: newer SDKs type content as a union of many block kinds, and
+        # checking b.type doesn't narrow it for mypy.
+        text = next(
+            (getattr(b, "text", "") for b in response.content if b.type == "text"), ""
+        )
         try:
             data = json.loads(text)
         except json.JSONDecodeError as exc:
