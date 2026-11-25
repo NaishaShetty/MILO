@@ -184,8 +184,8 @@ npm run test:e2e:ui         # Playwright's interactive UI/trace viewer
 -- never the backend -- and grants microphone permission with
 Chromium's `--use-fake-device-for-media-stream`/
 `--use-fake-ui-for-media-stream` flags, so mic-interaction tests
-(`tests/e2e/microphone.spec.ts`: permission, recording, transcript,
-barge-in) run fully headless with a synthetic audio device, no
+(`tests/e2e/microphone.spec.ts`: permission, recording, transcript
+becoming a mission, permission denied) run fully headless with a synthetic audio device, no
 physical microphone and no manual permission dialog required. See
 that file's own docstring, and `tests/e2e/milo-state.spec.ts` for a
 real-browser proof of the MILO state machine reacting to a real

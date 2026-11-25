@@ -118,6 +118,5 @@ All 10 deliberately bad plans were caught before acting, and 0 unsafe actions we
 2. Add mitigations for wrong detection and out-of-reach that work within a mission (look around, re-approach), not only on the next one.
 3. Authenticate user statements so spoofed "user" memories can be told apart.
 4. Re-measure everything on real AI2-THOR scenes.
-5. Retire or update the nine pre-redesign Playwright specs (`tests/e2e/microphone.spec.ts`, `screenshots.spec.ts`), which fail on the current UI.
 
 A short write-up of the project is in [docs/writeup.md](docs/writeup.md).
