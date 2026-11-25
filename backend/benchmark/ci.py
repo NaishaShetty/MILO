@@ -51,7 +51,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--write-baseline", action="store_true")
     a = ap.parse_args(argv)
     report = run("ci", PLANNERS, "reference", ablations=False)
-    current = {p: s["all"]["success"] for p, s in report["planners"].items()}
+    current = {
+        p: s["all"]["success"] for p, s in report["planners"].items() if "all" in s
+    }
     print(json.dumps(current, indent=2))
     if a.write_baseline:
         a.baseline.write_text(json.dumps(current, indent=2) + "\n")

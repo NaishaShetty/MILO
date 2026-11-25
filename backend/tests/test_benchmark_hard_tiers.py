@@ -77,3 +77,14 @@ def test_multi_goal_mission_ending_with_a_fetch_succeeds():
 def test_tier_sizes():
     assert (len(memory_cases()), len(long_cases()), len(route_cases())) == (8, 6, 4)
     assert len(hard_cases()) == 18
+
+
+def test_react_without_a_model_is_reported_as_not_measured():
+    from benchmark.run import markdown, run
+
+    report = run("ci", planners=["react", "rule_based"], ablations=False)
+    assert report["planners"]["react"] == {
+        "not_measured": "needs a model (--react-model)"
+    }
+    assert report["react_model"] is None
+    assert "react | not measured" in markdown(report)

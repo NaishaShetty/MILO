@@ -3,7 +3,7 @@
 | Planner | Known | Novel | Under faults | Steps | Sim time (s) | Replans |
 |---|---|---|---|---|---|---|
 | rule_based | 100% | 0% | 78% | 7.52 | 12.5 | 0.144 |
-| react | 100% | 0% | 78% | 7.52 | 12.5 | 0.144 |
+| react | not measured (needs a model (--react-model)) | | | | | |
 | behavior_tree | 100% | 0% | 78% | 5.63 | 9.88 | 0.144 |
 | htn | 100% | 0% | 78% | 5.63 | 9.88 | 0.144 |
 | novel | not run | 100% | not run | 5.25 | 9.38 | 0 |
@@ -13,7 +13,6 @@
 | Planner | blocked_path | out_of_reach | door_stuck | timeout | wrong_detection | missing_object |
 |---|---|---|---|---|---|---|
 | rule_based | 100% | 100% | 100% | 100% | 83% | 0% |
-| react | 100% | 100% | 100% | 100% | 83% | 0% |
 | behavior_tree | 100% | 100% | 100% | 100% | 83% | 0% |
 | htn | 100% | 100% | 100% | 100% | 83% | 0% |
 | novel | not run | not run | not run | not run | not run | not run |
@@ -23,7 +22,6 @@
 | Planner | memory | long | routes |
 |---|---|---|---|
 | rule_based | 100% | 100% | 0% |
-| react | 100% | 100% | 0% |
 | behavior_tree | 0% | 100% | 0% |
 | htn | 0% | 100% | 0% |
 | novel | not run | not run | not run |
@@ -49,4 +47,4 @@
 | no_in_mission_recovery | 57% | – | – |
 | no_skills | – | 100% | 1 |
 
-Ran in 20.4 s.
+Ran in 19.1 s.

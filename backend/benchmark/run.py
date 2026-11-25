@@ -7,6 +7,8 @@ One command, every planner, JSON + Markdown reports:
     python -m benchmark.run                       # full suite + ablations + faults
     python -m benchmark.run --subset ci           # the fast slice CI runs
     python -m benchmark.run --provider claude     # language-model planner = the real model
+    python -m benchmark.run --provider ollama --react-model qwen2.5:7b   # local models
+        (MILO_OLLAMA_URL / MILO_OLLAMA_MODEL pick the server and the novel planner's model)
 
 Reported per planner: success rate (the mission ended "succeeded" *and* the world-state
 goal checks passed), steps run, simulated time, replans. Plus an ablation table (what
@@ -143,6 +145,7 @@ def run_case(
     reflection: bool = True,
     replanning: bool = True,
     recovery: bool = True,
+    react_client: Any = None,
 ) -> Dict[str, Any]:
     objects = case_scene(case)
     sim = SyntheticSimulator(
@@ -157,7 +160,11 @@ def run_case(
                                  constraints=Constraints.load(), skills=skills or SkillLibrary(Path(tmp) / "s.db"))  # fmt: skip
             wrapper: Any = PlannerAgentWrapper(novel)  # type: ignore[arg-type]
         else:
-            wrapper = PlannerAgentWrapper(create_planner(planner))
+            wrapper = PlannerAgentWrapper(
+                create_planner(
+                    planner, llm_client=react_client if planner == "react" else None
+                )
+            )
         orch = Orchestrator(
             wrapper,
             execution,
@@ -218,11 +225,18 @@ def run(
     planners: Optional[List[str]] = None,
     provider_name: str = "reference",
     ablations: bool = True,
+    react_model: Optional[str] = None,
 ) -> Dict[str, Any]:
     planners = planners or PLANNERS
-    provider: Optional[Provider] = (
-        build_provider() if provider_name == "claude" else None
-    )
+    provider: Optional[Provider] = None
+    if provider_name in ("claude", "ollama"):
+        with _env(MILO_NOVEL_PROVIDER=provider_name):
+            provider = build_provider()
+        if provider.name == "offline":
+            raise SystemExit(
+                f"--provider {provider_name}: no model reachable (offline)"
+            )
+    react_client = _local_react_client(react_model) if react_model else None
     cases = (
         ci_subset() if subset == "ci" else full_suite() + fault_cases() + hard_cases()
     )
@@ -230,6 +244,8 @@ def run(
     report: Dict[str, Any] = {
         "subset": subset,
         "provider": provider_name,
+        "novel_model": getattr(provider, "model", None),
+        "react_model": f"{react_model} via Ollama" if react_model else None,
         "planners": {},
         "by_case": {},
     }
@@ -241,7 +257,17 @@ def run(
             if (planner == "novel" and provider is None)
             else cases
         )
-        rows = [run_case(c, planner, provider=provider) for c in todo]
+        if planner == "react" and react_client is None:
+            # Without a model ReAct falls back to rule-based: measuring it would only
+            # repeat the rule-based row under another name.
+            report["planners"][planner] = {
+                "not_measured": "needs a model (--react-model)"
+            }
+            continue
+        rows = [
+            run_case(c, planner, provider=provider, react_client=react_client)
+            for c in todo
+        ]
         report["by_case"][planner] = rows
         report["planners"][planner] = {
             # The regression tier (known, novel, faults); the harder tiers are under "tiers".
@@ -267,6 +293,17 @@ def run(
         report["ablations"] = ablation_table(provider)
     report["seconds"] = round(time.time() - started, 1)
     return report
+
+
+def _local_react_client(model: str) -> Any:
+    """ReAct's language-model client pointed at Ollama's OpenAI-compatible endpoint."""
+    from language.config import LLMRuntimeConfig
+    from language.provider_factory import create_llm_client
+
+    url = os.environ.get("MILO_OLLAMA_URL", "http://localhost:11434").rstrip("/")
+    with _env(LANGUAGE_LLM_PROVIDER="qwen", LANGUAGE_LLM_BASE_URL=f"{url}/v1",
+              LANGUAGE_LLM_MODEL=model, QWEN_API_KEY="not-needed"):  # fmt: skip
+        return create_llm_client(LLMRuntimeConfig.from_env())
 
 
 def ablation_table(provider: Optional[Provider]) -> Dict[str, Any]:
@@ -360,6 +397,11 @@ def ablation_table(provider: Optional[Provider]) -> Dict[str, Any]:
 # -- reports ---------------------------------------------------------------------------------------
 
 
+def measured(report: Dict[str, Any]) -> Dict[str, Any]:
+    """Planners that were actually run (ReAct without a model is not)."""
+    return {p: s for p, s in report["planners"].items() if "not_measured" not in s}
+
+
 def markdown(report: Dict[str, Any]) -> str:
     lines = [
         f"# MILO benchmark ({report['subset']} suite, novel planner: {report['provider']})",
@@ -374,13 +416,16 @@ def markdown(report: Dict[str, Any]) -> str:
         return "not run" if v is None else f"{v:.0%}"
 
     for p, s in report["planners"].items():
+        if "not_measured" in s:
+            lines.append(f"| {p} | not measured ({s['not_measured']}) | | | | | |")
+            continue
         lines.append(
             f"| {p} | {pct(s['known']['success'])} | {pct(s['novel']['success'])} | {pct(s['faults']['success'])} | "
             f"{s['all']['steps']} | {s['all']['sim_s']} | {s['all']['replans']} |"
         )
     lines += ["", "## Recovery by fault kind", "", "| Planner | " + " | ".join(FAULT_KINDS) + " |",
               "|---|" + "---|" * len(FAULT_KINDS)]  # fmt: skip
-    for p, s in report["planners"].items():
+    for p, s in measured(report).items():
         lines.append(
             f"| {p} | "
             + " | ".join(pct(s["recovery_by_fault"][f]) for f in FAULT_KINDS)
@@ -388,7 +433,7 @@ def markdown(report: Dict[str, Any]) -> str:
         )
     lines += ["", "## Harder tiers (memory, long missions, competing routes)", "",
               "| Planner | " + " | ".join(HARD_TIERS) + " |", "|---|" + "---|" * len(HARD_TIERS)]  # fmt: skip
-    for p, s in report["planners"].items():
+    for p, s in measured(report).items():
         tiers = s.get("tiers", {})
         lines.append(
             f"| {p} | "
@@ -447,7 +492,7 @@ def history_line(report: Dict[str, Any]) -> Dict[str, Any]:
         "provider": report["provider"],
         "planners": {
             p: {k: s[k]["success"] for k in ("known", "novel", "faults")}
-            for p, s in report["planners"].items()
+            for p, s in measured(report).items()
         },
     }
 
@@ -458,14 +503,19 @@ def main(argv: Optional[List[str]] = None) -> None:
     )
     ap.add_argument("--subset", choices=["ci", "full"], default="full")
     ap.add_argument("--planners", nargs="*", default=None)
-    ap.add_argument("--provider", choices=["reference", "claude"], default="reference")
+    ap.add_argument(
+        "--provider", choices=["reference", "claude", "ollama"], default="reference"
+    )
+    ap.add_argument(
+        "--react-model", default=None, help="local model for ReAct (via Ollama)"
+    )
     ap.add_argument("--no-ablations", action="store_true")
     ap.add_argument("--out", type=Path, default=REPO / "benchmarks" / "latest.json")
     ap.add_argument(
         "--history", type=Path, default=REPO / "benchmarks" / "history.jsonl"
     )
     a = ap.parse_args(argv)
-    report = run(a.subset, a.planners, a.provider, not a.no_ablations)
+    report = run(a.subset, a.planners, a.provider, not a.no_ablations, a.react_model)
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(json.dumps(report, indent=2))
     a.out.with_suffix(".md").write_text(markdown(report))
