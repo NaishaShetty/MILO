@@ -7,6 +7,7 @@ import { Link, NavLink } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { useAgents } from "../state/AgentsContext";
 import { ActivityPage } from "../pages/ActivityPage";
+import { isDemo } from "../api/demo";
 import { BookIcon, FlagIcon, FlaskIcon, GearIcon, PlayIcon, SparkIcon } from "./Icons";
 import { MiloWordmark } from "./MiloWordmark";
 
@@ -36,6 +37,15 @@ function Tabs({ className }: { className: string }) {
   );
 }
 
+function DemoBanner() {
+  if (!isDemo()) return null;
+  return (
+    <div className="notice" role="note">
+      Demo mode: replaying recorded missions. No simulator is connected. <a href="?demo=0">Leave demo mode</a>
+    </div>
+  );
+}
+
 export function NavBar() {
   const { status, error } = useAgents();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -43,17 +53,24 @@ export function NavBar() {
 
   const down =
     status === "error" && !(error instanceof ApiError && error.category === "agents_unavailable");
-  const label = down ? "Can't reach MILO" : status === "success" || status === "error" ? "Simulator online" : "Connecting";
+  const label = isDemo()
+    ? "Demo: recorded missions"
+    : down
+      ? "Can't reach MILO"
+      : status === "success" || status === "error"
+        ? "Simulator online"
+        : "Connecting";
 
   return (
     <>
+      <DemoBanner />
       <header className="topbar">
         <Link to="/" aria-label="MILO home" style={{ textDecoration: "none" }}>
           <MiloWordmark />
         </Link>
         <Tabs className="tabs" />
         <div className="topbar__right">
-          <span className={"status" + (down ? " status--down" : "")} role="status">
+          <span className={"status" + (down && !isDemo() ? " status--down" : "")} role="status">
             <span className="status__dot" aria-hidden="true" />
             {label}
           </span>

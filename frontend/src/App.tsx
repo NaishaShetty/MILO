@@ -14,6 +14,8 @@ import { LabPage } from "./pages/LabPage";
 import { MemoryPage } from "./pages/MemoryPage";
 import { SkillsPage } from "./pages/SkillsPage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
+import { DemoPage } from "./pages/DemoPage";
+import { isDemo } from "./api/demo";
 import { ReplayPage } from "./pages/ReplayPage";
 import { ObservabilityPanel } from "./components/ObservabilityPanel";
 import { MissionsPage } from "./pages/MissionsPage";
@@ -37,7 +39,8 @@ export default function App() {
                     <NavBar />
                     <ErrorBoundary>
                       <Routes>
-                        <Route path="/" element={<PlayPage />} />
+                        <Route path="/" element={isDemo() ? <DemoPage /> : <PlayPage />} />
+                        <Route path="/demo" element={<DemoPage />} />
                         <Route path="/missions" element={<MissionsPage />} />
                         <Route path="/mission-control" element={<Navigate to="/missions" replace />} />
                         <Route path="/memory" element={<MemoryPage />} />

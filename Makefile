@@ -80,3 +80,7 @@ benchmark:
 ## The CI regression gate (fast subset vs benchmarks/ci_baseline.json)
 benchmark-ci:
 	cd backend && $(PY) -m benchmark.ci
+
+## Re-record the demo missions the hosted UI replays (frontend/public/demo)
+demo:
+	cd backend && $(PY) -m demo.record
