@@ -131,6 +131,9 @@ class TaskState:
     #: MILO's running commentary, oldest first: `{"kind", "text", "at",
     #: "step_id"}` where kind is memory | planner | eyes | hands | reflect.
     thoughts: List[Dict[str, Any]] = field(default_factory=list)
+    #: Success-predicate results checked against the simulator at the end
+    #: (`verification.predicates`): [{kind, object, text, ok, reason}, ...].
+    verification: List[Dict[str, Any]] = field(default_factory=list)
     #: When the task was created (epoch seconds) -- for "yesterday"-style
     #: labels on recent missions.
     created_at: float = field(default_factory=time.time)
@@ -188,6 +191,7 @@ class TaskState:
             "retrieved_memories": self.retrieved_memories,
             "agent_states": {k: v.value for k, v in self.agent_states.items()},
             "status": self.status.value,
+            "verification": self.verification,
             "latencies_ms": self.latencies_ms,
             "created_memories": self.created_memories,
             "answer": self.answer,

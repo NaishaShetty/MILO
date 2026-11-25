@@ -127,6 +127,12 @@ class Simulator:
     def drop_held_object(self):
         return self.env.drop_held_object()
 
+    def push_object(self, object_id):
+        return self.env.push_object(object_id)
+
+    def look_around(self):
+        return self.env.look_around()
+
     def toggle_object_on(self, object_id):
         return self.env.toggle_object_on(object_id)
 

@@ -168,6 +168,15 @@ class PlanValidator:
                 )
                 previous_signature = None
                 continue
+            if not spec.executable:
+                issues.append(
+                    ValidationIssue(
+                        step_id=step.step_id,
+                        code="not_executable",
+                        message=f"I don't have a way to do '{step.parameters.get('action') or step.action}' yet.",
+                        severity="error",
+                    )
+                )
 
             if spec.requires_target and not step.target:
                 issues.append(

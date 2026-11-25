@@ -137,6 +137,7 @@ from api.routes.planner import router as planner_router
 from api.routes.speech import router as speech_router
 from api.routes.tasks import build_orchestrator
 from api.routes.tasks import router as tasks_router
+from api.routes.traces import router as traces_router
 from api.routes.vision import router as vision_router
 from api.routes.voice import router as voice_router
 from api.security import rate_limit, require_api_key
@@ -470,6 +471,9 @@ app.include_router(
 app.include_router(speech_router, prefix="/api/v1/speech", tags=["speech"])
 app.include_router(voice_router, prefix="/api/v1/voice", tags=["voice"])
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["agents"])
+app.include_router(
+    traces_router, prefix="/api/v1/traces", tags=["traces"], dependencies=_GUARDED
+)
 
 
 _STATUS_MESSAGES = {

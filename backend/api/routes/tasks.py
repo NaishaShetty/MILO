@@ -689,13 +689,19 @@ def build_orchestrator(
         # so on the task as `planner_note`).
         return PlannerAgentWrapper(create_planner(name, llm_client=llm_client))
 
+    from tracelog.recorder import build_recorder
+
+    execution = ExecutionAgentWrapper(
+        simulator, step_timeout_s=_step_timeout_from_env()
+    )
     orchestrator = Orchestrator(
         PlannerAgentWrapper(create_planner(PlannerType.RULE_BASED)),
-        ExecutionAgentWrapper(simulator, step_timeout_s=_step_timeout_from_env()),
+        execution,
         memory_agent=memory_agent,
         vision_agent=vision_agent,
         registry=registry,
         planner_factory=planner_for,
+        trace_recorder=build_recorder(frame_source=execution.get_frame),
         **learning_kwargs(),
     )
     _store.set_orchestrator(orchestrator)

@@ -312,7 +312,24 @@ class AI2ThorEnv:
     def drop_held_object(self):
         """Drops whatever the agent is holding (used to leave a clean state
         after a cancelled task)."""
-        return self._step(DROP_HAND_OBJECT, forceAction=True)
+        return self._step(DROP_HAND_OBJECT, PUSH_OBJECT, forceAction=True)
+
+    ####################################################
+
+    def push_object(self, object_id, force=50.0):
+        """Pushes the object (AI2-THOR `PushObject`, `force` in newtons)."""
+        return self._step(
+            PUSH_OBJECT, objectId=object_id, moveMagnitude=force, forceAction=True
+        )
+
+    ####################################################
+
+    def look_around(self):
+        """Turns a full circle in 90-degree steps; returns the last event."""
+        event = None
+        for _ in range(4):
+            event = self._step(TURN_RIGHT)
+        return event
 
     ####################################################
 

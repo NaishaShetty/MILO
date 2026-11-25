@@ -146,7 +146,9 @@ def test_htn_hands_an_unknown_goal_to_the_rule_based_planner_and_says_so():
     result = create_planner("htn").plan(
         SingleTask(goal="clean", object="window"), WorldState.initial()
     )
-    assert result.success
+    # The fallback is tried and explained; its plan is then refused because
+    # no executor action can do "clean".
+    assert not result.success
     fallback = result.plan.metadata["planner_fallback"]
     assert fallback["requested"] == "htn" and fallback["used"] == "rule_based"
     assert "no method for 'clean'" in fallback["reason"]

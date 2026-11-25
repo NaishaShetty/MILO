@@ -74,6 +74,9 @@ class ActionType(str, Enum):
     CLOSE = "close"
     TURN_ON = "turn_on"
     TURN_OFF = "turn_off"
+    DROP = "drop"  # let go of whatever is held, where the robot stands
+    PUSH = "push"  # shove an object (AI2-THOR PushObject)
+    LOOK_AROUND = "look_around"  # turn a full circle to see the room
     # `locate` has no simulator-side effect (Phase 4's symbolic
     # "perceive this object" step) -- `ActionDispatcher` handles it as
     # a documented no-op rather than refusing to dispatch it, so a

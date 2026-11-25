@@ -61,6 +61,7 @@ store_memory` -- `True` only for the two terminal outcomes
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 import uuid
@@ -120,6 +121,7 @@ class Orchestrator:
         episode_logger=None,
         outcome_predictor=None,
         plan_ranker=None,
+        trace_recorder=None,
     ) -> None:
         self._planner = planner_agent
         #: Builds a planner wrapper for a requested strategy name; without
@@ -133,6 +135,8 @@ class Orchestrator:
         #: `learning.ranker.PlanRanker` (choose among planners' plans). Both optional.
         self._predictor = outcome_predictor
         self._ranker = plan_ranker
+        #: Optional `tracelog.recorder.TraceRecorder`: per-mission trace store.
+        self._trace = trace_recorder
         self._contexts: Dict[int, Dict] = {}
         #: Extra fields for the logger's `begin()` (scene id, seed, injected fault...).
         self.episode_context: Dict = {}
@@ -319,6 +323,8 @@ class Orchestrator:
             task_state.latencies_ms["total_ms"] = (
                 time.perf_counter() - run_started_at
             ) * 1000.0
+            if planning_result.errors:
+                self._think(task_state, "planner", "; ".join(planning_result.errors))
             return self._finish_failed(
                 task,
                 task_state,
@@ -690,6 +696,8 @@ class Orchestrator:
                     self._think(task_state, kind, step.explanation, step.step_id)
             elif status == "cancelled":
                 step.explanation = "I stopped before this one."
+            if self._trace is not None:
+                self._trace.on_step(task_state, step, status)
 
         return listen
 
@@ -1027,6 +1035,11 @@ class Orchestrator:
         world_state: WorldState,
         subtasks: Optional[List[SingleTask]] = None,
     ) -> TaskState:
+        failed_check = self._verify_goal(task, subtasks, task_state)
+        if failed_check is not None:
+            return self._finish_failed(
+                task, task_state, episode_id, record=record, reason=failed_check
+            )
         # Memory is written *before* `status` flips to its terminal
         # value and *before* `TASK_COMPLETED` publishes -- a caller
         # (an API poller, a test) that treats a terminal `status` as
@@ -1050,6 +1063,37 @@ class Orchestrator:
         task_state.status = TaskStatus.SUCCEEDED
         self._publish(task_state, EventType.TASK_COMPLETED)
         return task_state
+
+    def _verify_goal(
+        self,
+        task: SingleTask,
+        subtasks: Optional[List[SingleTask]],
+        task_state: TaskState,
+    ) -> Optional[str]:
+        """Checks the goal's success predicates against the simulator's own
+        metadata. `MILO_GOAL_CHECK=off|report|enforce` (default `report`: record
+        and narrate; `enforce` also turns a failed check into a failed mission).
+        Returns the failure reason when enforcing, else None. Never raises."""
+        mode = os.environ.get("MILO_GOAL_CHECK", "report").strip().lower()
+        if mode not in ("report", "enforce"):
+            return None
+        try:
+            from verification.predicates import check_all, goal_predicates
+
+            predicates = [p for t in (subtasks or [task]) for p in goal_predicates(t)]
+            if not predicates:
+                return None
+            results = check_all(predicates, self._execution.get_metadata())
+        except Exception:
+            logger.warning("orchestrator.goal_check_failed", exc_info=True)
+            return None
+        task_state.verification = [r.to_dict() for r in results]
+        missed = [r for r in results if not r.ok]
+        if not missed:
+            return None  # kept in `verification`; "All done!" already says it
+        reason = "I checked and " + "; ".join(r.reason for r in missed) + "."
+        self._think(task_state, "eyes", reason)
+        return reason if mode == "enforce" else None
 
     def _finish_failed(
         self,
@@ -1111,6 +1155,8 @@ class Orchestrator:
                 payload=payload or {},
             )
         )
+        if self._trace is not None:
+            self._trace.on_event(task_state, event.value, payload or {})
 
     def _sync_agent_states(self, task_state: TaskState) -> None:
         if self._registry is not None:

@@ -300,6 +300,20 @@ class SyntheticSimulator:
     def toggle_object_off(self, object_id: str) -> FakeEvent:
         return self._toggle(object_id, False)
 
+    def push_object(self, object_id: str) -> FakeEvent:
+        obj = self._obj(object_id)
+        refused = self._interactable(obj, "push")
+        if refused is not None:
+            return refused
+        assert obj is not None
+        obj["distance"] = round(float(obj["distance"]) + 0.3, 2)
+        return self._event(True)
+
+    def look_around(self) -> FakeEvent:
+        for o in self.objects:
+            o["visible"] = True
+        return self._event(True)
+
     def drop_held_object(self) -> FakeEvent:
         self._current = "put"
         self.inventory_objects = []

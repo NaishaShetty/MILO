@@ -62,6 +62,8 @@ PUT_DOWN = "put_down"
 GENERIC_ACT = "act"
 TURN_ON = "turn_on"
 TURN_OFF = "turn_off"
+PUSH = "push"
+LOOK_AROUND = "look_around"
 
 CheckFn = Callable[[WorldState, Optional[str], Dict[str, Any]], bool]
 EffectFn = Callable[[WorldState, Optional[str], Dict[str, Any]], None]
@@ -92,6 +94,11 @@ class ActionSpec:
     preconditions: List[Precondition] = field(default_factory=list)
     postcondition_descriptions: List[str] = field(default_factory=list)
     apply_effect: EffectFn = field(default=lambda state, target, params: None)
+    #: Typed arguments, name -> type ("object", "receptacle", ...).
+    arguments: Dict[str, str] = field(default_factory=dict)
+    #: False for planning-only placeholders the executor cannot run; a plan
+    #: that contains one is rejected by `validator.py` before it runs.
+    executable: bool = True
 
     def describe(self, target: Optional[str]) -> str:
         return self.description_template.format(target=target or "")
@@ -265,6 +272,19 @@ def _effect_put_down(
     state.robot_holding = None
 
 
+def _effect_push(
+    state: WorldState, target: Optional[str], _params: Dict[str, Any]
+) -> None:
+    if target:
+        state.object(target).is_near_robot = False  # it moved away
+
+
+def _effect_look_around(
+    _state: WorldState, _target: Optional[str], _params: Dict[str, Any]
+) -> None:
+    return None
+
+
 def _effect_generic_act(
     _state: WorldState, _target: Optional[str], _params: Dict[str, Any]
 ) -> None:
@@ -412,6 +432,29 @@ ACTION_REGISTRY: Dict[str, ActionSpec] = {
         postcondition_descriptions=["{target} is placed down", "robot's hand is empty"],
         apply_effect=_effect_put_down,
     ),
+    PUSH: ActionSpec(
+        name=PUSH,
+        description_template="Push {target}",
+        preconditions=[
+            Precondition(
+                "target_near",
+                "robot must be near target to push it",
+                _require_target_near,
+            ),
+            Precondition(
+                "hand_empty", "robot's hand must be empty", _require_hand_empty
+            ),
+        ],
+        postcondition_descriptions=["{target} has moved"],
+        apply_effect=_effect_push,
+    ),
+    LOOK_AROUND: ActionSpec(
+        name=LOOK_AROUND,
+        description_template="Look around",
+        requires_target=False,
+        postcondition_descriptions=["the room has been scanned"],
+        apply_effect=_effect_look_around,
+    ),
     GENERIC_ACT: ActionSpec(
         name=GENERIC_ACT,
         description_template="Perform action on {target}",
@@ -419,8 +462,34 @@ ACTION_REGISTRY: Dict[str, ActionSpec] = {
         preconditions=[],
         postcondition_descriptions=[],
         apply_effect=_effect_generic_act,
+        executable=False,
     ),
 }
+
+#: Typed arguments per action (kept beside the registry so a reader sees one table).
+_ARGUMENTS: Dict[str, Dict[str, str]] = {
+    LOCATE: {"target": "object"},
+    NAVIGATE: {"target": "object"},
+    PICKUP: {"target": "object"},
+    PLACE: {"target": "object", "container": "receptacle"},
+    OPEN: {"target": "openable"},
+    CLOSE: {"target": "openable"},
+    TURN_ON: {"target": "toggleable"},
+    TURN_OFF: {"target": "toggleable"},
+    PUT_DOWN: {"target": "object"},
+    PUSH: {"target": "object"},
+    LOOK_AROUND: {},
+    GENERIC_ACT: {"target": "object", "action": "text"},
+}
+for _name, _spec in list(ACTION_REGISTRY.items()):
+    ACTION_REGISTRY[_name] = ActionSpec(
+        **{**_spec.__dict__, "arguments": _ARGUMENTS.get(_name, {})}
+    )
+
+
+def executable_actions() -> List[str]:
+    """Names of every registry action the executor can actually run."""
+    return [name for name, spec in ACTION_REGISTRY.items() if spec.executable]
 
 
 def get_action_spec(name: str) -> Optional[ActionSpec]:

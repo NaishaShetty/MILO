@@ -287,7 +287,9 @@ class Planner(ABC):
             success=validation.valid,
             plan=plan,
             validation=validation,
-            errors=[],
+            # A step the executor cannot run is the one reason the user should
+            # hear in words ("I don't have a way to do 'clean' yet").
+            errors=[i.message for i in validation.issues if i.code == "not_executable"],
             planner_type=self.planner_type,
             latency_ms=elapsed_ms,
         )

@@ -105,6 +105,11 @@ class ActionDispatcher:
             ActionType.TURN_OFF: lambda a: self._simulator.toggle_object_off(
                 self._require_object_id(a)
             ),
+            ActionType.DROP: lambda a: self._simulator.drop_held_object(),
+            ActionType.PUSH: lambda a: self._simulator.push_object(
+                self._require_object_id(a)
+            ),
+            ActionType.LOOK_AROUND: lambda a: self._simulator.look_around(),
             ActionType.LOCATE: lambda a: None,
         }
 

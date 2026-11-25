@@ -153,6 +153,9 @@ class ResultValidator:
                 return (
                     f"ToggleObjectOff reported success but {object_id!r} is still on."
                 )
+        elif action.action_type == ActionType.DROP:
+            if metadata.get("inventoryObjects"):
+                return "DropHandObject reported success but the hand is not empty."
         elif action.action_type == ActionType.PUT:
             # AI2-THOR's PutObject targets the receptacle by id and infers
             # the held object itself; the only ground-truth postcondition

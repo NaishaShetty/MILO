@@ -127,6 +127,9 @@ _ACTION_NAME_TO_TYPE = {
     "turn_on": ActionType.TURN_ON,
     "turn_off": ActionType.TURN_OFF,
     "place": ActionType.PUT,
+    "put_down": ActionType.DROP,
+    "push": ActionType.PUSH,
+    "look_around": ActionType.LOOK_AROUND,
 }
 
 
@@ -420,7 +423,7 @@ class ExecutionController:
     def _build_action(
         self, step: PlanStep, object_id: Optional[str], container_id: Optional[str]
     ) -> Action:
-        action_type = _ACTION_NAME_TO_TYPE.get(step.action, ActionType.LOCATE)
+        action_type = _ACTION_NAME_TO_TYPE[step.action]
         parameters: Dict[str, Any] = {}
         if object_id is not None:
             parameters["object_id"] = object_id

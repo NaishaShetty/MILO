@@ -109,6 +109,17 @@ class ExecutionAgentWrapper(BaseAgent):
             return f"I'm still holding the {name}."
         return f"I put down the {name}."
 
+    def get_frame(self):
+        """The current camera frame (RGB array), or None (no simulator, or one
+        without a camera, like the synthetic simulator)."""
+        get_rgb = getattr(self._simulator, "get_rgb", None)
+        if get_rgb is None:
+            return None
+        try:
+            return get_rgb()
+        except Exception:
+            return None
+
     def get_metadata(self) -> Optional[dict]:
         """The simulator's current metadata, or `None` if there is none --
         used to expand composite tasks and to answer where something is."""

@@ -126,7 +126,7 @@ def test_react_without_a_language_model_says_it_fell_back(client):
     assert "rule-based planner made this plan" in final["planner_note"]
 
 
-def test_htn_falls_back_with_a_plain_reason_for_a_goal_it_lacks(client):
+def test_a_goal_no_planner_can_execute_fails_with_a_plain_reason(client):
     sim = _wire(
         FakeSimulator(
             objects=kitchen()
@@ -142,8 +142,10 @@ def test_htn_falls_back_with_a_plain_reason_for_a_goal_it_lacks(client):
     body = _post(client, "Wipe down the window", planner="htn").json()
     final = _wait(client, body["task_id"])
 
-    assert final["planner"] == "htn"
-    assert "no method for 'clean'" in final["planner_note"]
+    # Neither HTN nor its rule-based fallback has a real action for "clean":
+    # the plan is refused before anything runs, instead of "succeeding".
+    assert final["status"] == "failed"
+    assert "I don't have a way to do 'clean' yet" in str(final)
     del sim
 
 
