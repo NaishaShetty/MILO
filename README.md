@@ -199,8 +199,15 @@ All benchmark numbers come from `benchmarks/latest.json` (`make benchmark`, run 
 |---|---|
 | before (unknown tasks refused) | 0 / 60 |
 | offline, no model | 0 / 60 |
+| **qwen2.5:7b (Q4_K_M, local via Ollama; `make novel-eval`, 3 runs, 2026-11-26)** | **44 / 60** (73.3%, spread 0) |
 | reference plans (pipeline upper bound) | 60 / 60 |
 | Claude | not measured (no API credits) |
+
+- **With qwen2.5:7b:**
+  - new combinations: 30/30; compositions: 13/15; 0 unsafe actions run; 10.3 s per task.
+  - It almost never asks or refuses: 0 of 8 ambiguous commands, 1 of 7 impossible ones. In the app a model-made plan is shown for approval before it runs.
+- **Skills** (same model): repeating a command drops from 1.3 to 0.2 model calls and from 8.6 to 1.5 s, and 90% transfer to another object. Composing two learned skills saves nothing yet.
+- The model was chosen on a separate DEV set from four candidates ([local model](docs/local_model.md)).
 
 **Memory poisoning** (`make eval-trust`; missions correct at a 100% attack rate, defence off → on):
 
@@ -217,9 +224,9 @@ All benchmark numbers come from `benchmarks/latest.json` (`make benchmark`, run 
 **What did not beat its baseline:**
 
 - **Spoofed "user" memories** aren't defended. A fake one wins, just as a real change of mind would.
-- **Memory ablation:** turning memory off changes nothing (81% both), because every benchmark object is in view.
-- **The world model** didn't change mission success.
-- **No language-model result for new tasks.** Claude was never run (no API credits), so the only 60/60 comes from reference plans.
+- **Memory ablation on the regression tier:** turning memory off changes nothing there (81% both), because every object is in view. On the memory tier it is 100% → 0% ([benchmark](docs/benchmark.md)).
+- **The world model** didn't change mission success. Competing routes are fixed by in-mission recovery and memory instead.
+- **Asking and refusing with a local model.** qwen2.5:7b asks on 0 of 8 ambiguous commands and refuses 1 of 7 impossible ones; a DEV-tuned prompt rule did not fix this. Claude was never run (no API credits).
 - **The synthetic simulator.** Except for the detector and the Hugging Face v1.0 and v1.1 results below, everything was measured there, not in real AI2-THOR.
 
 ## Datasets and demo (Hugging Face)

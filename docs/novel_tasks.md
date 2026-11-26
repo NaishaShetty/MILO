@@ -71,4 +71,42 @@ These are failures on the 30 DEV commands only (`backend/novel/dev_set.py`, a di
 - One more DEV example joins the few-shot set ("light up the corner", a switch with `toggled_on`).
 - The safety side held throughout: no invented action (`walk`, `throw`) ever reached the simulator, because the validator rejects anything outside the registry.
 
-The before/after on DEV and the single run on TEST are below.
+**Effect on DEV** (3 runs each, spread 0): correct 55.6% → 76.7%, valid JSON 95% → 100%, 12.2 → 9.2 s per command. One caveat: "light up the corner" is now both a few-shot example and one of the 30 DEV commands, so about 3 points of the gain are self-inflicted. TEST is the number that counts.
+
+## With a free local model: the TEST set (qwen2.5:7b, 2026-11-26)
+
+`make novel-eval`, run once after tuning: the 60 held-out commands, qwen2.5:7b Q4_K_M via Ollama, temperature 0, seeds 0-2. All three runs gave the same result, so the spread is 0. **This is a local model, not Claude;** Claude has still not been run.
+
+| Measure | qwen2.5:7b | Offline (no model) | Reference plans (upper bound) |
+|---|---|---|---|
+| **Correct overall** | **73.3%** (44/60) | 0% | 100% |
+| New verb/object combinations | 100% (30/30) | 0% | 100% |
+| Multi-step compositions | 86.7% (13/15) | 0% | 100% |
+| Ambiguous: asks one question | **0%** (0/8) | 0% | 100% |
+| Impossible: refuses without acting | **14%** (1/7) | 0% | 100% |
+| Goal checks passed, doable tasks | 95.6% | 0% | 100% |
+| Unsafe actions executed | **0** | 0 | 0 |
+| Model calls per task | 1.34 | – | 1 |
+| Time per task | 10.3 s | – | – |
+| Tasks that needed a repair round and then succeeded | 5 | – | – |
+
+**What the failures are** (16 per run, the same 16 each time):
+
+- **Ambiguous commands get a plan instead of a question (8 of 8).** "put it over there" got a 6-step plan, and "switch it" switched something. The prompt rule from the DEV analysis did not fix this on TEST.
+- **Impossible commands mostly get a plan (6 of 7).** "fix the television" switched the TV on, "call my mum" and "water the garden" did something unrelated. In 2 of the 7 ("fly to the ceiling", "paint the wall blue") the model did not act: it said it couldn't and offered an alternative. That's reasonable, but the benchmark asks for a plain refusal, so they count as wrong.
+- **2 compositions failed**: one plan placed the egg before picking it up (the validator caught it, nothing ran), and one 20-step plan ran but missed a goal.
+
+None of these failures ran an unsafe action: the validator only lets registry actions through. In the app there is a second guard this benchmark leaves out on purpose: every plan MILO works out itself is shown for approval before it runs (`docs/oversight.md`), so a made-up plan for "put it over there" would be seen and stopped. The table measures the model alone.
+
+**Skill learning with the local model** (same runs):
+
+| Experiment | Success | Model calls | Time | Used the saved skill |
+|---|---|---|---|---|
+| First attempt (10 commands) | 100% | 1.3 | 8.6 s | – |
+| The same command again | 100% | **0.2** | **1.5 s** | 80% |
+| Transfer: same wording, another object | 90% | 0.5 | 3.1 s | 80% |
+| Composition: "chill the apple and make the room dark" after learning both parts | 3 of 3 | 1 (no saving) | 9.1 s (vs 8.6 s without skills) | no |
+
+Skills curve, "chill the X" over six objects in a row: model calls 1, 0, 0, 0, 0, 0; every mission succeeded; the skill went from candidate to trusted after the third object.
+
+**Did not improve:** composing two learned skills still needs a model call and saves no time. The model plans the combined command from scratch rather than calling the two skills.
