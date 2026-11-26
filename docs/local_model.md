@@ -4,6 +4,44 @@ MILO can work out new tasks with a model running on your own machine through [Ol
 
 **Chosen model: `qwen2.5:7b` (Q4_K_M).** It was the most accurate of four models on the DEV set, by 19 points.
 
+## Summary: what the local model changed (2026-11-26)
+
+Every number below is labelled with where it came from. "DEV" numbers were used for tuning, so they flatter the model; TEST was run once, after tuning stopped. All model rows are `qwen2.5:7b` (Q4_K_M) through Ollama at temperature 0.
+
+| What | Before | After | Source |
+|---|---|---|---|
+| New tasks correct, DEV (30 commands, 3 runs) | 55.6% (prompt v1) | 76.7% (prompt v2) | `results/bakeoff/` |
+| New tasks correct, **TEST** (60 commands, 3 runs, spread 0) | not measured | **73.3%** (44/60) | `results/novel_local/` |
+| Goal checks pass on doable TEST tasks | not measured | 95.6% | `results/novel_local/` |
+| Unsafe actions on TEST | not measured | 0 | `results/novel_local/` |
+| Repeat task with skills: model calls / seconds | 1.3 / 8.6 s | 0.2 / 1.5 s | `results/novel_local/` |
+| ReAct, known tasks, model planning on its own | not measured | 13/23 | `results/react_local/` |
+| One real AI2-THOR mission, model + vision on a 6 GB GPU | untested | succeeded (5.77-5.87 GB peak) | smoke test above |
+| memory_synonyms tier, rule-based (synthetic, no model) | 75% (hashing embedder) | 88% (learned embedder) | `docs/benchmark.md` |
+| routes tier, rule-based (synthetic, no model) | 0% (no in-mission recovery) | 100% | `docs/benchmark.md` |
+
+**What did not improve:**
+
+- **Ambiguous commands: 0/8 on TEST.** The model never asks a clarifying question; it guesses and acts.
+- **Impossible commands: 1/7 on TEST.** It rarely refuses; it plans something instead.
+- **Skill composition saves nothing.** Building a new task out of two stored skills used as many model calls as planning it from scratch.
+- **ReAct with a 7B model fails on anything with three or more actions.** It succeeds on 0 of 8 new tasks and 0 of 26 harder-tier cases on its own; its good-looking overall row is the rule-based planner it falls back to (99 of 179 cases).
+- **The world model catches 0 of 4 route failures** (`make eval-worldmodel-routes`). It was trained on synthetic episodes only.
+- **Behaviour tree and HTN score 0% on the memory tiers.** They don't use memory hints at all.
+
+**Not run yet** (they take hours on this laptop, or need you):
+
+```bash
+make collect-thor       # 600 real AI2-THOR episodes, about 5-10 hours, resumable: run it overnight
+make train-real         # after collect-thor: retrain the outcome predictor on real episodes
+make benchmark-thor     # the benchmark on real AI2-THOR, about 1 hour per planner, resumable
+```
+
+- **Parser test set:** `data/parser_test_human.jsonl` has only its header. It needs commands written by a person, not generated, then `make eval-parser`.
+- **Hugging Face:** run `huggingface-cli login` yourself, then the dataset and Space can be refreshed with these results.
+
+**Next step with the most value:** the two TEST failure groups above (ambiguous and impossible, 14 of the 16 TEST misses). They look like prompt problems more than model-size problems (not yet tested): the model nearly always returns steps even when the right answer is a question or a refusal. Tune a fix on DEV only, then run TEST once more.
+
 ## The machine (`results/hardware.json`, 2026-11-25)
 
 | | |
