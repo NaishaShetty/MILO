@@ -77,7 +77,21 @@ Answer with exactly one of:
 - "impossible": a short plain reason, when no sequence of the listed actions can do it.
 Unused fields are empty strings or empty lists. Use lower-case object names as they appear
 in the scene. Prefer the shortest plan that makes the success conditions true. If feedback
-says an earlier attempt failed, change the plan to avoid that failure."""
+says an earlier attempt failed, change the plan to avoid that failure.
+
+Rules:
+- Ask, don't guess: if the command doesn't say what to act on or where ("it", "that",
+  "one", "something", "sort it out"), answer only "question"; no steps.
+- Refuse, don't improvise: if nothing in the scene and no listed action can do what was
+  asked, answer only "impossible"; no steps, no question. Never act out something else.
+- Every object you use: "locate" it, then "navigate" to it, then act on it. To move a
+  thing: locate, navigate, pickup, then locate and navigate to the place, then "place"
+  with the place as "container". "container" is only for "place". To put something in a
+  closed container, open it first and close it after.
+- Success conditions must match what the steps do: turn_on -> "toggled_on",
+  turn_off -> "toggled_off", open -> "is_open", close -> "is_closed",
+  place -> "in_receptacle" (object + receptacle), pickup and keep it -> "held".
+  "is_open"/"is_closed" are only for things that open (fridge, drawer, cabinet, box)."""
 
 
 def render(request: PlanRequest) -> str:
@@ -228,6 +242,7 @@ def _few_shot() -> List[Dict[str, str]]:
         {"objectType": "Cooler", "openable": True, "isOpen": False},
         {"objectType": "Bread", "pickupable": True},
         {"objectType": "Desk"},
+        {"objectType": "Lamp", "isToggled": False},
     ]
     messages: List[Dict[str, str]] = []
     for wanted in few_shot_commands():

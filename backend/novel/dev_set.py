@@ -196,4 +196,9 @@ def dev_commands() -> List[Dict[str, Any]]:
 
 def few_shot_commands() -> List[str]:
     """DEV commands whose reference answers are shown to the model as examples."""
-    return ["cool the bread down", "deal with that", "iron my shirt"]
+    return [
+        "cool the bread down",
+        "light up the corner",
+        "deal with that",
+        "iron my shirt",
+    ]

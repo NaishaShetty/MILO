@@ -135,13 +135,17 @@ def main() -> None:
     p.add_argument("--models", nargs="+", required=True)
     p.add_argument("--runs", type=int, default=3)
     p.add_argument("--url", default="http://localhost:11434")
+    p.add_argument(
+        "--out", type=Path, default=OUT, help="results folder (default results/bakeoff)"
+    )
     a = p.parse_args()
-    OUT.mkdir(parents=True, exist_ok=True)
+    out = a.out
+    out.mkdir(parents=True, exist_ok=True)
     table = []
     for model in a.models:
         runs = []
         for seed in range(a.runs):
-            path = OUT / f"{model.replace(':', '_').replace('/', '_')}_seed{seed}.json"
+            path = out / f"{model.replace(':', '_').replace('/', '_')}_seed{seed}.json"
             if path.exists():
                 runs.append(json.loads(path.read_text()))
                 continue
@@ -152,7 +156,7 @@ def main() -> None:
         unload(model, a.url.rstrip("/"))
         table.append(summary(runs))
     table.sort(key=lambda r: (-r["correct_rate"], r["seconds_per_command"]))
-    (OUT / "summary.json").write_text(json.dumps(table, indent=2))
+    (out / "summary.json").write_text(json.dumps(table, indent=2))
     for row in table:
         print(json.dumps(row))
 

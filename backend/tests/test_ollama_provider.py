@@ -100,10 +100,10 @@ def test_success_sends_schema_temperature_zero_and_dev_examples(fake):
     assert "\n" not in body["messages"][-1]["content"]  # compact JSON prompt
     assert body["stream"] is False
     examples = [m["content"] for m in body["messages"][1:-1] if m["role"] == "user"]
-    assert examples and all(
-        "cool the bread" in e or "deal with that" in e or "iron my shirt" in e
-        for e in examples
-    )
+    from novel.dev_set import few_shot_commands
+
+    assert len(examples) == len(few_shot_commands())
+    assert all(any(cmd in e for cmd in few_shot_commands()) for e in examples)
     assert p.stats["eval_tokens"] == 40 and p.stats["eval_seconds"] == pytest.approx(
         2.0
     )
