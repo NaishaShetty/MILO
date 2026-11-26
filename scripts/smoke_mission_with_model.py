@@ -54,9 +54,17 @@ def main() -> int:
         print("not started as a mission:", task)
         return 1
     state = task
+    approved = []
     while state.get("status") not in ("succeeded", "failed", "cancelled"):
         time.sleep(2)
         state = call("GET", f"/tasks/{task['task_id']}")
+        pending = state.get("pending_decision")
+        if pending:
+            # Answer like a user would (plans MILO works out itself wait for an OK).
+            approved.append({"kind": pending.get("kind"),
+                             "steps": [f"{s.get('action')} {s.get('target') or ''} {s.get('container') or ''}".strip()
+                                       for s in pending.get("steps") or []]})  # fmt: skip
+            call("POST", f"/tasks/{task['task_id']}/decision", {"choice": "approve"})
         if time.time() - started > 900:
             print("gave up after 15 minutes")
             break
@@ -64,9 +72,14 @@ def main() -> int:
     seconds = time.time() - started
     errors = state.get("error") or ""
     oom = "out of memory" in json.dumps(state).lower()
+    thoughts = [
+        f"{t.get('kind')}: {t.get('text')}" for t in (state.get("thoughts") or [])
+    ][-8:]
+    failures = [f.get("message") for f in (state.get("failures") or [])][-3:]
     print(json.dumps({"command": command, "status": state.get("status"), "seconds": round(seconds, 1),
                       "peak_vram_mib": peak[0], "vram_total_mib": total[0], "out_of_memory": oom,
-                      "error": errors}, indent=2))  # fmt: skip
+                      "error": errors, "approved": approved, "failures": failures,
+                      "last_thoughts": thoughts}, indent=2))  # fmt: skip
     return 0 if state.get("status") == "succeeded" and not oom else 1
 
 
