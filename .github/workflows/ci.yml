@@ -58,12 +58,15 @@ jobs:
         run: pip install -r backend/requirements.txt
 
       - name: Check formatting (black)
+        if: matrix.python == '3.9'  # black/mypy output depends on the Python version
         run: black --check backend
 
       - name: Lint (ruff)
+        if: matrix.python == '3.9'  # black/mypy output depends on the Python version
         run: ruff check backend
 
       - name: Type-check (mypy)
+        if: matrix.python == '3.9'  # black/mypy output depends on the Python version
         run: mypy backend
 
       # Run from backend/ so imports resolve the same way they do for a
