@@ -187,3 +187,52 @@ def test_a_plan_with_an_action_outside_the_registry_never_runs(fake):
         r["model_calls"] == len(server.requests) == 4
     )  # stops at the model-call budget
     assert "throw" in r["reason"]
+
+
+def test_prompt_v3_decides_before_writing_steps(fake):
+    server = fake(GOOD)
+    OllamaProvider(model="m", url=server.url, prompt_version="v3").propose(_request())
+    body = server.requests[0]
+    assert list(body["format"]["properties"])[0] == "decision"
+    assert body["format"]["required"][0] == "decision"
+    assert '"decision"' in body["messages"][0]["content"]
+    shown = [json.loads(m["content"]) for m in body["messages"][1:-1]
+             if m["role"] == "assistant"]  # fmt: skip
+    assert {a["decision"] for a in shown} == {"plan", "ask", "refuse"}
+    assert all(list(a)[0] == "decision" for a in shown)
+
+
+def test_prompt_v2_keeps_the_old_schema(fake):
+    server = fake(GOOD)
+    OllamaProvider(model="m", url=server.url, prompt_version="v2").propose(_request())
+    assert "decision" not in server.requests[0]["format"]["properties"]
+
+
+def test_decision_ask_drops_any_steps_the_model_also_wrote(fake):
+    both = {**GOOD, "decision": "ask", "question": "Which apple?"}
+    server = fake(both)
+    out = OllamaProvider(model="m", url=server.url, prompt_version="v3").propose(
+        _request("deal with it")
+    )
+    assert out["steps"] == [] and out["question"] == "Which apple?"
+
+
+def test_decision_refuse_without_a_reason_still_refuses(fake):
+    server = fake({**GOOD, "decision": "refuse"})
+    out = OllamaProvider(model="m", url=server.url, prompt_version="v3").propose(
+        _request("walk the dog")
+    )
+    assert out["steps"] == [] and out["impossible"]
+
+
+def test_decision_plan_ignores_a_stray_question(fake):
+    server = fake({**GOOD, "decision": "plan", "question": "Sure?"})
+    out = OllamaProvider(model="m", url=server.url, prompt_version="v3").propose(
+        _request()
+    )
+    assert out["steps"] == GOOD["steps"] and out["question"] == ""
+
+
+def test_unknown_prompt_version_is_rejected():
+    with pytest.raises(ValueError):
+        OllamaProvider(model="m", url="http://127.0.0.1:1", prompt_version="v9")

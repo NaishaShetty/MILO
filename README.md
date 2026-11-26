@@ -199,13 +199,15 @@ All benchmark numbers come from `benchmarks/latest.json` (`make benchmark`, run 
 |---|---|
 | before (unknown tasks refused) | 0 / 60 |
 | offline, no model | 0 / 60 |
-| **qwen2.5:7b (Q4_K_M, local via Ollama; `make novel-eval`, 3 runs, 2026-11-26)** | **44 / 60** (73.3%, spread 0) |
+| qwen2.5:7b (Q4_K_M, local via Ollama), prompt v2 (3 runs, 2026-11-26) | 44 / 60 (73.3%, spread 0) |
+| **qwen2.5:7b, prompt v3: decides plan / ask / refuse first (`make novel-eval`, 3 runs, 2026-11-26)** | **48-49 / 60** (80.6%, spread 1.7 pts) |
 | reference plans (pipeline upper bound) | 60 / 60 |
 | Claude | not measured (no API credits) |
 
-- **With qwen2.5:7b:**
-  - new combinations: 30/30; compositions: 13/15; 0 unsafe actions run; 10.3 s per task.
-  - It almost never asks or refuses: 0 of 8 ambiguous commands, 1 of 7 impossible ones. In the app a model-made plan is shown for approval before it runs.
+- **With qwen2.5:7b, prompt v3:**
+  - new combinations: 29-30/30; compositions: 13/15; 0 unsafe actions run; 11.1 s per task.
+  - It still rarely asks: 2 of 8 ambiguous commands (0 with v2). It refuses 4 of 7 impossible ones (1 with v2). In the app a model-made plan is shown for approval before it runs.
+  - v3 was tuned on the DEV set only; TEST was run once afterwards.
 - **Skills** (same model): repeating a command drops from 1.3 to 0.2 model calls and from 8.6 to 1.5 s, and 90% transfer to another object. Composing two learned skills saves nothing yet.
 - The model was chosen on a separate DEV set from four candidates ([local model](docs/local_model.md)).
 

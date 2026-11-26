@@ -94,6 +94,58 @@ Rules:
   "is_open"/"is_closed" are only for things that open (fridge, drawer, cabinet, box)."""
 
 
+# Prompt v3 (local models): the answer starts with "decision". With the schema's
+# fields in order goal, success, steps, question, impossible, a model writing JSON
+# commits to a plan before it ever reaches "question" or "impossible"; deciding first
+# lets it choose to ask or refuse before writing any steps.
+DECISIONS = ("plan", "ask", "refuse")
+DECIDE_SCHEMA: Dict[str, Any] = {
+    **PLAN_SCHEMA,
+    "properties": {
+        "decision": {"type": "string", "enum": list(DECISIONS)},
+        **PLAN_SCHEMA["properties"],
+    },
+    "required": ["decision"] + list(PLAN_SCHEMA["required"]),
+}
+DECIDE_RULE = """
+
+Start every answer with "decision", made before anything else:
+- "ask" when the command doesn't say what to act on or where; then only "question".
+- "refuse" when nothing in the scene and no listed action can do it; then only
+  "impossible".
+- "plan" otherwise; then "goal", "success" and "steps"."""
+PROMPT_VERSIONS = ("v2", "v3")
+
+
+def _decided(answer: Dict[str, Any]) -> Dict[str, Any]:
+    """An answer with "decision" first, as prompt v3 asks for (few-shot examples)."""
+    if answer.get("question"):
+        decision = "ask"
+    elif answer.get("impossible"):
+        decision = "refuse"
+    else:
+        decision = "plan"
+    return {"decision": decision, **answer}
+
+
+def apply_decision(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Keep only the part of a v3/v4 answer its "decision" chose, so a reply that asks
+    or refuses can't also act, and one that plans can't also ask."""
+    decision = data.get("decision")
+    if decision not in DECISIONS:
+        return data
+    out = dict(data)
+    if decision == "ask":
+        out.update(goal="", success=[], steps=[], impossible="")
+        out["question"] = out.get("question") or "What exactly would you like me to do?"
+    elif decision == "refuse":
+        out.update(goal="", success=[], steps=[], question="")
+        out["impossible"] = out.get("impossible") or "I can't do that with what I have"
+    else:
+        out.update(question="", impossible="")
+    return out
+
+
 def render(request: PlanRequest) -> str:
     return json.dumps(
         {
@@ -233,7 +285,7 @@ def ollama_reachable(url: str, timeout_s: float = 2.0) -> bool:
         return False
 
 
-def _few_shot() -> List[Dict[str, str]]:
+def _few_shot(decide: bool = False) -> List[Dict[str, str]]:
     """Worked examples from the DEV set only (never the held-out TEST set)."""
     from novel.dev_set import dev_commands, few_shot_commands
 
@@ -251,7 +303,8 @@ def _few_shot() -> List[Dict[str, str]]:
             command=item["command"], scene=tiny_scene, holding=None, actions=[]
         )
         messages.append({"role": "user", "content": render(example)})
-        messages.append({"role": "assistant", "content": json.dumps(item["answer"])})
+        answer = _decided(item["answer"]) if decide else item["answer"]
+        messages.append({"role": "assistant", "content": json.dumps(answer)})
     return messages
 
 
@@ -285,7 +338,14 @@ class OllamaProvider:
         post: Any = None,
         num_ctx: Optional[int] = None,
         num_predict: int = 1024,
+        prompt_version: Optional[str] = None,
     ) -> None:
+        self.prompt_version = prompt_version or os.environ.get(
+            "MILO_OLLAMA_PROMPT", "v3"
+        )
+        if self.prompt_version not in PROMPT_VERSIONS:
+            raise ValueError(f"unknown prompt version {self.prompt_version!r}")
+        self._decide = self.prompt_version in ("v3", "v4")
         self.num_ctx = num_ctx or int(os.environ.get("MILO_OLLAMA_NUM_CTX", "8192"))
         self.num_predict = num_predict
         self.model = model or os.environ.get("MILO_OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
@@ -299,7 +359,7 @@ class OllamaProvider:
         self.think = think
         self._examples = [
             {**m, "content": _compact(m["content"])}
-            for m in (_few_shot() if few_shot else [])
+            for m in (_few_shot(self._decide) if few_shot else [])
         ]
         self._post = post or _post_json
         self._cache: Dict[str, Dict[str, Any]] = {}
@@ -312,11 +372,16 @@ class OllamaProvider:
         body: Dict[str, Any] = {
             "model": self.model,
             "stream": False,
-            "format": PLAN_SCHEMA,
+            "format": DECIDE_SCHEMA if self._decide else PLAN_SCHEMA,
             "keep_alive": self.keep_alive,
             "options": {"temperature": 0, "seed": self.seed, "num_ctx": self.num_ctx,
                         "num_predict": self.num_predict},  # fmt: skip
-            "messages": [{"role": "system", "content": SYSTEM}]
+            "messages": [
+                {
+                    "role": "system",
+                    "content": SYSTEM + (DECIDE_RULE if self._decide else ""),
+                }
+            ]
             + self._examples
             + [{"role": "user", "content": prompt}],
         }
@@ -326,7 +391,9 @@ class OllamaProvider:
 
     def propose(self, request: PlanRequest) -> Dict[str, Any]:
         prompt = _compact(render(request))
-        key = hashlib.sha256(f"{self.model}\n{prompt}".encode()).hexdigest()
+        key = hashlib.sha256(
+            f"{self.model}\n{self.prompt_version}\n{prompt}".encode()
+        ).hexdigest()
         if key in self._cache:
             return self._cache[key]
         body = self._body(prompt)
@@ -381,6 +448,8 @@ class OllamaProvider:
                 self.stats["invalid_json"] += 1
                 problem = ProviderError("my local model's answer wasn't a plan")
                 continue
+            if self._decide:
+                data = apply_decision(data)
             self._cache[key] = data
             return data
         raise problem

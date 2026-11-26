@@ -73,7 +73,37 @@ These are failures on the 30 DEV commands only (`backend/novel/dev_set.py`, a di
 
 **Effect on DEV** (3 runs each, spread 0): correct 55.6% → 76.7%, valid JSON 95% → 100%, 12.2 → 9.2 s per command. One caveat: "light up the corner" is now both a few-shot example and one of the 30 DEV commands, so about 3 points of the gain are self-inflicted. TEST is the number that counts.
 
-## With a free local model: the TEST set (qwen2.5:7b, 2026-11-26)
+## Prompt v3: decide before planning (2026-11-26)
+
+The TEST failures below (prompt v2) were mostly commands that should get a question or a refusal and got a plan. The plan schema lists `goal`, `success` and `steps` before `question` and `impossible`, and the model writes JSON in that order, so it has committed to a plan before it reaches the fields for asking or refusing. **Prompt v3** (`backend/novel/providers.py`, now the default; `MILO_OLLAMA_PROMPT=v2` restores the old one) makes the answer start with `"decision": "plan" | "ask" | "refuse"`, and code keeps only the part the decision chose: a reply that asks or refuses can't also act.
+
+**Tuned on DEV only.** DEV had 3 ambiguous and 3 impossible commands, 2 of them few-shot examples, too few to tune on, so 5 of each were added (DEV is now 40 commands; `tests/test_novel_dev_split.py` still checks it shares no command, phrasing, leading verb or object type with TEST). qwen2.5:7b, 3 runs each, every run identical (`results/bakeoff/dev40_prompt_*`):
+
+| DEV (40 commands) | Overall | New combinations | Compositions | Ambiguous | Impossible | s/command |
+|---|---|---|---|---|---|---|
+| v2 (before) | 60% | 17/18 | 4/6 | 1/8 | 2/8 | 9.3 |
+| **v3: decide first** | **70%** | 16/18 | 4/6 | 3/8 | 5/8 | 9.0 |
+| v4: list what the command names, then decide; naming nothing forces a question | 55% | 13/18 | 1/6 | 8/8 | 0/8 | 6.0 |
+
+v4 overcorrected (it asked about everything ambiguous but refused nothing and broke simple tasks), so it was dropped and its code removed. Only these two variants were tried, to limit tuning to DEV noise.
+
+**TEST, run once with v3** (60 held-out commands, seeds 0-2, `results/novel_local/prompt_v3/`):
+
+| TEST | v2 (before) | **v3** |
+|---|---|---|
+| **Correct overall** | 73.3% (44/60, spread 0) | **80.6%** (49, 48, 48 of 60; spread 1.7 pts) |
+| New verb/object combinations | 30/30 | 30, 29, 29 of 30 |
+| Multi-step compositions | 13/15 | 13/15 |
+| Ambiguous: asks one question | 0/8 | **2/8** |
+| Impossible: refuses without acting | 1/7 | **4/7** |
+| Goal checks passed, doable tasks | 95.6% | 94.1% |
+| Unsafe actions executed | 0 | 0 |
+| Model calls per task | 1.34 | 1.39 |
+| Time per task | 10.3 s | 11.1 s |
+
+**Read honestly:** v3 is better by 7 points, almost all of it from refusing (1 → 4 of 7) and asking (0 → 2 of 8). Asking is still poor: 6 of 8 ambiguous commands on TEST still get a plan, and the plan approval step in the app (`docs/oversight.md`) remains the real guard against those. One new-combination command that passed with v2 fails in 2 of 3 v3 runs.
+
+## With a free local model: the TEST set (qwen2.5:7b, prompt v2, 2026-11-26)
 
 `make novel-eval`, run once after tuning: the 60 held-out commands, qwen2.5:7b Q4_K_M via Ollama, temperature 0, seeds 0-2. All three runs gave the same result, so the spread is 0. **This is a local model, not Claude;** Claude has still not been run.
 

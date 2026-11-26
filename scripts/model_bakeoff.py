@@ -1,4 +1,4 @@
-"""Pick the local model: every candidate on the same 30-command DEV set (never TEST).
+"""Pick the local model: every candidate on the same 40-command DEV set (never TEST).
 
     python scripts/model_bakeoff.py --models qwen2.5:7b llama3.1:8b qwen3.5:4b \
         [--runs 3] [--url http://localhost:11434]          (make model-bakeoff)
@@ -75,20 +75,22 @@ def unload(model: str, url: str) -> None:
         pass
 
 
-def one_run(model: str, url: str, seed: int) -> Dict[str, Any]:
+def one_run(model: str, url: str, seed: int, prompt: str = "v3") -> Dict[str, Any]:
     constraints = Constraints.load()
-    provider = OllamaProvider(model=model, url=url, seed=seed, timeout_s=180)
+    provider = OllamaProvider(model=model, url=url, seed=seed, timeout_s=180,
+                              prompt_version=prompt)  # fmt: skip
+    commands = dev_commands()
     rows = []
     started = time.perf_counter()
     with VramPeak() as vram, tempfile.TemporaryDirectory() as tmp:
-        for i, item in enumerate(dev_commands()):
+        for i, item in enumerate(commands):
             r = run_one(item["command"], provider, SkillLibrary(Path(tmp) / f"{i}.db"),
                         constraints, scene_objects=dev_scene())  # fmt: skip
             rows.append({"command": item["command"], "category": item["category"],
                          "correct": correct(item, r), **{k: r[k] for k in
                          ("status", "model_calls", "caught_unsafe", "caught_infeasible", "acted", "ms")}})  # fmt: skip
             print(
-                f"  [{model} seed {seed}] {i + 1:2d}/30 {'ok ' if rows[-1]['correct'] else 'BAD'} {item['command']}",
+                f"  [{model} seed {seed}] {i + 1:2d}/{len(commands)} {'ok ' if rows[-1]['correct'] else 'BAD'} {item['command']}",
                 flush=True,
             )
     calls = sum(r["model_calls"] for r in rows)
@@ -97,6 +99,7 @@ def one_run(model: str, url: str, seed: int) -> Dict[str, Any]:
     return {
         "model": model,
         "seed": seed,
+        "prompt": prompt,
         "correct_rate": sum(r["correct"] for r in rows) / len(rows),
         "valid_json_rate": 1 - s["invalid_json"] / max(1, s["calls"]),
         "plan_validity": 1 - rejected / max(1, calls),
@@ -135,6 +138,8 @@ def main() -> None:
     p.add_argument("--models", nargs="+", required=True)
     p.add_argument("--runs", type=int, default=3)
     p.add_argument("--url", default="http://localhost:11434")
+    p.add_argument("--prompt", default="v3", choices=["v2", "v3"],
+                   help="v3 (default): the answer starts with a plan/ask/refuse decision")  # fmt: skip
     p.add_argument(
         "--out", type=Path, default=OUT, help="results folder (default results/bakeoff)"
     )
@@ -150,7 +155,7 @@ def main() -> None:
                 runs.append(json.loads(path.read_text()))
                 continue
             print(f"{model}, run {seed + 1}/{a.runs}", flush=True)
-            result = one_run(model, a.url.rstrip("/"), seed)
+            result = one_run(model, a.url.rstrip("/"), seed, a.prompt)
             path.write_text(json.dumps(result, indent=1))
             runs.append(result)
         unload(model, a.url.rstrip("/"))

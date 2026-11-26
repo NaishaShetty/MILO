@@ -1,0 +1,204 @@
+{
+  "source": "qwen2.5:7b via Ollama (temperature 0, seeds 0-2)",
+  "runs": 3,
+  "correct_rate": {
+    "mean": 0.8056,
+    "spread": 0.0167
+  },
+  "goal_check_success_doable": {
+    "mean": 0.9407,
+    "spread": 0.0222
+  },
+  "validator_rejections_per_task": {
+    "mean": 0.2833,
+    "spread": 0.0
+  },
+  "tasks_needing_repair": {
+    "mean": 6.0,
+    "spread": 0.0
+  },
+  "model_calls_per_task": {
+    "mean": 1.3889,
+    "spread": 0.0167
+  },
+  "seconds_per_task": {
+    "mean": 11.0832,
+    "spread": 0.5119
+  },
+  "unsafe_actions_executed": {
+    "mean": 0.0,
+    "spread": 0.0
+  },
+  "by_category": {
+    "new_combination": {
+      "mean": 0.9778,
+      "spread": 0.0333
+    },
+    "composition": {
+      "mean": 0.8667,
+      "spread": 0.0
+    },
+    "ambiguous": {
+      "mean": 0.25,
+      "spread": 0.0
+    },
+    "impossible": {
+      "mean": 0.5714,
+      "spread": 0.0
+    }
+  },
+  "skills_first_attempt": {
+    "success": {
+      "mean": 1.0,
+      "spread": 0.0
+    },
+    "model_calls": {
+      "mean": 1.2,
+      "spread": 0.0
+    },
+    "seconds": {
+      "mean": 7.3614,
+      "spread": 0.2288
+    },
+    "used_skill": {
+      "mean": 0.0,
+      "spread": 0.0
+    }
+  },
+  "skills_same_command_again": {
+    "success": {
+      "mean": 1.0,
+      "spread": 0.0
+    },
+    "model_calls": {
+      "mean": 0.1,
+      "spread": 0.0
+    },
+    "seconds": {
+      "mean": 0.7128,
+      "spread": 0.0149
+    },
+    "used_skill": {
+      "mean": 0.9,
+      "spread": 0.0
+    }
+  },
+  "skills_transfer_other_object": {
+    "success": {
+      "mean": 1.0,
+      "spread": 0.0
+    },
+    "model_calls": {
+      "mean": 0.1,
+      "spread": 0.0
+    },
+    "seconds": {
+      "mean": 0.7174,
+      "spread": 0.0251
+    },
+    "used_skill": {
+      "mean": 0.9,
+      "spread": 0.0
+    }
+  },
+  "skills_composition": [
+    {
+      "without_skills": {
+        "ok": true,
+        "calls": 1,
+        "s": 8.453409161997115,
+        "source": "model"
+      },
+      "parts_learned": [
+        true,
+        true
+      ],
+      "with_learned_skills": {
+        "ok": true,
+        "calls": 1,
+        "s": 9.129731040000479,
+        "source": "model"
+      }
+    },
+    {
+      "without_skills": {
+        "ok": true,
+        "calls": 1,
+        "s": 8.23651976200199,
+        "source": "model"
+      },
+      "parts_learned": [
+        true,
+        true
+      ],
+      "with_learned_skills": {
+        "ok": true,
+        "calls": 1,
+        "s": 8.803714899000624,
+        "source": "model"
+      }
+    },
+    {
+      "without_skills": {
+        "ok": true,
+        "calls": 1,
+        "s": 8.651129467998544,
+        "source": "model"
+      },
+      "parts_learned": [
+        true,
+        true
+      ],
+      "with_learned_skills": {
+        "ok": true,
+        "calls": 1,
+        "s": 8.984646097000223,
+        "source": "model"
+      }
+    }
+  ],
+  "skills_curve": [
+    {
+      "command": "chill the apple",
+      "ok": true,
+      "model_calls": 1,
+      "seconds": 7.01,
+      "skill_status": "candidate"
+    },
+    {
+      "command": "chill the tomato",
+      "ok": true,
+      "model_calls": 0,
+      "seconds": 0.0,
+      "skill_status": "candidate"
+    },
+    {
+      "command": "chill the potato",
+      "ok": true,
+      "model_calls": 0,
+      "seconds": 0.0,
+      "skill_status": "trusted"
+    },
+    {
+      "command": "chill the bottle",
+      "ok": true,
+      "model_calls": 0,
+      "seconds": 0.0,
+      "skill_status": "trusted"
+    },
+    {
+      "command": "chill the egg",
+      "ok": true,
+      "model_calls": 0,
+      "seconds": 0.0,
+      "skill_status": "trusted"
+    },
+    {
+      "command": "chill the bowl",
+      "ok": true,
+      "model_calls": 0,
+      "seconds": 0.0,
+      "skill_status": "trusted"
+    }
+  ]
+}

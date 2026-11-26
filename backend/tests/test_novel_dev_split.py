@@ -20,7 +20,7 @@ def _family(command: str, object_words: set) -> str:
 
 
 def test_sizes():
-    assert len(dev_commands()) == 30
+    assert len(dev_commands()) == 40
     assert len(held_out_commands()) == 60
 
 

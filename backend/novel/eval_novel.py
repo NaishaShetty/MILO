@@ -571,6 +571,7 @@ def local_run(model: str, seed: int, url: Optional[str]) -> Dict[str, Any]:
     out: Dict[str, Any] = {
         "model": model,
         "seed": seed,
+        "prompt": provider().prompt_version,
         "correct_rate": sum(r["correct"] for r in rows) / len(rows),
         "goal_check_success_doable": sum(r["status"] == "succeeded" for r in doable)
         / len(doable),
@@ -688,12 +689,23 @@ def main(argv: Optional[List[str]] = None) -> None:
                    help="measure a local model served by Ollama on the TEST set (three runs)")  # fmt: skip
     p.add_argument("--runs", type=int, default=3)
     p.add_argument("--out", type=Path, default=Path("artifacts/novel_eval.json"))
+    p.add_argument("--results-dir", type=Path, default=None,
+                   help="where --ollama runs are saved (default results/novel_local/prompt_<version>); finished runs there are reused")  # fmt: skip
     a = p.parse_args(argv)
     if a.ollama:
         import os
 
-        report = evaluate_local(a.ollama, a.runs, os.environ.get("MILO_OLLAMA_URL"),
-                                Path(__file__).resolve().parents[2] / "results" / "novel_local")  # fmt: skip
+        # one folder per prompt version, so a run never reuses another prompt's results
+        prompt = os.environ.get("MILO_OLLAMA_PROMPT", "v3")
+        out_dir = a.results_dir or (
+            Path(__file__).resolve().parents[2]
+            / "results"
+            / "novel_local"
+            / f"prompt_{prompt}"
+        )
+        report = evaluate_local(
+            a.ollama, a.runs, os.environ.get("MILO_OLLAMA_URL"), out_dir
+        )
         print(
             json.dumps(
                 {k: v for k, v in report.items() if k != "skills_curve"}, indent=2

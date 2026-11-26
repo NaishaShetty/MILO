@@ -1,7 +1,7 @@
 """
 dev_set.py (backend/novel)
 
-The DEV set for the local language model: 30 commands, used ONLY to pick a model and
+The DEV set for the local language model: 40 commands, used ONLY to pick a model and
 tune prompts and few-shot examples. The 60-command TEST set in `novel.eval_novel` is
 touched once per final result.
 
@@ -177,7 +177,14 @@ def dev_commands() -> List[Dict[str, Any]]:
 
     for cmd, q in [("deal with that", "What would you like me to deal with?"),
                    ("sort it out", "What should I sort out?"),
-                   ("bring one over", "Which thing should I bring?")]:  # fmt: skip
+                   ("bring one over", "Which thing should I bring?"),
+                   # added 2026-11-26: 3 ambiguous commands (2 of them few-shot
+                   # examples) were too few to tune asking on
+                   ("straighten those up", "Which things should I straighten up?"),
+                   ("shift it over there", "What should I move, and where to?"),
+                   ("could you see to this", "What would you like me to see to?"),
+                   ("stick that somewhere", "What should I put away, and where?"),
+                   ("give me a hand with these", "Which things do you need help with?")]:  # fmt: skip
         add(
             cmd,
             "ambiguous",
@@ -185,7 +192,12 @@ def dev_commands() -> List[Dict[str, Any]]:
         )
     for cmd, why in [("iron my shirt", "I have no iron and no ironing action"),
                      ("walk the dog", "there is no dog here and I can't go outside"),
-                     ("sing me a song", "I can't sing")]:  # fmt: skip
+                     ("sing me a song", "I can't sing"),
+                     ("fold the laundry", "there is no laundry here and I can't fold"),
+                     ("mow the lawn", "there is no lawn here and I can't go outside"),
+                     ("phone my sister", "I can't make phone calls"),
+                     ("repaint the safe red", "I have no paint and no painting action"),
+                     ("feed the goldfish", "there is no goldfish here")]:  # fmt: skip
         add(
             cmd,
             "impossible",

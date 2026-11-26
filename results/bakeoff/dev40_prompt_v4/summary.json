@@ -1,0 +1,22 @@
+[
+  {
+    "model": "qwen2.5:7b",
+    "runs": 3,
+    "context_full": 0,
+    "prompt_tokens_max": 2312,
+    "correct_rate": 0.55,
+    "correct_rate_spread": 0.0,
+    "valid_json_rate": 1.0,
+    "valid_json_rate_spread": 0.0,
+    "plan_validity": 0.851,
+    "plan_validity_spread": 0.0,
+    "model_calls_per_command": 1.175,
+    "model_calls_per_command_spread": 0.0,
+    "tokens_per_second": 23.748,
+    "tokens_per_second_spread": 0.889,
+    "seconds_per_command": 5.991,
+    "seconds_per_command_spread": 0.234,
+    "peak_vram_mib": 4105,
+    "peak_vram_mib_spread": 0
+  }
+]

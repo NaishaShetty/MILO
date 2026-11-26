@@ -11,10 +11,11 @@ Every number below is labelled with where it came from. "DEV" numbers were used 
 | What | Before | After | Source |
 |---|---|---|---|
 | New tasks correct, DEV (30 commands, 3 runs) | 55.6% (prompt v1) | 76.7% (prompt v2) | `results/bakeoff/` |
-| New tasks correct, **TEST** (60 commands, 3 runs, spread 0) | not measured | **73.3%** (44/60) | `results/novel_local/` |
-| Goal checks pass on doable TEST tasks | not measured | 95.6% | `results/novel_local/` |
+| New tasks correct, **TEST** (60 commands, 3 runs) | not measured | 73.3% (prompt v2) → **80.6%** (prompt v3) | `results/novel_local/prompt_v2/`, `prompt_v3/` |
+| Ambiguous / impossible TEST commands handled | not measured | 0/8, 1/7 (v2) → 2/8, 4/7 (v3) | `results/novel_local/` |
+| Goal checks pass on doable TEST tasks | not measured | 95.6% (v2), 94.1% (v3) | `results/novel_local/` |
 | Unsafe actions on TEST | not measured | 0 | `results/novel_local/` |
-| Repeat task with skills: model calls / seconds | 1.3 / 8.6 s | 0.2 / 1.5 s | `results/novel_local/` |
+| Repeat task with skills: model calls / seconds | 1.3 / 8.6 s | 0.2 / 1.5 s | `results/novel_local/prompt_v2/` |
 | ReAct, known tasks, model planning on its own | not measured | 13/23 | `results/react_local/` |
 | One real AI2-THOR mission, model + vision on a 6 GB GPU | untested | succeeded (5.77-5.87 GB peak) | smoke test above |
 | memory_synonyms tier, rule-based (synthetic, no model) | 75% (hashing embedder) | 88% (learned embedder) | `docs/benchmark.md` |
@@ -22,8 +23,8 @@ Every number below is labelled with where it came from. "DEV" numbers were used 
 
 **What did not improve:**
 
-- **Ambiguous commands: 0/8 on TEST.** The model never asks a clarifying question; it guesses and acts.
-- **Impossible commands: 1/7 on TEST.** It rarely refuses; it plans something instead.
+- **Ambiguous commands: 2/8 on TEST** with prompt v3 (0/8 with v2). The model still usually guesses and acts instead of asking.
+- **Impossible commands: 4/7 on TEST** with v3 (1/7 with v2). Better, but 3 of 7 still get a plan.
 - **Skill composition saves nothing.** Building a new task out of two stored skills used as many model calls as planning it from scratch.
 - **ReAct with a 7B model fails on anything with three or more actions.** It succeeds on 0 of 8 new tasks and 0 of 26 harder-tier cases on its own; its good-looking overall row is the rule-based planner it falls back to (99 of 179 cases).
 - **The world model catches 0 of 4 route failures** (`make eval-worldmodel-routes`). It was trained on synthetic episodes only.
@@ -40,7 +41,7 @@ make benchmark-thor     # the benchmark on real AI2-THOR, about 1 hour per plann
 - **Parser test set:** `data/parser_test_human.jsonl` has only its header. It needs commands written by a person, not generated, then `make eval-parser`.
 - **Hugging Face:** run `huggingface-cli login` yourself, then the dataset and Space can be refreshed with these results.
 
-**Next step with the most value:** the two TEST failure groups above (ambiguous and impossible, 14 of the 16 TEST misses). They look like prompt problems more than model-size problems (not yet tested): the model nearly always returns steps even when the right answer is a question or a refusal. Tune a fix on DEV only, then run TEST once more.
+**Next step with the most value:** asking. Prompt v3 (decide plan / ask / refuse before writing steps, tuned on DEV only, [details](novel_tasks.md)) took TEST from 73.3% to 80.6%, mostly through refusals; 6 of 8 ambiguous commands still get a plan. A stricter variant that forced a question whenever the command named nothing overcorrected on DEV and was dropped. The plan-approval step in the app is the guard meanwhile.
 
 ## The machine (`results/hardware.json`, 2026-11-25)
 
