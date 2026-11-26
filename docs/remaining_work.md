@@ -39,6 +39,5 @@ Use `MILO_OLLAMA_KEEP_ALIVE=0` if a local model shares the GPU ([local_model.md]
 
 - A "Record" button for saving a mission as a demo clip from the app.
 - A browser test for voice with a fake microphone (Playwright fake media), and a short manual checklist for trying voice in a real browser.
-- `scripts/profile_perception.py`: per-stage timing for Grounding DINO and SAM2 on the laptop GPU.
 - Scripts to fetch and publish trained model weights.
 - A `ci-gate-demo` branch that shows the benchmark gate failing a deliberately broken change.

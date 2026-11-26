@@ -100,8 +100,12 @@ OLLAMA_URL ?= http://localhost:11434
 MODEL ?= qwen2.5:7b
 BAKEOFF_MODELS ?= qwen2.5:7b qwen3.5:4b llama3.1:8b gemma4:e2b-it-qat
 
-.PHONY: model-bakeoff novel-eval benchmark-thor collect-thor train-real
-## Pick the local model on the 30-command DEV set (3 runs per model)
+.PHONY: model-bakeoff novel-eval benchmark-thor collect-thor train-real profile-perception
+## Time each perception stage (Grounding DINO, fast detector, SAM2, depth) on this GPU
+profile-perception:
+	$(PY) scripts/profile_perception.py --frames 40
+
+## Pick the local model on the 40-command DEV set (3 runs per model)
 model-bakeoff:
 	@echo "Expect about 15-30 min per model per run on an RTX 4050 laptop (resumable)."
 	$(PY) scripts/model_bakeoff.py --url $(OLLAMA_URL) --runs 3 --models $(BAKEOFF_MODELS)

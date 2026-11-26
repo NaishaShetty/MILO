@@ -1,0 +1,82 @@
+{
+  "date": "2026-11-26",
+  "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+  "torch": "2.5.1+cu124",
+  "python": "3.9.25",
+  "frames": 40,
+  "warmup_frames": 3,
+  "frame_size": [
+    480,
+    640
+  ],
+  "split": "/home/naishashetty/Vision-Language-Robotics/backend/artifacts/detector/test.txt",
+  "prompt": "apple. mug. refrigerator. cabinet. table. bowl. sink. drawer.",
+  "load": {
+    "grounding_dino": {
+      "ms": 664,
+      "peak_vram_mib": 892.1
+    },
+    "fast_detector": {
+      "ms": 913,
+      "provider": "CUDAExecutionProvider"
+    },
+    "sam2": {
+      "ms": 136,
+      "peak_vram_mib": 129.6
+    },
+    "depth_anything": {
+      "ms": 213,
+      "peak_vram_mib": 167.2
+    }
+  },
+  "stages": {
+    "grounding_dino": {
+      "n": 40,
+      "mean_ms": 498.0,
+      "p50_ms": 496.7,
+      "p95_ms": 508.9,
+      "peak_vram_mib": 2007.2
+    },
+    "fast_detector": {
+      "n": 40,
+      "mean_ms": 5.4,
+      "p50_ms": 5.3,
+      "p95_ms": 6.0,
+      "provider": "CUDAExecutionProvider"
+    },
+    "sam2": {
+      "n": 36,
+      "mean_ms": 127.0,
+      "p50_ms": 121.2,
+      "p95_ms": 159.5,
+      "peak_vram_mib": 862.0
+    },
+    "sam2_one_call_per_box (before 2026-11-26)": {
+      "n": 36,
+      "mean_ms": 486.5,
+      "p50_ms": 339.2,
+      "p95_ms": 1410.6,
+      "mask_iou_vs_sam2": {
+        "mean": 1.0,
+        "min": 0.9983
+      }
+    },
+    "depth_anything": {
+      "n": 40,
+      "mean_ms": 53.8,
+      "p50_ms": 53.8,
+      "p95_ms": 54.7,
+      "peak_vram_mib": 308.3
+    },
+    "scene_graph": {
+      "n": 40,
+      "mean_ms": 1.5,
+      "p50_ms": 0.4,
+      "p95_ms": 7.8
+    }
+  },
+  "detections_per_frame": {
+    "mean": 3.83,
+    "max": 14
+  }
+}

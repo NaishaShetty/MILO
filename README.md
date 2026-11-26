@@ -22,6 +22,7 @@ It is a research and engineering platform for people working on embodied agents,
 | Problem | What we did | Measured result |
 |---|---|---|
 | A hung simulator call froze the whole mission | Steps time out (default 120 s, `EXECUTION_STEP_TIMEOUT_S`); retries and replans skip steps the world already shows as done | A hung call now fails its step at the timeout. Tests cover this (`tests/test_step_timeout_default.py`) |
+| SAM2 encoded the same image again for every object | All of a frame's boxes in one SAM2 call | Masks per frame 487 ms → 127 ms (p95 1,411 → 160 ms) on an RTX 4050, identical masks ([perception profile](docs/perception_profile.md), 2026-11-26) |
 | Perception was slow inside the planning loop | Cheap observation (no SAM2 masks) while planning, full pipeline only in the Vision panel; an optional fast YOLO11n detector that hands over to Grounding DINO when unsure | Observe time per mission 1.37 s → 0.068 s on real AI2-THOR, success unchanged at 0.90 ([fast detector card](docs/models/fast_detector.md), 2026-11-24) |
 | Memory search slowed down as memories grew | In-memory vector index loaded once, batched writes, indexed lookups | At 5,000 memories, search went from 26.7 ms to 3.8 ms (7×) (`pytest tests/test_memory_scaling_benchmark.py -s`, 2026-11-25) |
 | Unknown requests were refused | A novel-task planner: reuse a saved skill, otherwise ask a language model, validate the plan, then act; successes become skills | All 10 deliberately bad plans caught before acting; 0 unsafe actions run ([novel tasks](docs/novel_tasks.md)) |

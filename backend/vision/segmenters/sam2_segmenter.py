@@ -10,14 +10,21 @@ Responsibilities
 -----------------
 - Implement `BaseSegmenter`: enrich an existing `Scene`'s detections
   with masks, never create new detections.
-- For every `Detection` in the scene, use its `bbox` as a box prompt
-  for SAM2, run a forward pass, and attach the resulting `Mask`
-  (scene/mask.py) to that detection.
+- Use every `Detection`'s `bbox` as a box prompt, run ONE SAM2 forward
+  pass for the whole frame, and attach each resulting `Mask`
+  (scene/mask.py) to its detection.
 
-Pipeline per detection
-------------------------
-Detection.bbox -> SAM2 box prompt -> SAM2 forward pass -> binary mask
--> Mask(binary, area, bbox) -> Detection.mask
+Pipeline per frame
+--------------------
+all Detection.bbox -> SAM2 box prompts -> one SAM2 forward pass (the
+image is encoded once) -> one binary mask per box -> Mask(binary, area,
+bbox) -> Detection.mask
+
+Until 2026-11-26 this ran one forward pass per box, which re-encoded the
+same image for every detection. `scripts/profile_perception.py` on an
+RTX 4050 (40 held-out AI2-THOR frames, 3.8 objects each on average):
+487 ms mean / 1,421 ms p95 per frame one box at a time, 125 / 159 ms with
+all boxes in one pass, masks identical (IoU mean 1.0, minimum 0.998).
 
 Why this abstraction exists
 -----------------------------
@@ -136,37 +143,36 @@ class SAM2Segmenter(BaseSegmenter):
         if not scene.detections:
             return scene
 
-        pil_image = Image.fromarray(image)
+        boxes = [list(detection.bbox) for detection in scene.detections]
 
-        for detection in scene.detections:
+        # Every box in one call: SAM2 encodes the image once and decodes one
+        # mask per box prompt.
+        inputs = self.processor(
+            images=Image.fromarray(image),
+            input_boxes=[boxes],
+            return_tensors="pt",
+        ).to(self.device)
 
-            box = detection.bbox
+        with torch.no_grad():
 
-            inputs = self.processor(
-                images=pil_image,
-                input_boxes=[[box]],
-                return_tensors="pt",
-            ).to(self.device)
+            outputs = self.model(**inputs, multimask_output=False)
 
-            with torch.no_grad():
+        masks = self.processor.post_process_masks(
+            outputs.pred_masks,
+            inputs["original_sizes"],
+        )
 
-                outputs = self.model(**inputs, multimask_output=False)
+        # masks[0]: this image's masks, shaped
+        # [num_boxes, num_masks_per_box, H, W]; multimask_output=False
+        # makes the second dim 1. Box i's mask belongs to detection i.
+        for i, detection in enumerate(scene.detections):
 
-            masks = self.processor.post_process_masks(
-                outputs.pred_masks,
-                inputs["original_sizes"],
-            )
-
-            # masks[0]: this image's masks, shaped
-            # [num_prompts, num_masks_per_prompt, H, W]. One box
-            # prompt and multimask_output=False means both of those
-            # dims are 1.
-            binary_mask = masks[0][0, 0].cpu().numpy().astype(bool)
+            binary_mask = masks[0][i, 0].cpu().numpy().astype(bool)
 
             detection.mask = Mask(
                 binary=binary_mask,
                 area=int(binary_mask.sum()),
-                bbox=box,
+                bbox=detection.bbox,
             )
 
         return scene
