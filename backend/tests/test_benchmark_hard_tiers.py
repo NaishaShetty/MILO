@@ -99,7 +99,6 @@ def test_react_without_a_model_is_reported_as_not_measured():
 
 def test_react_whose_model_never_answers_is_not_reported_as_measured(monkeypatch):
     import benchmark.run as br
-
     from language.exceptions import LLMProviderError
 
     class Broken:
