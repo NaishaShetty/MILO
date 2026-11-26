@@ -229,7 +229,8 @@ jobs:
       # docker/Dockerfile's own docstring makes.
       - name: Smoke-test backend container (no credentials)
         run: |
-          docker run -d --name backend-smoke -p 8000:8000 vlr-backend:ci
+          docker network create milo-smoke
+          docker run -d --name backend --network milo-smoke -p 8000:8000 vlr-backend:ci
           for i in $(seq 1 30); do
             if curl -sf http://localhost:8000/health > /dev/null; then
               echo "backend healthy"; exit 0
@@ -237,5 +238,27 @@ jobs:
             sleep 2
           done
           echo "backend did not become healthy in time"
-          docker logs backend-smoke
+          docker logs backend
           exit 1
+
+      # Both containers together, as docker-compose.yml runs them: the frontend's
+      # nginx must serve the app (deep links too) and proxy /health and /api/ to the
+      # backend by its service name. A broken proxy or BACKEND_ORIGIN would pass
+      # every check above and still give a blank, offline app.
+      - name: Smoke-test frontend + backend together
+        run: |
+          docker run -d --name frontend --network milo-smoke -p 8080:80 \
+            -e BACKEND_ORIGIN=http://backend:8000 vlr-frontend:ci
+          ok=""
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:8080/ > /dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          [ -n "$ok" ] || { echo "frontend did not start"; docker logs frontend; exit 1; }
+          curl -sf http://localhost:8080/ | grep -q 'id="root"' || { echo "index.html not served"; exit 1; }
+          curl -sf http://localhost:8080/memory | grep -q 'id="root"' || { echo "deep link not served"; exit 1; }
+          curl -sf http://localhost:8080/health || { echo "/health not proxied"; docker logs frontend; exit 1; }
+          echo
+          curl -sf -o /dev/null -w "%{http_code}\n" http://localhost:8080/api/v1/traces \
+            || { echo "/api not proxied"; docker logs frontend; docker logs backend; exit 1; }
+          echo "frontend serves the app and reaches the backend through its proxy"
