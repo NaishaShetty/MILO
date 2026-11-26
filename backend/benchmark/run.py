@@ -151,6 +151,8 @@ def run_case(
     react_client: Any = None,
 ) -> Dict[str, Any]:
     objects = case_scene(case)
+    react_before = getattr(react_client, "calls", 0)
+    react_errors_before = getattr(react_client, "errors", 0)
     sim = SyntheticSimulator(
         [dict(o) for o in objects],
         Faults(kind=case.fault, target=case.fault_target, times=case.fault_times),
@@ -198,7 +200,14 @@ def run_case(
         "steps": len(steps),
         "sim_s": round(sim.clock_s, 2),
         "replans": orch._replans,
-        "model_calls": novel_log.model_calls if novel_log else 0,
+        "model_calls": (
+            novel_log.model_calls
+            if novel_log
+            else (react_client.calls - react_before if react_client is not None else 0)
+        ),
+        "model_errors": (
+            react_client.errors - react_errors_before if react_client is not None else 0
+        ),
     }
 
 
@@ -276,6 +285,14 @@ def run(
             for c in todo
         ]
         report["by_case"][planner] = rows
+        if planner == "react":
+            calls = sum(r["model_calls"] for r in rows)
+            errors = sum(r["model_errors"] for r in rows)
+            if calls == 0 or errors == calls:
+                report["planners"][planner] = {
+                    "not_measured": f"the model never answered ({calls} calls, {errors} errors)"
+                }
+                continue
         report["planners"][planner] = {
             # The regression tier (known, novel, faults); the harder tiers are under "tiers".
             "all": summarise([r for r in rows if r["kind"] in ("known", "novel")]),
@@ -302,15 +319,40 @@ def run(
     return report
 
 
-def _local_react_client(model: str) -> Any:
+class CountingClient:
+    """Wraps ReAct's language-model client and counts real calls and errors. ReAct falls
+    back to the rule-based planner when the model fails, without saying so; counting
+    is how the benchmark knows whether a ReAct row measured the model at all."""
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+        self.calls = 0
+        self.errors = 0
+
+    def complete(self, request: Any) -> Any:
+        self.calls += 1
+        try:
+            return self._inner.complete(request)
+        except Exception:
+            self.errors += 1
+            raise
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+
+def _local_react_client(model: str) -> CountingClient:
     """ReAct's language-model client pointed at Ollama's OpenAI-compatible endpoint."""
     from language.config import LLMRuntimeConfig
     from language.provider_factory import create_llm_client
 
     url = os.environ.get("MILO_OLLAMA_URL", "http://localhost:11434").rstrip("/")
+    # The client reads the key variable at call time, not only when it is built, so it
+    # must stay set. Ollama ignores it; it only has to exist.
+    os.environ.setdefault("QWEN_API_KEY", "not-needed")
     with _env(LANGUAGE_LLM_PROVIDER="qwen", LANGUAGE_LLM_BASE_URL=f"{url}/v1",
-              LANGUAGE_LLM_MODEL=model, QWEN_API_KEY="not-needed"):  # fmt: skip
-        return create_llm_client(LLMRuntimeConfig.from_env())
+              LANGUAGE_LLM_MODEL=model):  # fmt: skip
+        return CountingClient(create_llm_client(LLMRuntimeConfig.from_env()))
 
 
 def ablation_table(provider: Optional[Provider]) -> Dict[str, Any]:

@@ -95,3 +95,20 @@ def test_react_without_a_model_is_reported_as_not_measured():
     }
     assert report["react_model"] is None
     assert "react | not measured" in markdown(report)
+
+
+def test_react_whose_model_never_answers_is_not_reported_as_measured(monkeypatch):
+    import benchmark.run as br
+
+    from language.exceptions import LLMProviderError
+
+    class Broken:
+        def complete(self, request):
+            raise LLMProviderError("no model here")  # what the real client raises
+
+    monkeypatch.setattr(
+        br, "_local_react_client", lambda model: br.CountingClient(Broken())
+    )
+    report = br.run("ci", planners=["react"], ablations=False, react_model="qwen2.5:7b")
+    assert "not_measured" in report["planners"]["react"]
+    assert "never answered" in report["planners"]["react"]["not_measured"]
