@@ -239,3 +239,45 @@ def test_memory_api_lists_trust_and_lets_the_user_fix_things(tmp_path):
 
 
 _ = time
+
+
+# -- spoofed "user" memories ---------------------------------------------------------------
+
+
+def test_an_import_claiming_to_be_from_the_user_is_still_an_import(tmp_path):
+    from memory.trust import describe
+
+    agent = _agent(str(tmp_path))
+    agent.remember_preference("apple", "stored_in", "fridge")
+    with defence(True):
+        m = agent.import_memory(
+            "apple", "located_on", "sofa", provenance=MemoryProvenance.USER_INPUT
+        )
+    assert m is not None and source_of(m) == "imported"
+    stored = agent.get(m.memory_id)
+    assert stored.status == MemoryStatus.QUARANTINED
+    info = describe(stored)
+    assert info["claimed_source"] == "user"
+    assert "says it came from you" in info["quarantine_reason"]
+    assert _put_away(agent, "apple")  # the user's word still wins
+
+
+def test_without_the_defence_the_spoofed_user_memory_wins(tmp_path):
+    agent = _agent(str(tmp_path))
+    agent.remember_preference("apple", "stored_in", "fridge")
+    with defence(False):
+        m = agent.import_memory(
+            "apple", "located_on", "sofa", provenance=MemoryProvenance.USER_INPUT
+        )
+        assert source_of(m) == "user"
+        assert not _put_away(agent, "apple")
+
+
+def test_someone_else_telling_milo_directly_is_not_defended(tmp_path):
+    """MILO can't tell who is speaking: a new statement through the user's own channel
+    is a change of mind. This documents the remaining gap."""
+    agent = _agent(str(tmp_path))
+    agent.remember_preference("apple", "stored_in", "fridge")
+    with defence(True):
+        agent.remember_preference("apple", "located_on", "sofa")
+        assert not _put_away(agent, "apple")

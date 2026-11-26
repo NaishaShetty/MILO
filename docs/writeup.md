@@ -37,8 +37,8 @@ Household-robot demos usually work for the commands they were built for and fail
 | Novel tasks (60 commands) | 0/60 (refused) | 60/60 with reference plans; 10/10 bad plans caught; 0 unsafe actions | pipeline proven; **LLM result not measured** |
 | Teaching skills | — | a taught skill reused in a new room on a new object, 0 model calls; chained skills run end to end | meets acceptance |
 | Ask / approve / undo | guesses between two cups | one question with exact choices; risky steps wait; undo restores the fridge and the apple | meets acceptance |
-| Memory poisoning | 0% correct at full attack | 100% (imported preferences, fake skills) | better, except **spoofed user memories: 0% → 0%** |
-| Failure memory | 0% on repeats | 100% for "couldn't see it"; out of reach unchanged | better where a fix exists |
+| Memory poisoning | 0% correct at full attack | 100% (imported preferences, fake skills) | better; spoofed "user" imports 0% → 100% (2026-11-26); **someone else speaking to MILO directly: 0% → 0%** |
+| Failure memory | 0% on repeats | 100% for "couldn't see it"; out of reach unchanged. Since in-mission recovery, the first attempt already succeeds, so it no longer changes the result | superseded by in-mission recovery |
 | Benchmark and CI | none | reproducible suite; gate fails a broken branch | meets acceptance |
 | Observability / replay / map | — | stage p50/p95, waterfall, scrubbable replay, shareable link, report, top-down map | delivered |
 | Voice | server speech only | browser speech, spoken questions and approvals, fallback | delivered; **not tried in a real browser** |
@@ -48,7 +48,7 @@ Household-robot demos usually work for the commands they were built for and fail
 
 - **Some faults used to barely recover within a mission.** Wrong detection recovered 4% of the time and out of reach 22%, because a retry never re-ran the walk-up. Targeted in-mission fixes (look around after "not visible", re-approach after "not reachable") raised these to 83% and 100%. "Find" tasks under a wrong detection still only recover on the *next* mission, through failure memory.
 - **Memory adds nothing on our benchmark** because every object is always visible. That's a weakness of the benchmark as much as a finding.
-- **Spoofed user memories can't be told apart from a real change of mind** without authenticated input.
+- **Someone else telling MILO directly can't be told apart from a real change of mind** without knowing who is speaking. (Imports that only claim to be from the user are quarantined since 2026-11-26.)
 - **We never ran a language model in this environment** (no credentials). The novel-task numbers measure everything except the model's own planning.
 - **Nearly everything was measured in a synthetic simulator.** Only the detector was evaluated on real rendered AI2-THOR frames.
 

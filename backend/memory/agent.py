@@ -574,9 +574,19 @@ class MemoryAgent:
         content: Optional[str] = None,
     ) -> Optional[Memory]:
         """A "where X goes / is" memory from outside (a file, another robot). Screened
-        like any imported memory (see `memory.trust.screen`)."""
+        like any imported memory (see `memory.trust.screen`).
+
+        The channel decides the source, not the memory: with the defence on, an import
+        that claims to come from the user (or from MILO's own eyes) is still stored as
+        imported, and the claim is kept as `claimed_source` for the Memory page."""
+        from memory.trust import defence_on, source_of_provenance
+
         if self._engine is None:
             return None
+        claimed = None
+        if defence_on() and provenance != MemoryProvenance.IMPORTED:
+            claimed = source_of_provenance(provenance)
+            provenance = MemoryProvenance.IMPORTED
         memory = build_user_memory(
             predicate,
             object_,
@@ -584,6 +594,8 @@ class MemoryAgent:
             confidence=confidence,
             provenance=provenance,
         )
+        if claimed:
+            memory.metadata = {**(memory.metadata or {}), "claimed_source": claimed}
         if content:
             memory.content = content
         return self._store_and_index(memory, event="imported")

@@ -51,6 +51,8 @@ export interface MemoryTrust {
   quarantined: boolean;
   quarantine_reason?: string | null;
   contradicted: number;
+  /** The source an imported memory claimed to have ("user"...); it is still stored as imported. */
+  claimed_source?: MemoryTrust["source"] | null;
 }
 
 export interface MemoryListResponse {

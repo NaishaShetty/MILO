@@ -62,6 +62,10 @@ def source_of(memory: Memory) -> str:
     return SOURCE.get(memory.provenance, "imported")
 
 
+def source_of_provenance(provenance: Any) -> str:
+    return SOURCE.get(provenance, "imported")
+
+
 def pinned(memory: Memory) -> bool:
     return bool((memory.metadata or {}).get("pinned"))
 
@@ -94,6 +98,8 @@ def describe(memory: Memory, now: Optional[float] = None) -> Dict[str, Any]:
         "quarantined": memory.status == MemoryStatus.QUARANTINED,
         "quarantine_reason": meta.get("quarantine_reason"),
         "contradicted": int(meta.get("contradicted", 0)),
+        # what an imported memory said it was ("user"...); it was stored as imported
+        "claimed_source": meta.get("claimed_source"),
     }
 
 
@@ -126,6 +132,12 @@ def screen(new: Memory, existing: Iterable[Memory]) -> Optional[str]:
             continue
         o = _triple(old)
         if o and o[0] == t[0] and o[2] != t[2] and TRUST[source_of(old)] > 0:
+            claim = (new.metadata or {}).get("claimed_source")
+            if claim == "user":
+                return (
+                    f"it says it came from you, but it arrived as an import, and it "
+                    f"contradicts what you told me ({old.content})"
+                )
             return f"it contradicts what I know from a {source_of(old)} ({old.content})"
     return None
 

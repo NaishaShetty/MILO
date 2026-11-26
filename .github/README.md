@@ -36,7 +36,7 @@ These are open directions MILO makes it possible to study. They aren't claims of
 
 | Direction | The question | What MILO already provides |
 |---|---|---|
-| Memory poisoning and provenance | How should an agent weigh memories by source, and how can it tell a spoofed "user" memory from a real change of mind? | Memory sources, decay and quarantine, plus a red-team evaluation (`make eval-trust`). The spoofed-user case is a documented open gap |
+| Memory poisoning and provenance | How should an agent weigh memories by source, and how can it tell a spoofed "user" memory from a real change of mind? | Memory sources, decay and quarantine, plus a red-team evaluation (`make eval-trust`). Imports can't claim to be the user; someone else speaking to MILO directly is the documented open gap |
 | Learned step-outcome prediction | When should an agent abort, retry or replan, judged by predicted outcome rather than fixed rules? | An episode logger, a fault-injecting simulator, a calibrated outcome model, and a shadow mode for comparing it against the rules |
 | Unseen tasks and skill libraries | How far can validated plans plus a growing skill library carry an agent beyond its programmed tasks? | The novel-task pipeline, 60 held-out commands, and skill chaining with a trust threshold |
 | In-mission recovery (self-healing) | Which failures can be repaired within the mission, and which need a new plan? | Six injectable fault kinds and per-fault recovery rates, with recovery behind its own switch |
@@ -217,18 +217,19 @@ All benchmark numbers come from `benchmarks/latest.json` (`make benchmark`, run 
 |---|---|
 | imported preference | 0% → 100% |
 | fake imported skills | 0% → 100% |
-| spoofed "user" preference | 0% → 0% |
+| spoofed "user" preference (an import claiming to be from you) | 0% → 100% |
+| someone else telling MILO directly | 0% → 0% |
 
-**Failure memory** ([memory trust](../docs/memory_trust.md)): with a persistent "can't see it" fault, the repeat attempt succeeded 0% → 100%. Out of reach, which has no known fix, stayed at 0%.
+**Failure memory** ([memory trust](../docs/memory_trust.md)): first measured, a persistent "can't see it" fault went 0% → 100% on the repeat attempt. Since in-mission recovery was added, the first attempt already succeeds, so failure memory no longer changes the result. Out of reach, which has no known fix, stays at 0%.
 
 **Goal checks** (`make eval-goal-check`, 300 held-out missions): the world contradicted 3 of 213 reported successes. All 3 were "find" tasks under a wrong detection.
 
 **What did not beat its baseline:**
 
-- **Spoofed "user" memories** aren't defended. A fake one wins, just as a real change of mind would.
+- **Someone else telling MILO directly** isn't defended: MILO can't tell who is speaking, so it looks like a change of mind. (Imports that only *claim* to be from you are now quarantined.)
 - **Memory ablation on the regression tier:** turning memory off changes nothing there (81% both), because every object is in view. On the memory tier it is 100% → 0% ([benchmark](../docs/benchmark.md)).
 - **The world model** didn't change mission success. Competing routes are fixed by in-mission recovery and memory instead.
-- **Asking and refusing with a local model.** qwen2.5:7b asks on 0 of 8 ambiguous commands and refuses 1 of 7 impossible ones; a DEV-tuned prompt rule did not fix this. Claude was never run (no API credits).
+- **Asking with a local model.** qwen2.5:7b with prompt v3 asks on only 2 of 8 ambiguous commands (refusing improved to 4 of 7). Claude was never run (no API credits).
 - **The synthetic simulator.** Except for the detector and the Hugging Face v1.0 and v1.1 results below, everything was measured there, not in real AI2-THOR.
 
 ## Datasets and demo (Hugging Face)

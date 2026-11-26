@@ -45,6 +45,7 @@ function setup() {
         quarantined: true,
         quarantine_reason: "it contradicts what I know from a user (apple stored_in fridge)",
         contradicted: 0,
+        claimed_source: "user",
       },
     },
   });
@@ -59,6 +60,8 @@ describe("MemoryPage trust", () => {
     render(<MemoryPage />);
     expect(screen.getByText("you told me")).toBeInTheDocument();
     expect(screen.getByText("imported")).toBeInTheDocument();
+    // an import that says it came from the user is labelled as a claim, not believed
+    expect(screen.getByText("claims “you told me”")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("I've set aside 1 memory");
     expect(screen.getByRole("note")).toHaveTextContent("it contradicts what I know from a user");
   });

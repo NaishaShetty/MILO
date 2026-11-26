@@ -43,6 +43,11 @@ function Card({ memory, trust, onForget, act }: { memory: Memory; trust?: Memory
       <div className="scrap__top">
         <span className="pill">{label}</span>
         {trust && <span className="tag">{SOURCE_LABEL[trust.source]}</span>}
+        {trust?.claimed_source && trust.claimed_source !== trust.source && (
+          <span className="tag" title="It arrived as an import, so MILO treats it as one">
+            claims “{SOURCE_LABEL[trust.claimed_source]}”
+          </span>
+        )}
         {trust?.pinned && <span className="tag">pinned</span>}
         {trust?.quarantined && <span className="tag">set aside</span>}
         <span className="muted">{relativeDay(memory.created_at)}</span>
