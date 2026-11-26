@@ -159,17 +159,23 @@ def run_case(
     )
     execution = ExecutionAgentWrapper(sim)  # type: ignore[arg-type]
     novel_log = None
+    fallbacks: Any = None
     with tempfile.TemporaryDirectory() as tmp:
         if planner == "novel":
             novel = NovelPlanner(provider or reference_provider(), execution.get_metadata,
                                  constraints=Constraints.load(), skills=skills or SkillLibrary(Path(tmp) / "s.db"))  # fmt: skip
             wrapper: Any = PlannerAgentWrapper(novel)  # type: ignore[arg-type]
         else:
-            wrapper = PlannerAgentWrapper(
-                create_planner(
-                    planner, llm_client=react_client if planner == "react" else None
-                )
+            inner = create_planner(
+                planner, llm_client=react_client if planner == "react" else None
             )
+            if planner == "react" and getattr(inner, "_fallback_planner", None):
+                # Count plans ReAct handed to rule-based, so its row can say how much
+                # of it is really the model.
+                inner._fallback_planner = fallbacks = _CountingPlanner(  # type: ignore[attr-defined]
+                    inner._fallback_planner  # type: ignore[attr-defined]
+                )
+            wrapper = PlannerAgentWrapper(inner)
         orch = Orchestrator(
             wrapper,
             execution,
@@ -208,7 +214,23 @@ def run_case(
         "model_errors": (
             react_client.errors - react_errors_before if react_client is not None else 0
         ),
+        "fallback_plans": fallbacks.calls if fallbacks is not None else 0,
     }
+
+
+class _CountingPlanner:
+    """Wraps a planner and counts how often it was asked for a plan."""
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+        self.calls = 0
+
+    def plan(self, *args: Any, **kwargs: Any) -> Any:
+        self.calls += 1
+        return self._inner.plan(*args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
 
 
 def summarise(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -293,6 +315,18 @@ def run(
                     "not_measured": f"the model never answered ({calls} calls, {errors} errors)"
                 }
                 continue
+            clean = [r for r in rows if r["kind"] in ("known", "novel")]
+            report["react_fallback"] = {
+                "cases_with_fallback": sum(1 for r in rows if r["fallback_plans"]),
+                "cases": len(rows),
+                "fallback_plans": sum(r["fallback_plans"] for r in rows),
+                # success counting only cases the model planned on its own
+                "success_without_fallback": round(
+                    sum(r["success"] and not r["fallback_plans"] for r in clean)
+                    / max(len(clean), 1),
+                    4,
+                ),
+            }
         report["planners"][planner] = {
             # The regression tier (known, novel, faults); the harder tiers are under "tiers".
             "all": summarise([r for r in rows if r["kind"] in ("known", "novel")]),
@@ -483,6 +517,12 @@ def markdown(report: Dict[str, Any]) -> str:
             f"| {p} | {pct(s['known']['success'])} | {pct(s['novel']['success'])} | {pct(s['faults']['success'])} | "
             f"{s['all']['steps']} | {s['all']['sim_s']} | {s['all']['replans']} |"
         )
+    fb = report.get("react_fallback")
+    if fb:
+        lines += ["", f"ReAct model: {report.get('react_model')}. On {fb['cases_with_fallback']} of "
+                  f"{fb['cases']} cases ReAct handed at least one plan to the rule-based planner "
+                  f"({fb['fallback_plans']} plans in all). Counting only cases the model planned "
+                  f"on its own, known + novel success is {pct(fb['success_without_fallback'])}."]  # fmt: skip
     lines += ["", "## Recovery by fault kind", "", "| Planner | " + " | ".join(FAULT_KINDS) + " |",
               "|---|" + "---|" * len(FAULT_KINDS)]  # fmt: skip
     for p, s in measured(report).items():

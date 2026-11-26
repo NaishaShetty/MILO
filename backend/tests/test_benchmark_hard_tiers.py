@@ -111,3 +111,24 @@ def test_react_whose_model_never_answers_is_not_reported_as_measured(monkeypatch
     report = br.run("ci", planners=["react"], ablations=False, react_model="qwen2.5:7b")
     assert "not_measured" in report["planners"]["react"]
     assert "never answered" in report["planners"]["react"]["not_measured"]
+
+
+def test_react_plans_handed_to_rule_based_are_counted(monkeypatch):
+    import benchmark.run as br
+    from language.llm_client import LLMResponse
+
+    class Nonsense:
+        """Always answers, never with a usable plan, so ReAct falls back every time."""
+
+        def complete(self, request):
+            return LLMResponse(content="no idea", provider="test", model="m",
+                               latency_ms=1.0)  # fmt: skip
+
+    monkeypatch.setattr(
+        br, "_local_react_client", lambda model: br.CountingClient(Nonsense())
+    )
+    report = br.run("ci", planners=["react"], ablations=False, react_model="m")
+    fb = report["react_fallback"]
+    assert fb["cases_with_fallback"] >= fb["cases"] - 1 > 0  # one case never plans
+    assert fb["success_without_fallback"] < 2 / fb["cases"]  # only that one case
+    assert "handed at least one plan" in br.markdown(report)
