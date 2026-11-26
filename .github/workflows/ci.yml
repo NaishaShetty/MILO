@@ -32,8 +32,14 @@ on:
 
 jobs:
   backend:
-    name: Backend -- format, lint, type-check, test
+    name: Backend (Python ${{ matrix.python }}) -- format, lint, type-check, test
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.9 is the supported interpreter (the cp39 PyTorch wheel in
+        # backend/scripts/download_torch.py); 3.12 checks nothing depends on 3.9.
+        python: ["3.9", "3.12"]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -41,10 +47,10 @@ jobs:
       # Supported interpreter for this project -- matches the cp39
       # PyTorch wheel used in backend/scripts/download_torch.py and the
       # version documented in the README's setup instructions.
-      - name: Set up Python 3.9
+      - name: Set up Python ${{ matrix.python }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          python-version: ${{ matrix.python }}
           cache: "pip"
           cache-dependency-path: backend/requirements.txt
 
