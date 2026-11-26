@@ -21,14 +21,27 @@ A fixed synthetic home with fixed tasks, faults and seeds, so repeated runs give
 | Planner | Known | New tasks | Under faults | Steps | Sim time (s) | Replans |
 |---|---|---|---|---|---|---|
 | rule-based | 100% | 0% | 78% | 7.52 | 12.5 | 0.144 |
-| ReAct | not measured (needs a model) | | | | | |
+| ReAct, qwen2.5:7b via Ollama ¹ | 100% | 0% | 80% | 7.39 | 10.66 | 0.124 |
 | behaviour tree | 100% | 0% | 78% | 5.63 | 9.88 | 0.144 |
 | HTN | 100% | 0% | 78% | 5.63 | 9.88 | 0.144 |
 | language model (reference plans) | not run | 100% | not run | 5.25 | 9.38 | 0 |
 
-- **ReAct** isn't measured: with no language model configured it falls back to the rule-based
-  planner, so `benchmarks/latest.json` repeats the rule-based numbers under its name. A real
-  ReAct result needs a model (for example a local one through Ollama).
+- ¹ **ReAct** was measured separately with a local model: `qwen2.5:7b` (Q4_K_M) through
+  Ollama, temperature 0, one run, 2026-11-26, 8,694 s (`results/react_local/benchmark.md`).
+  1,558 real model calls, 25 transport errors. **Most of its row is not the model.** When the
+  model's answer is unusable, or it hits ReAct's 12-step limit, ReAct hands the plan to the
+  rule-based planner. That happened in 99 of the 179 cases. Counting only cases the model planned
+  on its own:
+
+  | | Known | New tasks | Under faults | memory | memory_synonyms | long | routes |
+  |---|---|---|---|---|---|---|---|
+  | success, fallback included | 23/23 | 0/8 | 98/122 | 6/8 | 4/8 | 6/6 | 3/4 |
+  | model alone | 13/23 | 0/8 | 53/122 | 0/8 | 0/8 | 0/6 | 0/4 |
+
+  The model handles one-step tasks (open, switch on, find something in view) and short fetches.
+  It fails on everything with three or more actions, every new task, and every harder-tier case.
+  Without a model, `make benchmark` reports ReAct as "not measured" instead of repeating the
+  rule-based numbers under its name.
 - **Behaviour tree and HTN are identical for a real reason.** Checked plan by plan, all three
   classical planners produce exactly the same first plan for all 23 known tasks. Rule-based
   still executes more steps per mission (5.83 vs 4.43 on known tasks, 8.33 vs 6.23 under
@@ -52,7 +65,7 @@ What each part is worth (rule-based on known + fault cases; the novel planner on
 | no skills | | 100% | 1 |
 
 **Read honestly:**
-- **ReAct is identical to rule-based here.** With no language model configured it falls back to the rule-based planner, by design.
+- **ReAct with a local 7B model is mostly rule-based underneath** (see ¹ above): its own plans succeed on 13 of 23 known tasks and on none of the new ones.
 - **Memory is worth nothing on this tier.** Every object is in view, so remembered locations change nothing. The memory tier below is where it counts.
 - **Reflection and replanning are worth 60 points under faults** (81% vs 21%). Without the in-mission fixes below they were worth 36 (57% vs 21%).
 - **Skills don't change success** with reference plans, but they remove the model call entirely on repeat tasks.
@@ -77,7 +90,8 @@ genuinely differ (`backend/benchmark/suite.py`):
 | rule-based | 100% | 75% | 100% | 100% |
 | behaviour tree | 0% | 0% | 100% | 100% |
 | HTN | 0% | 0% | 100% | 100% |
-| ReAct | not measured (needs a model) | | | |
+| ReAct, qwen2.5:7b ¹ (fallback included) | 75% | 50% | 100% | 75% |
+| ReAct, qwen2.5:7b ¹ (model alone) | 0% | 0% | 0% | 0% |
 
 | Rule-based, ablation | memory | memory_synonyms | long | routes |
 |---|---|---|---|---|

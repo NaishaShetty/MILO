@@ -164,7 +164,7 @@ All benchmark numbers come from `benchmarks/latest.json` (`make benchmark`, run 
 | novel planner, **reference plans** | not run | 100% | not run | 5.25 |
 
 - **New tasks:** the classical planners refuse them, hence 0%. The novel planner's 100% uses hand-written reference plans, so it measures the pipeline, not a model.
-- **ReAct:** not measured, because without a language model it falls back to rule-based.
+- **ReAct** (measured separately: `qwen2.5:7b` via Ollama, one run, `results/react_local/benchmark.md`): 100% known, 0% new tasks, 80% under faults, but in 99 of 179 cases it handed the plan to rule-based after an unusable answer or hitting its 12-step limit. The model alone succeeds on 13 of 23 known tasks, 0 of 8 new tasks and 0 of 26 harder-tier cases.
 - **Behaviour tree and HTN:** identical because all three classical planners produce the same first plan on every known task. Rule-based executes more steps; the cause hasn't been traced.
 
 **Recovery by fault kind** (rule-based; before → after in-mission recovery):
