@@ -52,6 +52,8 @@ that remains. For the detailed per-phase implementation record, see
 
 ## Future work
 
+For a short, current list of what's left and what needs you, see [remaining_work.md](remaining_work.md).
+
 Audited against the Phase 8.7 implementation — items already built (Reflection,
 dynamic replanning, memory-conditioned planning for the rule-based path, Speech)
 are removed from this list; only what's genuinely still open remains. Three
