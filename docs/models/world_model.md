@@ -51,6 +51,13 @@ The benchmark's routes tier (`docs/benchmark.md`) is where a world model should 
 1. The blockage isn't in anything the model sees. It is a hidden fault, not an object state, so a doomed route plan scores exactly like a good one.
 2. Plans name object types ("shelf"), not instances ("Shelf|2"). Even a perfect score could only reject the plan; nothing could ask for the other shelf instead.
 
-The criterion also can't catch anything while some successful plan scores 0.0. Fixing either reason needs new inputs, not a better model: an observable obstacle in the state, and plans that can name an instance. Until then the recommendation stands: leave it off.
+The criterion also can't catch anything while some successful plan scores 0.0.
+
+**What fixed the routes tier instead (2026-11-26).** Not the world model: it still can't see a blockage. Two changes elsewhere, both measured in `docs/benchmark.md`:
+
+- In-mission recovery now treats a second "blocked" failure on the same place as permanent and switches the rest of the plan to another instance of that kind ("Shelf|2"). Routes tier: 0% to 100% for every planner, and back to 0% without in-mission recovery.
+- MILO remembers the blocked instance as a `path_blocked` observation, and the next mission plans around it before acting. In a two-mission test in the same home, the first mission needed 2 failed attempts, the second none. That is the "caught before it happens" this card asked for, done by memory rather than prediction.
+
+For the world model itself, the recommendation stands: leave it off.
 
 Reproduce: `make eval-worldmodel-routes` (uses `backend/artifacts`).

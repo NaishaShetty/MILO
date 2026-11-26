@@ -34,13 +34,21 @@ Latency (fine-tuned, GPU, real `RetrievalEngine`): 5,000 memories p50 5.8 ms / p
 
 Reproduce: `make train-embedder eval-retrieval eval-retrieval-missions`.
 
-## Re-checked on the benchmark's memory tier (2026-11-25)
+## On the benchmark's memory tiers (2026-11-26)
 
-The memory tier (`docs/benchmark.md`) is the first place remembered locations change mission success: objects start out of view, and only going where they usually are finds them.
+On the memory tier (objects start out of view; only going where they usually are finds them) both embedders give 8/8. There the planner finds the place by the object's exact name, so the embedder isn't involved.
 
-| Embedder | Memory tier success (rule-based, 8 missions) | Steps per mission |
-|---|---|---|
-| hashing (default) | 8 / 8 | 8.38 |
-| learned (fine-tuned BGE-small) | 8 / 8 | 8.38 |
+What changed: when nothing is remembered under the exact name, the planner now compares the object's name with the names of remembered places' subjects ("ceramic mug" vs "mug") using this embedder, and uses a place only if its name is clearly the closest: at least the embedder's minimum similarity (hashing 0.45, learned 0.60, as their scales differ) and 0.05 above the runner-up. Otherwise there is no hint, so MILO searches as before rather than going to a wrong place.
 
-Identical, for a structural reason. The planner's memory hint looks up a stored fact by its subject ("mug located_on shelf"), not by embedding similarity, so the embedder is not on the path that decides these missions. Retraining it on retrieval logs from these tasks can't change this result. The embedder matters where MILO searches free-text memories, which no benchmark tier exercises yet. Recommendation unchanged: optional, off by default.
+The thresholds were picked on a probe set of eight paraphrases ("coffee mug", "paperback novel", "water bottle", "dinner plate", "teacup", "cherry tomato", "spud", "hen's egg"). There, name similarity was 0.46-0.74 for hashing where a word is shared (0 for "paperback" and "spud"), and 0.67-0.92 for learned (0.43 for "spud"). The highest wrong pair was 0.26 for hashing and 0.55 for learned.
+
+The benchmark's **memory_synonyms** tier uses eight different paraphrases ("ceramic mug", "hardcover", "flask", "paper cup", "serving plate", "plum tomato", "baked potato", "boiled egg"), fixed before measuring:
+
+| Embedder | memory tier | memory_synonyms tier | Misses |
+|---|---|---|---|
+| hashing (default) | 8 / 8 | 6 / 8 | "hardcover", "flask": no shared word |
+| learned (fine-tuned BGE-small) | 8 / 8 | 7 / 8 | "flask" |
+
+So the learned embedder now changes mission success, by one mission in eight, on synonyms that share no word with the object. The gap is small partly because six of the eight held-out paraphrases contain the object's own word, which hashing can match. That list was not changed after seeing these results. Reproduce: `make benchmark` (the `learned_memory_embedder` ablation row runs when a trained embedder exists).
+
+A first version of this fallback ranked candidates by their similarity to the whole query instead of by name. It let an unrelated memory ("refrigerator in the kitchen") steer the search for a mug, which an existing test caught; it was replaced before release.

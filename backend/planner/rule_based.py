@@ -155,6 +155,7 @@ def _find_location_hint(
     from memory.semantics import SemanticTriple
 
     target_subject = _normalize(obj)
+    places: List[Tuple[str, "MemoryResult", str]] = []
     for result in memory_context.results:
         memory = result.memory
         if memory.memory_type not in (MemoryType.SEMANTIC, MemoryType.USER):
@@ -165,12 +166,65 @@ def _find_location_hint(
             triple = SemanticTriple.from_metadata(memory.metadata)
         except (KeyError, TypeError):
             continue
-        if _normalize(triple.subject) != target_subject:
-            continue
         if triple.predicate not in _LOCATION_PREDICATES:
             continue
-        return triple.object, result
-    return None
+        if _normalize(triple.subject) == target_subject:
+            return triple.object, result  # remembered under this very name
+        places.append((triple.object, result, _normalize(triple.subject)))
+    return _similar_location_hint(places, target_subject)
+
+
+#: Similarity fallback: a "where is it" memory stored under another name ("coffee mug"
+#: for "mug", "paperback" for "book") is used only if its subject is clearly another name
+#: for the object: name-to-name similarity (same embedder as memory search) at least the
+#: embedder's minimum, and this much above the runner-up. Per embedder because their
+#: scales differ. Chosen on a probe set of paraphrases the benchmark's synonym tier
+#: doesn't reuse (docs/models/memory_embedder.md).
+_SIMILAR_NAME_MIN = {"hashing": 0.45, "learned": 0.60, "sentence_transformer": 0.60}
+_SIMILAR_NAME_MARGIN = 0.05
+
+
+def _name_similarity(a: str, b: str) -> Tuple[float, str]:
+    """Cosine similarity of two names with the configured memory embedder."""
+    from memory.embeddings import EmbeddingConfig, get_embedder
+
+    config = EmbeddingConfig.from_env()
+    embedder = _EMBEDDERS.get(config.provider)
+    if embedder is None:
+        embedder = _EMBEDDERS[config.provider] = get_embedder(config)
+    va, vb = embedder.embed(a), embedder.embed(b)
+    dot = sum(x * y for x, y in zip(va, vb))
+    na = sum(x * x for x in va) ** 0.5
+    nb = sum(y * y for y in vb) ** 0.5
+    return (dot / (na * nb) if na and nb else 0.0), config.provider
+
+
+_EMBEDDERS: Dict[str, Any] = {}
+
+
+def _similar_location_hint(
+    places: "List[Tuple[str, MemoryResult, str]]", obj: str
+) -> "Optional[Tuple[str, MemoryResult]]":
+    """The location memory whose subject is clearly another name for `obj`, or None
+    (no hint is better than sending MILO to the wrong place)."""
+    if not places:
+        return None
+    try:
+        scored = []
+        provider = "hashing"
+        for place, result, subject in places:
+            sim, provider = _name_similarity(obj, subject)
+            scored.append((sim, place, result))
+    except Exception:
+        return None  # no embedder: exact names only, as before
+    scored.sort(key=lambda s: s[0], reverse=True)
+    best_sim, place, result = scored[0]
+    runner_up = scored[1][0] if len(scored) > 1 else 0.0
+    if best_sim < _SIMILAR_NAME_MIN.get(provider, 0.60):
+        return None
+    if best_sim - runner_up < _SIMILAR_NAME_MARGIN:
+        return None
+    return place, result
 
 
 class _StepBuilder:

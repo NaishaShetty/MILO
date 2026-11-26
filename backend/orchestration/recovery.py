@@ -13,6 +13,12 @@ So, before the next attempt:
     "not reachable" -> insert a fresh `navigate` to the target before it (re-approach).
                        A second time for the same step: look around first, then
                        re-approach from wherever that leaves MILO.
+    "blocked"       -> the first time, a plain retry (most blockages clear). The second
+                       time for the same place, mark that instance as blocked and point
+                       the rest of the plan at the nearest other one of the same kind
+                       ("Shelf|2" instead of the blocked "Shelf|1"), for the rest of the
+                       mission, replans included. The orchestrator also remembers the
+                       blocked instance, so the next mission avoids it before acting.
 
 Each fix is applied at most `MAX_PER_STEP` times per (failure, action, target) in one
 mission, and the orchestrator's own `max_replans` still bounds the attempts. Failure
@@ -27,10 +33,13 @@ orchestrator (the training-data generator turns it off to keep its dataset fixed
 from __future__ import annotations
 
 import os
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from execution.models import ExecutionRecord, StepStatus
+from execution.resolver import ObjectResolver
 from planner.models import Plan, PlanStep
+
+_resolver = ObjectResolver()
 
 MAX_PER_STEP = 2
 
@@ -63,19 +72,100 @@ def _failed_step(record: ExecutionRecord) -> Optional[Tuple[str, Optional[str], 
         )
         if kind in ("not_visible", "not_reachable"):
             return s.action, s.target, kind
+        if kind == "blocked" and s.action == "navigate":
+            return s.action, s.target, kind
         return None
     return None
 
 
+def instances(name: str, metadata: Mapping[str, Any]) -> List[str]:
+    """objectIds of every object of this kind, nearest first."""
+    found = _resolver._candidates(name, dict(metadata))
+    found.sort(key=lambda o: o.get("distance", float("inf")))
+    return [str(o["objectId"]) for o in found if o.get("objectId")]
+
+
+def avoid(
+    plan: Plan, avoided: Mapping[str, List[str]], metadata: Mapping[str, Any]
+) -> List[Tuple[str, str]]:
+    """Point the plan's remaining steps that name a kind of place ("shelf") at the
+    nearest instance that isn't known to be blocked. Returns (kind, instance) changes.
+    """
+    changes = []
+    for name, bad in avoided.items():
+        blocked = {b.lower() for b in bad}
+        ids = instances(name, metadata)
+        if not blocked & {i.lower() for i in ids}:
+            continue
+        alt = next((i for i in ids if i.lower() not in blocked), None)
+        if alt is None:
+            continue
+        changed = False
+        for step in plan.steps:
+            if step.status == StepStatus.COMPLETED:
+                continue
+            if step.target and "|" not in step.target and _name(step.target) == name:
+                step.target = alt
+                changed = True
+            container = (step.parameters or {}).get("container")
+            if (
+                isinstance(container, str)
+                and "|" not in container
+                and _name(container) == name
+            ):
+                step.parameters = {**step.parameters, "container": alt}
+                changed = True
+        if changed:
+            changes.append((name, alt))
+    return changes
+
+
+def _switch_instance(
+    plan: Plan,
+    action: str,
+    target: Optional[str],
+    counts: Dict[Any, Any],
+    metadata: Optional[Mapping[str, Any]],
+) -> Optional[str]:
+    name = _name(target)
+    key = ("blocked", action, name)
+    counts[key] = counts.get(key, 0) + 1
+    if counts[key] < 2 or metadata is None:
+        return None  # the first time, a plain retry: most blockages clear
+    bad: List[str] = counts.setdefault("avoid", {}).setdefault(name, [])
+    ids = instances(name, metadata)
+    blocked = (
+        target
+        if target and "|" in target
+        else next((i for i in ids if i not in bad), None)
+    )
+    if blocked and blocked not in bad:
+        bad.append(blocked)
+    if not avoid(plan, {name: bad}, metadata):
+        return None
+    plan.metadata.setdefault("in_mission_recovery", []).append(
+        {"failure": "blocked", "action": action, "target": name, "avoided": list(bad)}
+    )
+    return f"The way to the {name} is blocked, so I'll use another {name}."
+
+
 def mitigate(
-    plan: Plan, record: ExecutionRecord, counts: Dict[Tuple[str, str, str], int]
+    plan: Plan,
+    record: ExecutionRecord,
+    counts: Dict[Any, Any],
+    metadata: Optional[Mapping[str, Any]] = None,
 ) -> Optional[str]:
     """Adjusts `plan` in place after the failed attempt `record`; returns what MILO
-    says about it (None if nothing applies). `counts` is the mission's tally."""
+    says about it (None if nothing applies). `counts` is the mission's tally; it also
+    keeps the instances found blocked, so a replan keeps avoiding them."""
+    if metadata is not None and counts.get("avoid"):
+        avoid(plan, counts["avoid"], metadata)
     failed = _failed_step(record)
     if failed is None:
         return None
     action, target, kind = failed
+    if kind == "blocked":
+        return _switch_instance(plan, action, target, counts, metadata)
     name = _name(target)
     key = (kind, action, name)
     if counts.get(key, 0) >= MAX_PER_STEP:

@@ -152,8 +152,9 @@ class Orchestrator:
         self._snapshots: Dict[int, Dict] = {}
         self._retries = 0
         self._replans = 0
-        #: In-mission recovery tally: (failure, action, target) -> fixes applied.
-        self._mitigations: Dict[Tuple[str, str, str], int] = {}
+        #: In-mission recovery tally: (failure, action, target) -> fixes applied, plus
+        #: "avoid": {kind: [instances found blocked]} for the rest of the mission.
+        self._mitigations: Dict[Any, Any] = {}
         self._memory_stats: Dict[str, float] = {}
         self._execution = execution_agent
         self._memory = memory_agent
@@ -359,6 +360,7 @@ class Orchestrator:
             )
         task_state.current_plan = planning_result.plan
         self._apply_lessons(task, task_state)
+        self._avoid_remembered_blocks(task_state)
         self._note_planner(task_state, planning_result.plan)
         self._think(
             task_state,
@@ -556,6 +558,7 @@ class Orchestrator:
                 )
             task_state.current_plan = planning_result.plan
             self._apply_lessons(task, task_state)
+            self._avoid_remembered_blocks(task_state)
             self._recover_in_mission(task_state, record)
             self._note_planner(task_state, planning_result.plan)
             self._think(
@@ -1328,12 +1331,75 @@ class Orchestrator:
         if plan is None or not (recovery.enabled() if on is None else on):
             return
         try:
-            said = recovery.mitigate(plan, record, self._mitigations)
+            before = {
+                k: list(v) for k, v in (self._mitigations.get("avoid") or {}).items()
+            }
+            said = recovery.mitigate(
+                plan, record, self._mitigations, self._execution.get_metadata()
+            )
         except Exception:
             logger.warning("orchestrator.recovery_failed", exc_info=True)
             return
         if said:
             self._think(task_state, "planner", said)
+        for name, ids in (self._mitigations.get("avoid") or {}).items():
+            for object_id in ids:
+                if object_id not in before.get(name, []):
+                    self._remember_blocked(object_id)
+
+    def _remember_blocked(self, object_id: str) -> None:
+        """Failure memory for a place MILO couldn't get to: the next mission plans
+        around it before acting (`_avoid_remembered_blocks`)."""
+        from memory import lessons
+
+        agent = self._raw_memory()
+        if agent is None or not lessons.enabled():
+            return
+        try:
+            from memory.models import MemoryProvenance
+
+            agent.remember_observation(object_id.lower(), "path_blocked", "true",
+                                       provenance=MemoryProvenance.OBSERVATION, confidence=0.8)  # fmt: skip
+        except Exception:
+            logger.warning("orchestrator.remember_blocked_failed", exc_info=True)
+
+    def _avoid_remembered_blocks(self, task_state: TaskState) -> None:
+        """Before acting: if MILO remembers the way to an instance being blocked and the
+        plan would go there, use another instance of the same kind instead."""
+        from memory import lessons
+        from orchestration import recovery
+
+        agent = self._raw_memory()
+        plan = task_state.current_plan
+        if agent is None or plan is None or not lessons.enabled():
+            return
+        try:
+            blocked = {
+                str((m.metadata or {}).get("subject", "")).lower()
+                for m in agent.list_memories()
+                if (m.metadata or {}).get("predicate") == "path_blocked"
+                and getattr(m.status, "value", m.status) == "active"
+            }
+            if not blocked:
+                return
+            metadata = self._execution.get_metadata() or {}
+            by_kind: Dict[str, List[str]] = {}
+            for o in metadata.get("objects") or []:
+                if str(o.get("objectId", "")).lower() in blocked:
+                    by_kind.setdefault(str(o["objectType"]).lower(), []).append(
+                        o["objectId"]
+                    )
+            changes = recovery.avoid(plan, by_kind, metadata)
+        except Exception:
+            logger.warning("orchestrator.avoid_blocked_failed", exc_info=True)
+            return
+        avoided = self._mitigations.setdefault("avoid", {})
+        for kind, ids in by_kind.items():
+            avoided.setdefault(kind, [])
+            avoided[kind] += [i for i in ids if i not in avoided[kind]]
+        for kind, _alt in changes:
+            self._think(task_state, "memory",
+                        f"Last time the way to the {kind} was blocked, so I'll use another {kind}.")  # fmt: skip
 
     def _after_mission(self, task_state: TaskState) -> None:
         """Lets a planner that learns from outcomes (the novel-task planner) see how

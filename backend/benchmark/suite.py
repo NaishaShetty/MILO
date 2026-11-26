@@ -44,6 +44,9 @@ class Case:
     #: Harder tiers: objects that start out of view, an ordered list of goals for one
     #: mission, and a scene variant (an extra, farther receptacle of the same type).
     hidden: Tuple[str, ...] = ()
+    #: (object, other name): MILO remembers where the object is only under the other
+    #: name ("ceramic mug" for "mug"), so finding it needs similarity, not exact lookup.
+    aliases: Tuple[Tuple[str, str], ...] = ()
     subtasks: Tuple[Tuple[str, Optional[str], Optional[str]], ...] = ()
     variant: str = ""
 
@@ -158,11 +161,27 @@ def route_cases() -> List[Case]:
             for g, o, t, kind in tasks]  # fmt: skip
 
 
-HARD_TIERS = ("memory", "long", "routes")
+#: Held-out paraphrases: none of these were used to choose the similarity threshold
+#: (that probe used "coffee mug", "paperback", "water bottle", "dinner plate", "teacup",
+#: "cherry tomato", "spud", "hen's egg").
+SYNONYMS = {"mug": "ceramic mug", "book": "hardcover", "bottle": "flask", "cup": "paper cup",
+            "plate": "serving plate", "tomato": "plum tomato", "potato": "baked potato",
+            "egg": "boiled egg"}  # fmt: skip
+
+
+def memory_synonym_cases() -> List[Case]:
+    """The memory tier again, but each object's place is remembered only under another
+    name: the memory embedder decides whether MILO finds it."""
+    return [Case(c.case_id.replace("memory-", "memsyn-"), "memory_synonyms", c.goal, c.object, c.target,
+                 hidden=c.hidden, aliases=((c.object or "", SYNONYMS[c.object or ""]),))
+            for c in memory_cases()]  # fmt: skip
+
+
+HARD_TIERS = ("memory", "memory_synonyms", "long", "routes")
 
 
 def hard_cases() -> List[Case]:
-    return memory_cases() + long_cases() + route_cases()
+    return memory_cases() + memory_synonym_cases() + long_cases() + route_cases()
 
 
 def full_suite() -> List[Case]:

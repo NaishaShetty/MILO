@@ -54,6 +54,14 @@
           "replans": 0,
           "model_calls": 0
         },
+        "memory_synonyms": {
+          "cases": 8,
+          "success": 0.75,
+          "steps": 8.62,
+          "sim_s": 18.61,
+          "replans": 0.5,
+          "model_calls": 0
+        },
         "long": {
           "cases": 6,
           "success": 1.0,
@@ -64,9 +72,9 @@
         },
         "routes": {
           "cases": 4,
-          "success": 0.0,
-          "steps": 9.75,
-          "sim_s": 26.32,
+          "success": 1.0,
+          "steps": 12,
+          "sim_s": 27.8,
           "replans": 2,
           "model_calls": 0
         }
@@ -125,6 +133,14 @@
           "replans": 2,
           "model_calls": 0
         },
+        "memory_synonyms": {
+          "cases": 8,
+          "success": 0.0,
+          "steps": 8,
+          "sim_s": 27.2,
+          "replans": 2,
+          "model_calls": 0
+        },
         "long": {
           "cases": 6,
           "success": 1.0,
@@ -135,9 +151,9 @@
         },
         "routes": {
           "cases": 4,
-          "success": 0.0,
-          "steps": 9,
-          "sim_s": 24.7,
+          "success": 1.0,
+          "steps": 10,
+          "sim_s": 23.8,
           "replans": 2,
           "model_calls": 0
         }
@@ -193,6 +209,14 @@
           "replans": 2,
           "model_calls": 0
         },
+        "memory_synonyms": {
+          "cases": 8,
+          "success": 0.0,
+          "steps": 8,
+          "sim_s": 27.2,
+          "replans": 2,
+          "model_calls": 0
+        },
         "long": {
           "cases": 6,
           "success": 1.0,
@@ -203,9 +227,9 @@
         },
         "routes": {
           "cases": 4,
-          "success": 0.0,
-          "steps": 9,
-          "sim_s": 24.7,
+          "success": 1.0,
+          "steps": 10,
+          "sim_s": 23.8,
           "replans": 2,
           "model_calls": 0
         }
@@ -254,6 +278,14 @@
       },
       "tiers": {
         "memory": {
+          "cases": 0,
+          "success": null,
+          "steps": null,
+          "sim_s": null,
+          "replans": null,
+          "model_calls": null
+        },
+        "memory_synonyms": {
           "cases": 0,
           "success": null,
           "steps": null,
@@ -1893,6 +1925,86 @@
         "model_calls": 0
       },
       {
+        "case": "memsyn-fetch-mug",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": true,
+        "steps": 7,
+        "sim_s": 13.5,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-fetch-book",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-fetch-bottle",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-place-cup-sofa",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": true,
+        "steps": 8,
+        "sim_s": 15.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-place-plate-countertop",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": true,
+        "steps": 8,
+        "sim_s": 15.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-store-tomato-fridge",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": true,
+        "steps": 10,
+        "sim_s": 17.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-store-potato-cabinet",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": true,
+        "steps": 10,
+        "sim_s": 17.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-store-egg-drawer",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": true,
+        "steps": 10,
+        "sim_s": 17.0,
+        "replans": 0,
+        "model_calls": 0
+      },
+      {
         "case": "long-store-apple+turn_off-lightswitch+fetch-mug",
         "kind": "long",
         "fault": "none",
@@ -1956,9 +2068,9 @@
         "case": "route-place-mug-shelf",
         "kind": "routes",
         "fault": "blocked_path",
-        "success": false,
-        "steps": 11,
-        "sim_s": 28.7,
+        "success": true,
+        "steps": 12,
+        "sim_s": 27.8,
         "replans": 2,
         "model_calls": 0
       },
@@ -1966,9 +2078,9 @@
         "case": "route-place-bowl-shelf",
         "kind": "routes",
         "fault": "blocked_path",
-        "success": false,
-        "steps": 11,
-        "sim_s": 28.7,
+        "success": true,
+        "steps": 12,
+        "sim_s": 27.8,
         "replans": 2,
         "model_calls": 0
       },
@@ -1976,9 +2088,9 @@
         "case": "route-place-book-table",
         "kind": "routes",
         "fault": "blocked_path",
-        "success": false,
-        "steps": 6,
-        "sim_s": 19.2,
+        "success": true,
+        "steps": 12,
+        "sim_s": 27.8,
         "replans": 2,
         "model_calls": 0
       },
@@ -1986,9 +2098,9 @@
         "case": "route-place-cup-table",
         "kind": "routes",
         "fault": "blocked_path",
-        "success": false,
-        "steps": 11,
-        "sim_s": 28.7,
+        "success": true,
+        "steps": 12,
+        "sim_s": 27.8,
         "replans": 2,
         "model_calls": 0
       }
@@ -3605,6 +3717,86 @@
         "model_calls": 0
       },
       {
+        "case": "memsyn-fetch-mug",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-fetch-book",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-fetch-bottle",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-place-cup-sofa",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-place-plate-countertop",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-store-tomato-fridge",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-store-potato-cabinet",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-store-egg-drawer",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
         "case": "long-store-apple+turn_off-lightswitch+fetch-mug",
         "kind": "long",
         "fault": "none",
@@ -3668,9 +3860,9 @@
         "case": "route-place-mug-shelf",
         "kind": "routes",
         "fault": "blocked_path",
-        "success": false,
-        "steps": 9,
-        "sim_s": 24.7,
+        "success": true,
+        "steps": 10,
+        "sim_s": 23.8,
         "replans": 2,
         "model_calls": 0
       },
@@ -3678,9 +3870,9 @@
         "case": "route-place-bowl-shelf",
         "kind": "routes",
         "fault": "blocked_path",
-        "success": false,
-        "steps": 9,
-        "sim_s": 24.7,
+        "success": true,
+        "steps": 10,
+        "sim_s": 23.8,
         "replans": 2,
         "model_calls": 0
       },
@@ -3688,9 +3880,9 @@
         "case": "route-place-book-table",
         "kind": "routes",
         "fault": "blocked_path",
-        "success": false,
-        "steps": 9,
-        "sim_s": 24.7,
+        "success": true,
+        "steps": 10,
+        "sim_s": 23.8,
         "replans": 2,
         "model_calls": 0
       },
@@ -3698,9 +3890,9 @@
         "case": "route-place-cup-table",
         "kind": "routes",
         "fault": "blocked_path",
-        "success": false,
-        "steps": 9,
-        "sim_s": 24.7,
+        "success": true,
+        "steps": 10,
+        "sim_s": 23.8,
         "replans": 2,
         "model_calls": 0
       }
@@ -5317,6 +5509,86 @@
         "model_calls": 0
       },
       {
+        "case": "memsyn-fetch-mug",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-fetch-book",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-fetch-bottle",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-place-cup-sofa",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-place-plate-countertop",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-store-tomato-fridge",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-store-potato-cabinet",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
+        "case": "memsyn-store-egg-drawer",
+        "kind": "memory_synonyms",
+        "fault": "none",
+        "success": false,
+        "steps": 8,
+        "sim_s": 27.2,
+        "replans": 2,
+        "model_calls": 0
+      },
+      {
         "case": "long-store-apple+turn_off-lightswitch+fetch-mug",
         "kind": "long",
         "fault": "none",
@@ -5380,9 +5652,9 @@
         "case": "route-place-mug-shelf",
         "kind": "routes",
         "fault": "blocked_path",
-        "success": false,
-        "steps": 9,
-        "sim_s": 24.7,
+        "success": true,
+        "steps": 10,
+        "sim_s": 23.8,
         "replans": 2,
         "model_calls": 0
       },
@@ -5390,9 +5662,9 @@
         "case": "route-place-bowl-shelf",
         "kind": "routes",
         "fault": "blocked_path",
-        "success": false,
-        "steps": 9,
-        "sim_s": 24.7,
+        "success": true,
+        "steps": 10,
+        "sim_s": 23.8,
         "replans": 2,
         "model_calls": 0
       },
@@ -5400,9 +5672,9 @@
         "case": "route-place-book-table",
         "kind": "routes",
         "fault": "blocked_path",
-        "success": false,
-        "steps": 9,
-        "sim_s": 24.7,
+        "success": true,
+        "steps": 10,
+        "sim_s": 23.8,
         "replans": 2,
         "model_calls": 0
       },
@@ -5410,9 +5682,9 @@
         "case": "route-place-cup-table",
         "kind": "routes",
         "fault": "blocked_path",
-        "success": false,
-        "steps": 9,
-        "sim_s": 24.7,
+        "success": true,
+        "steps": 10,
+        "sim_s": 23.8,
         "replans": 2,
         "model_calls": 0
       }
@@ -5505,8 +5777,9 @@
       "known+faults success": 0.8138,
       "hard tiers": {
         "memory": 1.0,
+        "memory_synonyms": 0.75,
         "long": 1.0,
-        "routes": 0.0
+        "routes": 1.0
       },
       "novel second pass": {
         "success": 1.0,
@@ -5517,14 +5790,16 @@
       "known+faults success": 0.8138,
       "hard tiers": {
         "memory": 0.0,
+        "memory_synonyms": 0.0,
         "long": 1.0,
-        "routes": 0.0
+        "routes": 1.0
       }
     },
     "no_reflection": {
       "known+faults success": 0.2138,
       "hard tiers": {
         "memory": 1.0,
+        "memory_synonyms": 0.75,
         "long": 1.0,
         "routes": 0.0
       }
@@ -5533,6 +5808,7 @@
       "known+faults success": 0.2138,
       "hard tiers": {
         "memory": 1.0,
+        "memory_synonyms": 0.75,
         "long": 1.0,
         "routes": 0.0
       }
@@ -5541,8 +5817,17 @@
       "known+faults success": 0.5655,
       "hard tiers": {
         "memory": 1.0,
+        "memory_synonyms": 0.75,
         "long": 1.0,
         "routes": 0.0
+      }
+    },
+    "learned_memory_embedder": {
+      "hard tiers": {
+        "memory": 1.0,
+        "memory_synonyms": 0.875,
+        "long": 1.0,
+        "routes": 1.0
       }
     },
     "no_skills": {
@@ -5552,5 +5837,5 @@
       }
     }
   },
-  "seconds": 19.1
+  "seconds": 34.1
 }

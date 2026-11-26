@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from benchmark.run import case_scene, run_case
-from benchmark.suite import hard_cases, long_cases, memory_cases, route_cases
+from benchmark.suite import (
+    hard_cases,
+    long_cases,
+    memory_cases,
+    memory_synonym_cases,
+    route_cases,
+)
 from learning.synthetic import Faults, SyntheticSimulator
 from verification.predicates import Predicate, final_state_predicates
 
@@ -76,7 +82,8 @@ def test_multi_goal_mission_ending_with_a_fetch_succeeds():
 
 def test_tier_sizes():
     assert (len(memory_cases()), len(long_cases()), len(route_cases())) == (8, 6, 4)
-    assert len(hard_cases()) == 18
+    assert len(memory_synonym_cases()) == 8
+    assert len(hard_cases()) == 26
 
 
 def test_react_without_a_model_is_reported_as_not_measured():

@@ -117,7 +117,9 @@ def _task(case: Case) -> Any:
 
 
 def _memory(
-    tmp: str, objects_list: Optional[List[Dict[str, Any]]] = None
+    tmp: str,
+    objects_list: Optional[List[Dict[str, Any]]] = None,
+    aliases: Optional[Dict[str, str]] = None,
 ) -> MemoryAgent:
     agent = MemoryAgent.from_config(
         MemoryConfig(
@@ -130,7 +132,8 @@ def _memory(
     for o in objects.values():  # true facts about where things are
         parents = o.get("parentReceptacles") or []
         if o.get("pickupable") and parents:
-            agent.remember_observation(o["objectType"].lower(), "located_on", parents[0].split("|")[0].lower(),
+            name = o["objectType"].lower()
+            agent.remember_observation((aliases or {}).get(name, name), "located_on", parents[0].split("|")[0].lower(),
                                        provenance=MemoryProvenance.OBSERVATION, confidence=0.9)  # fmt: skip
     return agent
 
@@ -168,7 +171,11 @@ def run_case(
         orch = Orchestrator(
             wrapper,
             execution,
-            memory_agent=MemoryAgentWrapper(_memory(tmp, objects)) if memory else None,
+            memory_agent=(
+                MemoryAgentWrapper(_memory(tmp, objects, dict(case.aliases)))
+                if memory
+                else None
+            ),
             reflection_agent=None if reflection else NoReflection(),
         )
         with _env(
@@ -380,6 +387,17 @@ def ablation_table(provider: Optional[Provider]) -> Dict[str, Any]:
                            ("no_reflection", {"reflection": False}), ("no_replanning", {"replanning": False}),
                            ("no_in_mission_recovery", {"recovery": False})):  # fmt: skip
         out[name]["hard tiers"] = hard_score(**switches)
+    # The learned memory embedder instead of hashing (where a trained one exists).
+    learned_dir = Path(
+        os.environ.get("MEMORY_LEARNED_EMBEDDER_DIR", "artifacts/memory_embedder")
+    )
+    if (learned_dir / "config.json").exists():
+        with _env(MEMORY_EMBEDDING_PROVIDER="learned"):
+            out["learned_memory_embedder"] = {"hard tiers": hard_score()}
+    else:
+        out["learned_memory_embedder"] = {
+            "not_available": f"no trained embedder at {learned_dir}"
+        }
     with_skills, without = novel_score(True), novel_score(False)
     out["full"]["novel second pass"] = {
         "success": with_skills["success"],
@@ -460,6 +478,8 @@ def markdown(report: Dict[str, Any]) -> str:
         ]
         for name, v in a.items():
             nov = v.get("novel second pass")
+            if "known+faults success" not in v and not nov:
+                continue  # a hard-tiers-only variant (shown in the table above)
             lines.append(
                 f"| {name} | {v['known+faults success']:.0%} | "
                 + (f"{nov['success']:.0%} | {nov['model_calls']}" if nov else "– | –")

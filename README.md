@@ -27,7 +27,8 @@ It is a research and engineering platform for people working on embodied agents,
 | Unknown requests were refused | A novel-task planner: reuse a saved skill, otherwise ask a language model, validate the plan, then act; successes become skills | All 10 deliberately bad plans caught before acting; 0 unsafe actions run ([novel tasks](docs/novel_tasks.md)) |
 | Trust and safety | Plan validation, a constraints file, approval before risky steps (no answer means skip), "which one?" questions, undo | Covered by tests ([oversight](docs/oversight.md)); no benchmark number |
 | No visibility into what the robot did | A trace store for every mission, with replay, p50/p95 timings per stage, a scene map and a downloadable report | Tracing costs about 2.4 ms per mission ([foundation](docs/foundation.md)) |
-| No way to tell whether a change made it worse | A fixed, seeded benchmark over every planner, plus a CI gate that fails if a planner drops more than 5 points | The full suite (153 missions per planner) runs in 10.6 s ([benchmark](docs/benchmark.md), 2026-11-25) |
+| A blocked way to a place stalled the mission for good | After a second "blocked" failure, MILO uses another place of the same kind (the other shelf) and remembers the blocked one for next time | Competing-routes tier 0% → 100% for every planner; the next mission avoids it before acting ([benchmark](docs/benchmark.md), 2026-11-26) |
+| No way to tell whether a change made it worse | A fixed, seeded benchmark over every planner, plus a CI gate that fails if a planner drops more than 5 points | The regression suite (153 missions per planner) and four harder tiers run in about 35 s ([benchmark](docs/benchmark.md), 2026-11-26) |
 
 ## Research opportunities
 
@@ -68,7 +69,7 @@ flowchart LR
 1. **Interpret.** "Put the apple in the fridge" is matched to a known task by the phrasebook (or the optional learned parser). A request it can't match goes to the novel planner, and an ambiguous one ("the mug" when there are two) gets one question.
 2. **Plan.** The chosen planner writes the steps. For a new task, the novel planner first tries a saved skill, then a language model. The plan is validated before anything moves: registry actions only, objects that exist, a step budget, a symbolic dry run.
 3. **Approve and execute.** Risky steps wait for your approval, and the rest run in the simulator.
-4. **Reflect and recover.** After each failure, reflection picks continue, retry or replan. In-mission recovery looks around or re-approaches first.
+4. **Reflect and recover.** After each failure, reflection picks continue, retry or replan. In-mission recovery looks around, re-approaches, or switches to another place of the same kind when the way to one is blocked.
 5. **Check and save.** At the end, goal predicates (held, in the fridge, closed) are read from the world. The mission's trace is saved for replay, memory records what was learned, and a success can be saved as a skill.
 
 | Module (`backend/`) | Owns | Doc |
@@ -188,7 +189,7 @@ All benchmark numbers come from `benchmarks/latest.json` (`make benchmark`, run 
 |---|---|---|---|
 | Step outcome predictor | rules: AUROC 0.661; success 0.717 | AUROC 0.968, ECE 0.005; success 0.783, wasted steps 1.94 → 1.22 | Better, synthetic simulator only |
 | Fast detector (real AI2-THOR frames) | Grounding DINO: mAP@0.5 0.315, 547 ms | mAP@0.5 0.548, 5.9 ms | Better |
-| Memory embedder | hashing: recall@5 0.606 | recall@5 0.9997 | Better retrieval, no mission effect (0.72 both) |
+| Memory embedder | hashing: recall@5 0.606 | recall@5 0.9997 | Better retrieval; finds places remembered under other names: 7 of 8 missions vs 6 of 8 (2026-11-26) |
 | Instruction parser | phrasebook: 0.137 exact on new wording | 0.647 exact | Better on new wording |
 | World model | static plan scoring | plan-score AUROC 0.525 → 0.552 | No mission gain (0.70 both) |
 

@@ -19,22 +19,23 @@
 
 ## Harder tiers (memory, long missions, competing routes)
 
-| Planner | memory | long | routes |
-|---|---|---|---|
-| rule_based | 100% | 100% | 0% |
-| behavior_tree | 0% | 100% | 0% |
-| htn | 0% | 100% | 0% |
-| novel | not run | not run | not run |
+| Planner | memory | memory_synonyms | long | routes |
+|---|---|---|---|---|
+| rule_based | 100% | 75% | 100% | 100% |
+| behavior_tree | 0% | 0% | 100% | 100% |
+| htn | 0% | 0% | 100% | 100% |
+| novel | not run | not run | not run | not run |
 
 ## Ablations on the harder tiers (rule-based)
 
-| Variant | memory | long | routes |
-|---|---|---|---|
-| full | 100% | 100% | 0% |
-| no_memory | 0% | 100% | 0% |
-| no_reflection | 100% | 100% | 0% |
-| no_replanning | 100% | 100% | 0% |
-| no_in_mission_recovery | 100% | 100% | 0% |
+| Variant | memory | memory_synonyms | long | routes |
+|---|---|---|---|---|
+| full | 100% | 75% | 100% | 100% |
+| no_memory | 0% | 0% | 100% | 100% |
+| no_reflection | 100% | 75% | 100% | 0% |
+| no_replanning | 100% | 75% | 100% | 0% |
+| no_in_mission_recovery | 100% | 75% | 100% | 0% |
+| learned_memory_embedder | 100% | 88% | 100% | 100% |
 
 ## Ablations
 
@@ -47,4 +48,4 @@
 | no_in_mission_recovery | 57% | – | – |
 | no_skills | – | 100% | 1 |
 
-Ran in 19.1 s.
+Ran in 34.1 s.

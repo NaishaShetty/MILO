@@ -115,9 +115,18 @@ class Predicate:
         if obj is None:
             return self._result(False, f"I can't find the {self.object}")
         if self.kind == "in_receptacle":
-            place_id = _resolver.resolve(self.receptacle, meta)
+            # "On the shelf" is true on any shelf when there are several; a concrete id
+            # ("Shelf|2") means that one only.
+            receptacle = self.receptacle or ""
+            if "|" in receptacle:
+                places = {receptacle}
+            else:
+                places = {
+                    str(o.get("objectId"))
+                    for o in _resolver._candidates(receptacle, meta)
+                }
             parents = [str(p) for p in (obj.get("parentReceptacles") or [])]
-            ok = place_id is not None and place_id in parents
+            ok = bool(places & set(parents))
             return self._result(
                 ok, f"the {self.object} is not in/on the {self.receptacle}"
             )

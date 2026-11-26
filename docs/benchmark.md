@@ -62,36 +62,39 @@ What each part is worth (rule-based on known + fault cases; the novel planner on
   - **What's still missing.** The remaining wrong-detection failures (4 of 23) are all **find** tasks. There, no step fails: the plan "succeeds", and only the final goal check sees the object isn't visible. Failure memory (Phase 5) still fixes those on the *next* mission.
 - A missing object can't be recovered, as expected.
 
-## Harder tiers (2026-11-25, `make benchmark`, synthetic home)
+## Harder tiers (2026-11-26, `make benchmark`, synthetic home)
 
-The tasks above stay as the regression tier. Three tiers were added where planners can
+The tasks above stay as the regression tier. Four tiers were added where planners can
 genuinely differ (`backend/benchmark/suite.py`):
 
 - **memory** (8 cases): the object starts out of view. It can't be walked to directly, looking around doesn't reveal it, and it appears only when MILO goes to the place it is actually on (`"hidden": True` in `learning/synthetic.py`). MILO's memory holds true facts about where things usually are.
+- **memory_synonyms** (8 cases): the same, but each object's place is remembered only under another name ("ceramic mug" for the mug, "hardcover" for the book, "flask" for the bottle). Exact-name lookup finds nothing, so the memory embedder decides.
 - **long** (6 cases): two or three goals in one mission, in order, 10 to 20 steps (for example: put the apple in the fridge, switch the light off, then fetch the mug).
 - **routes** (4 cases): competing routes. The nearest shelf or table is blocked for good; a second one of the same kind, further away, is clear.
 
-| Planner | memory | long | routes |
-|---|---|---|---|
-| rule-based | 100% | 100% | 0% |
-| behaviour tree | 0% | 100% | 0% |
-| HTN | 0% | 100% | 0% |
-| ReAct | not measured (needs a model) | | |
+| Planner | memory | memory_synonyms | long | routes |
+|---|---|---|---|---|
+| rule-based | 100% | 75% | 100% | 100% |
+| behaviour tree | 0% | 0% | 100% | 100% |
+| HTN | 0% | 0% | 100% | 100% |
+| ReAct | not measured (needs a model) | | | |
 
-| Rule-based, ablation | memory | long | routes |
-|---|---|---|---|
-| everything on | 100% | 100% | 0% |
-| no memory | **0%** | 100% | 0% |
-| no reflection | 100% | 100% | 0% |
-| no replanning | 100% | 100% | 0% |
-| no in-mission recovery | 100% | 100% | 0% |
+| Rule-based, ablation | memory | memory_synonyms | long | routes |
+|---|---|---|---|---|
+| everything on (hashing embedder) | 100% | 75% | 100% | 100% |
+| learned memory embedder | 100% | 88% | 100% | 100% |
+| no memory | **0%** | **0%** | 100% | 100% |
+| no reflection | 100% | 75% | 100% | **0%** |
+| no replanning | 100% | 75% | 100% | **0%** |
+| no in-mission recovery | 100% | 75% | 100% | **0%** |
 
 What this shows, plainly:
 
-- **Memory finally shows an effect:** 100% with it, 0% without, on the memory tier.
+- **Memory shows a clear effect:** 100% with it, 0% without, on the memory tier.
 - **The planners separate on memory**, for a structural reason: only the rule-based planner uses remembered locations (`_apply_memory_hint`). The behaviour tree is always built with no memory context, and HTN has no memory-conditioned methods yet.
-- **Long missions don't separate the planners.** All three produce the same first plan for every single goal in the suite, and a long mission is those plans in sequence. Adding the tier did find a real bug: the end-of-mission goal check required every goal's conditions at once, so "put the apple away, then fetch the mug" failed on the first goal's "hand empty". Only the last goal's condition for each slot (hand, object location, open, switched on) is now checked (`verification.predicates.final_state_predicates`). Before the fix, 2 of 6 long missions failed for every planner.
-- **No planner handles competing routes (0%).** The executor always resolves "the shelf" to the nearest one, and a replan resolves it the same way, so nothing ever tries the second shelf. This is an open weakness; the world model (`docs/models/world_model.md`) is the component meant to catch it before acting.
+- **The embedder now matters, modestly.** When nothing is remembered under the object's exact name, the planner compares the names of remembered places' subjects with the object ("ceramic mug" vs "mug") using the memory embedder, and uses a place only if its name is clearly the closest (a per-embedder minimum and a 0.05 margin over the runner-up; otherwise no hint, rather than a wrong place). Hashing finds the 6 paraphrases that share a word with the object; the learned embedder also finds "hardcover" for the book (7 of 8). Neither finds "flask" for the bottle. The thresholds were chosen on a separate probe set ("coffee mug", "paperback", "spud"...) that this tier doesn't reuse.
+- **Long missions don't separate the planners.** All three produce the same first plan for every single goal in the suite, and a long mission is those plans in sequence. Adding the tier found a real bug: the end-of-mission goal check required every goal's conditions at once, so "put the apple away, then fetch the mug" failed on the first goal's "hand empty". Only the last goal's condition for each slot (hand, object location, open, switched on) is now checked (`verification.predicates.final_state_predicates`).
+- **Competing routes: 0% before, 100% now, for every planner.** Plans name a kind of place ("the shelf") and the executor picks the nearest one, so a replan used to go back to the same blocked shelf. In-mission recovery now treats a second "blocked" failure on the same place as permanent: it marks that instance as blocked and points the rest of the plan at the nearest other one ("Shelf|2"), for the rest of the mission, replans included (`orchestration/recovery.py`). Without in-mission recovery the tier is back to 0%. MILO also remembers the blocked instance (a `path_blocked` observation), so the **next** mission plans around it before acting: in a test with two missions in the same home, the first needed 2 failed attempts and the second none. "On the shelf" now means any shelf in the goal check, unless a specific one is named.
 - These tiers run in the synthetic home. A real AI2-THOR run of the suite is the next step (`make benchmark-thor`, see `docs/local_model.md`).
 
 ## CI
