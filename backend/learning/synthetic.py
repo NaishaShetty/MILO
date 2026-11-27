@@ -243,6 +243,27 @@ class SyntheticSimulator:
             return self._event(False, f"cannot {name}: object not reachable")
         return None
 
+    # What an object can do, as AI2-THOR enforces it. Until 2026-11-27 the synthetic
+    # simulator allowed every action on every object, so "pick up the fridge" or "open
+    # the apple" succeeded here (benchmark tier "impossible" found it). An object with
+    # no flag at all (hand-built test scenes) keeps the old, permissive behaviour where
+    # that is safe: pickupable unless it says otherwise (`planner.affordances`).
+    def _cannot(self, obj: Dict[str, Any], name: str) -> Optional[FakeEvent]:
+        from planner.affordances import can_open, can_pick_up, can_switch, is_receptacle
+
+        kind = obj.get("objectType", "object")
+        if name == "pick up" and not can_pick_up(obj):
+            return self._event(False, f"cannot pick up: {kind} is not pickupable")
+        if name in ("open", "close") and not can_open(obj):
+            return self._event(False, f"cannot {name}: {kind} is not openable")
+        if name == "toggle" and not can_switch(obj):
+            return self._event(
+                False, f"cannot toggle: {kind} can't be switched on or off"
+            )
+        if name == "put" and not is_receptacle(obj):
+            return self._event(False, f"cannot put: {kind} is not a receptacle")
+        return None
+
     def pickup_object(self, object_id: str) -> FakeEvent:
         self._current = "pickup"
         obj = self._obj(object_id)
@@ -250,6 +271,9 @@ class SyntheticSimulator:
         if bad is not None:
             return bad
         assert obj is not None
+        refused = self._cannot(obj, "pick up")
+        if refused is not None:
+            return refused
         if self.inventory_objects:
             return self._event(False, "hand is full")
         self.inventory_objects.append(
@@ -265,6 +289,10 @@ class SyntheticSimulator:
         bad = self._interactable(target, "put")
         if bad is not None:
             return bad
+        assert target is not None
+        refused = self._cannot(target, "put")
+        if refused is not None:
+            return refused
         for held in self.inventory_objects:
             item = self._obj(held["objectId"])
             if item is not None:
@@ -280,6 +308,9 @@ class SyntheticSimulator:
         if bad is not None:
             return bad
         assert obj is not None
+        refused = self._cannot(obj, "open")
+        if refused is not None:
+            return refused
         if (
             self.faults.kind == "door_stuck"
             and self._is_fault_target(obj)
@@ -297,6 +328,9 @@ class SyntheticSimulator:
         if bad is not None:
             return bad
         assert obj is not None
+        refused = self._cannot(obj, "close")
+        if refused is not None:
+            return refused
         obj["isOpen"] = False
         return self._event(True)
 
@@ -307,6 +341,9 @@ class SyntheticSimulator:
         if bad is not None:
             return bad
         assert obj is not None
+        refused = self._cannot(obj, "toggle")
+        if refused is not None:
+            return refused
         obj["isToggled"] = on
         return self._event(True)
 

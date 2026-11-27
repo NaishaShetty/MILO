@@ -177,11 +177,34 @@ def memory_synonym_cases() -> List[Case]:
             for c in memory_cases()]  # fmt: skip
 
 
-HARD_TIERS = ("memory", "memory_synonyms", "long", "routes")
+def impossible_cases() -> List[Case]:
+    """Requests nothing in the home can carry out: a thing that can't be picked up,
+    opened or switched on, a place that isn't a receptacle, an object that isn't there.
+    Correct means MILO doesn't report success AND takes no action at all (not even
+    walking over): refusing up front, not failing halfway.
+
+    Ambiguous requests ("bring the cup" with two cups) are not a tier here: MILO asks
+    its question in the API before a mission starts, and the benchmark runs missions
+    from structured tasks. They are measured in the novel-task evaluation instead."""
+    tasks = [("pick_up", "fridge", None), ("open", "apple", None), ("turn_on", "book", None),
+             ("place", "sofa", "table"), ("fetch", "unicorn", None), ("store", "mug", "apple")]  # fmt: skip
+    return [
+        Case(f"impossible-{g}-{o}" + (f"-{t}" if t else ""), "impossible", g, o, t)
+        for g, o, t in tasks
+    ]
+
+
+HARD_TIERS = ("memory", "memory_synonyms", "long", "routes", "impossible")
 
 
 def hard_cases() -> List[Case]:
-    return memory_cases() + memory_synonym_cases() + long_cases() + route_cases()
+    return (
+        memory_cases()
+        + memory_synonym_cases()
+        + long_cases()
+        + route_cases()
+        + impossible_cases()
+    )
 
 
 def full_suite() -> List[Case]:

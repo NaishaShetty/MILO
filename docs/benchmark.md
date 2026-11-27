@@ -77,30 +77,33 @@ What each part is worth (rule-based on known + fault cases; the novel planner on
 
 ## Harder tiers (2026-11-26, `make benchmark`, synthetic home)
 
-The tasks above stay as the regression tier. Four tiers were added where planners can
+The tasks above stay as the regression tier. Five tiers were added where planners can
 genuinely differ (`backend/benchmark/suite.py`):
 
 - **memory** (8 cases): the object starts out of view. It can't be walked to directly, looking around doesn't reveal it, and it appears only when MILO goes to the place it is actually on (`"hidden": True` in `learning/synthetic.py`). MILO's memory holds true facts about where things usually are.
 - **memory_synonyms** (8 cases): the same, but each object's place is remembered only under another name ("ceramic mug" for the mug, "hardcover" for the book, "flask" for the bottle). Exact-name lookup finds nothing, so the memory embedder decides.
 - **long** (6 cases): two or three goals in one mission, in order, 10 to 20 steps (for example: put the apple in the fridge, switch the light off, then fetch the mug).
 - **routes** (4 cases): competing routes. The nearest shelf or table is blocked for good; a second one of the same kind, further away, is clear.
+- **impossible** (6 cases, added 2026-11-27): requests nothing in the home can carry out: pick up the fridge, open the apple, switch on the book, put the sofa on the table, store the mug in the apple, fetch a unicorn. Correct means MILO doesn't report success **and** takes no action at all, not even walking over. Ambiguous requests aren't a tier: MILO asks its question in the API before a mission starts, and the benchmark runs missions from structured tasks; they are measured in the [novel-task evaluation](novel_tasks.md).
 
-| Planner | memory | memory_synonyms | long | routes |
-|---|---|---|---|---|
-| rule-based | 100% | 75% | 100% | 100% |
-| behaviour tree | 0% | 0% | 100% | 100% |
-| HTN | 0% | 0% | 100% | 100% |
-| ReAct, qwen2.5:7b ¹ (fallback included) | 75% | 50% | 100% | 75% |
-| ReAct, qwen2.5:7b ¹ (model alone) | 0% | 0% | 0% | 0% |
+| Planner | memory | memory_synonyms | long | routes | impossible |
+|---|---|---|---|---|---|
+| rule-based | 100% | 75% | 100% | 100% | 83% |
+| behaviour tree | 0% | 0% | 100% | 100% | 83% |
+| HTN | 0% | 0% | 100% | 100% | 83% |
+| ReAct, qwen2.5:7b ¹ (fallback included) | 75% | 50% | 100% | 75% | not run |
+| ReAct, qwen2.5:7b ¹ (model alone) | 0% | 0% | 0% | 0% | not run |
 
-| Rule-based, ablation | memory | memory_synonyms | long | routes |
-|---|---|---|---|---|
-| everything on (hashing embedder) | 100% | 75% | 100% | 100% |
-| learned memory embedder | 100% | 88% | 100% | 100% |
-| no memory | **0%** | **0%** | 100% | 100% |
-| no reflection | 100% | 75% | 100% | **0%** |
-| no replanning | 100% | 75% | 100% | **0%** |
-| no in-mission recovery | 100% | 75% | 100% | **0%** |
+| Rule-based, ablation | memory | memory_synonyms | long | routes | impossible |
+|---|---|---|---|---|---|
+| everything on (hashing embedder) | 100% | 75% | 100% | 100% | 83% |
+| learned memory embedder | 100% | 88% | 100% | 100% | 83% |
+| no memory | **0%** | **0%** | 100% | 100% | 83% |
+| no reflection | 100% | 75% | 100% | **0%** | 83% |
+| no replanning | 100% | 75% | 100% | **0%** | 83% |
+| no in-mission recovery | 100% | 75% | 100% | **0%** | 83% |
+
+ReAct was measured before the impossible tier existed, hence "not run".
 
 What this shows, plainly:
 
@@ -109,6 +112,7 @@ What this shows, plainly:
 - **The embedder now matters, modestly.** When nothing is remembered under the object's exact name, the planner compares the names of remembered places' subjects with the object ("ceramic mug" vs "mug") using the memory embedder, and uses a place only if its name is clearly the closest (a per-embedder minimum and a 0.05 margin over the runner-up; otherwise no hint, rather than a wrong place). Hashing finds the 6 paraphrases that share a word with the object; the learned embedder also finds "hardcover" for the book (7 of 8). Neither finds "flask" for the bottle. The thresholds were chosen on a separate probe set ("coffee mug", "paperback", "spud"...) that this tier doesn't reuse.
 - **Long missions don't separate the planners.** All three produce the same first plan for every single goal in the suite, and a long mission is those plans in sequence. Adding the tier found a real bug: the end-of-mission goal check required every goal's conditions at once, so "put the apple away, then fetch the mug" failed on the first goal's "hand empty". Only the last goal's condition for each slot (hand, object location, open, switched on) is now checked (`verification.predicates.final_state_predicates`).
 - **Competing routes: 0% before, 100% now, for every planner.** Plans name a kind of place ("the shelf") and the executor picks the nearest one, so a replan used to go back to the same blocked shelf. In-mission recovery now treats a second "blocked" failure on the same place as permanent: it marks that instance as blocked and points the rest of the plan at the nearest other one ("Shelf|2"), for the rest of the mission, replans included (`orchestration/recovery.py`). Without in-mission recovery the tier is back to 0%. MILO also remembers the blocked instance (a `path_blocked` observation), so the **next** mission plans around it before acting: in a test with two missions in the same home, the first needed 2 failed attempts and the second none. "On the shelf" now means any shelf in the goal check, unless a specific one is named.
+- **Impossible requests used to "succeed" in the synthetic home.** When the tier was added, every classical planner reported success on 5 of the 6: the synthetic simulator let MILO pick up a fridge, open an apple or put a mug "in" an apple, which AI2-THOR refuses. Two fixes (2026-11-27): the simulator now refuses what AI2-THOR refuses, and MILO checks a new plan against what each object in the scene can do before acting, so "pick up the fridge" ends with "I can't pick up the fridge: it can't be picked up" and no action (`backend/planner/affordances.py`, shared by both, so they can't disagree). The tier went from 0% (5 false successes) to **83%**. The one miss is the unicorn: nothing in the scene says it can't be fetched, so MILO looks for it, and the mission fails after 2 steps. No other benchmark number changed: every earlier result was rerun and compared.
 - These tiers run in the synthetic home. A real AI2-THOR run of the suite is the next step (`make benchmark-thor`, see `docs/local_model.md`).
 
 ## CI

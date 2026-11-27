@@ -198,11 +198,16 @@ def run_case(
         for s in r.step_results
         if s.status.value in ("completed", "failed", "blocked")
     ]
+    succeeded = state.status.value == "succeeded"
     return {
         "case": case.case_id,
         "kind": case.kind,
         "fault": case.fault,
-        "success": state.status.value == "succeeded",
+        # an impossible request is handled correctly only if it is refused before acting
+        "success": (
+            (not succeeded and not steps) if case.kind == "impossible" else succeeded
+        ),
+        "mission_succeeded": succeeded,
         "steps": len(steps),
         "sim_s": round(sim.clock_s, 2),
         "replans": orch._replans,
@@ -531,7 +536,7 @@ def markdown(report: Dict[str, Any]) -> str:
             + " | ".join(pct(s["recovery_by_fault"][f]) for f in FAULT_KINDS)
             + " |"
         )
-    lines += ["", "## Harder tiers (memory, long missions, competing routes)", "",
+    lines += ["", "## Harder tiers (memory, long missions, competing routes, impossible requests)", "",
               "| Planner | " + " | ".join(HARD_TIERS) + " |", "|---|" + "---|" * len(HARD_TIERS)]  # fmt: skip
     for p, s in measured(report).items():
         tiers = s.get("tiers", {})

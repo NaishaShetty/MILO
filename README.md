@@ -29,7 +29,8 @@ It is a research and engineering platform for people working on embodied agents,
 | Trust and safety | Plan validation, a constraints file, approval before risky steps (no answer means skip), "which one?" questions, undo | Covered by tests ([oversight](docs/oversight.md)); no benchmark number |
 | No visibility into what the robot did | A trace store for every mission, with replay, p50/p95 timings per stage, a scene map and a downloadable report | Tracing costs about 2.4 ms per mission ([foundation](docs/foundation.md)) |
 | A blocked way to a place stalled the mission for good | After a second "blocked" failure, MILO uses another place of the same kind (the other shelf) and remembers the blocked one for next time | Competing-routes tier 0% → 100% for every planner; the next mission avoids it before acting ([benchmark](docs/benchmark.md), 2026-11-26) |
-| No way to tell whether a change made it worse | A fixed, seeded benchmark over every planner, plus a CI gate that fails if a planner drops more than 5 points | The regression suite (153 missions per planner) and four harder tiers run in about 35 s ([benchmark](docs/benchmark.md), 2026-11-26) |
+| Impossible requests ("pick up the fridge") were reported as successes in the synthetic home | The simulator refuses what AI2-THOR refuses, and MILO checks a plan against what each object can do before acting | Impossible tier 0% → 83%: 5 of 6 refused with no action; the missing object can't be judged ([benchmark](docs/benchmark.md), 2026-11-27) |
+| No way to tell whether a change made it worse | A fixed, seeded benchmark over every planner, plus a CI gate that fails if a planner drops more than 5 points | The regression suite (153 missions per planner) and five harder tiers run in about 35 s ([benchmark](docs/benchmark.md), 2026-11-26) |
 
 ## Research opportunities
 

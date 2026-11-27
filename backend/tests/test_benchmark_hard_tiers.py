@@ -83,7 +83,7 @@ def test_multi_goal_mission_ending_with_a_fetch_succeeds():
 def test_tier_sizes():
     assert (len(memory_cases()), len(long_cases()), len(route_cases())) == (8, 6, 4)
     assert len(memory_synonym_cases()) == 8
-    assert len(hard_cases()) == 26
+    assert len(hard_cases()) == 32
 
 
 def test_react_without_a_model_is_reported_as_not_measured():
@@ -132,3 +132,27 @@ def test_react_plans_handed_to_rule_based_are_counted(monkeypatch):
     assert fb["cases_with_fallback"] >= fb["cases"] - 1 > 0  # one case never plans
     assert fb["success_without_fallback"] < 2 / fb["cases"]  # only that one case
     assert "handed at least one plan" in br.markdown(report)
+
+
+def test_impossible_requests_are_refused_before_acting():
+    from benchmark.suite import impossible_cases
+
+    for planner in ("rule_based", "behavior_tree", "htn"):
+        rows = [run_case(c, planner) for c in impossible_cases()]
+        assert not any(r["mission_succeeded"] for r in rows), planner
+        refused = [r["case"] for r in rows if r["success"]]
+        # the unicorn isn't in the scene, so nothing says it can't be fetched
+        assert set(refused) == {c.case_id for c in impossible_cases()} - {
+            "impossible-fetch-unicorn"
+        }, planner
+
+
+def test_the_simulator_refuses_what_ai2thor_refuses():
+    from benchmark.suite import Case
+
+    sim = SyntheticSimulator(case_scene(Case("x", "known", "find", "apple")))
+    sim.navigate_to("Fridge|1")
+    assert not sim.pickup_object("Fridge|1").metadata["lastActionSuccess"]
+    sim.navigate_to("Apple|1")
+    assert not sim.open_object("Apple|1").metadata["lastActionSuccess"]
+    assert sim.pickup_object("Apple|1").metadata["lastActionSuccess"]

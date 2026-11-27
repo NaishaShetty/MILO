@@ -362,6 +362,14 @@ class Orchestrator:
         self._apply_lessons(task, task_state)
         self._avoid_remembered_blocks(task_state)
         self._note_planner(task_state, planning_result.plan)
+        cannot = self._impossible(task_state)
+        if cannot is not None:
+            task_state.latencies_ms["total_ms"] = (
+                time.perf_counter() - run_started_at
+            ) * 1000.0
+            return self._finish_failed(
+                task, task_state, episode_id, record=None, reason=cannot
+            )
         self._think(
             task_state,
             "planner",
@@ -1458,6 +1466,23 @@ class Orchestrator:
         reason = "I checked and " + "; ".join(r.reason for r in missed) + "."
         self._think(task_state, "eyes", reason)
         return reason if mode == "enforce" else None
+
+    def _impossible(self, task_state: TaskState) -> Optional[str]:
+        """Refuse before acting if the plan asks an object in view to do something it
+        can't ("pick up the fridge"); see `planner.affordances`."""
+        plan = task_state.current_plan
+        if plan is None:
+            return None
+        try:
+            from planner.affordances import impossible_step
+
+            reason = impossible_step(plan.steps, self._execution.get_metadata())
+        except Exception:
+            logger.warning("orchestrator.affordance_check_failed", exc_info=True)
+            return None
+        if reason is not None:
+            self._think(task_state, "planner", reason + ", so I won't try.")
+        return reason
 
     def _finish_failed(
         self,
