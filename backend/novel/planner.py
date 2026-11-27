@@ -83,6 +83,35 @@ class MissionLog:
     scene_objects: List[str] = field(default_factory=list)
 
 
+#: A structured task said as a sentence, for when one reaches this planner (the
+#: benchmark runs it on known tasks too). Without this the model saw only the goal word:
+#: "fetch the mug" arrived as "fetch", and the model had to guess what to fetch.
+_SAY = {"fetch": "bring me the {o}", "pick_up": "pick up the {o}", "find": "find the {o}",
+        "place": "put the {o} on the {t}", "store": "put the {o} in the {t}",
+        "deliver": "take the {o} to the {t}", "open": "open the {o}", "close": "close the {o}",
+        "turn_on": "turn on the {o}", "turn_off": "turn off the {o}",
+        "navigate_to": "go to the {t}"}  # fmt: skip
+
+
+def command_text(task: Any) -> str:
+    """The words the model is given: the user's own command for a novel task, else the
+    structured task (goal, object, place) as a plain sentence."""
+    said = (getattr(task, "estimated_goal", None) or "").strip()
+    if said:
+        return said
+    goal = (getattr(task, "goal", None) or "").strip()
+    obj = getattr(task, "object", None)
+    target = getattr(task, "target", None)
+    template = _SAY.get(goal)
+    if (
+        template
+        and ("{o}" not in template or obj)
+        and ("{t}" not in template or target)
+    ):
+        return template.format(o=obj, t=target)
+    return " ".join(str(w).replace("_", " ") for w in (goal, obj, target) if w)
+
+
 class NovelPlanner:
     planner_type = "novel"
 
@@ -112,7 +141,7 @@ class NovelPlanner:
 
     def plan(self, task: Any, state: Any, memory_context: Any = None) -> PlanningResult:
         started = time.perf_counter()
-        command = (getattr(task, "estimated_goal", None) or task.goal or "").strip()
+        command = command_text(task)
         task_id = task.task_id or ""
         if self.log is None or self.log.task_id != task_id:
             self.log = MissionLog(task_id, command)
