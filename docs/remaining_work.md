@@ -12,7 +12,7 @@ make train-real         # after collect-thor: retrain the outcome predictor on r
 make benchmark-thor     # the benchmark in real AI2-THOR, about 1 hour per planner
 ```
 
-`make collect-thor` has been run (2026-11-27: 600 real episodes, about 70 minutes, not overnight), and the memory embedder was retrained on it, with no gain ([memory embedder card](models/memory_embedder.md)). Still open from that data: `make train-real` for the outcome predictor. The real episodes are in `backend/data/episodes_thor/` on this laptop (not in git).
+`make collect-thor` has been run (2026-11-27: 600 real episodes, about 70 minutes, not overnight), and the memory embedder was retrained on it, with no gain ([memory embedder card](models/memory_embedder.md)). `make train-real` has been run too: the shipped outcome predictor scores AUROC 0.39 on real steps, the retrained one 0.99 (0.87 on place steps) ([card](models/outcome_predictor.md)). Still open: comparing the retrained predictor on real *missions* against the rule-based reflector, which decides whether it can leave shadow mode. The real episodes are in `backend/data/episodes_thor/` on this laptop (not in git).
 
 Use `MILO_OLLAMA_KEEP_ALIVE=0` if a local model shares the GPU ([local_model.md](local_model.md)).
 

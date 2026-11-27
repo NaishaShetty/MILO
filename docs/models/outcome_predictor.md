@@ -32,3 +32,21 @@ Duration MAE 234 ms (mean-predictor 1,482 ms). Failure-type accuracy 0.899 (majo
 **Known limits.** Trained and evaluated on synthetic data whose failures are mostly determined by the features the model sees, so the offline numbers are optimistic and the online gain is **not yet shown on AI2-THOR**. Keep the flag at `shadow` until real-simulator episodes have been logged and compared. Memory-hit features are always zero in this dataset. Duration labels are simulated seconds. Under input drift, high latency or low confidence the system falls back to the rule-based reflector.
 
 **Flags.** `MILO_LEARNED_REFLECTOR=off|shadow|on` (default `off`), `MILO_PLAN_RANKING=0|1`, `MILO_MODEL_DIR`. Reproduce: `make data dataset train-outcome eval-outcome`. Promote a retrained model only if it wins: `make promote-outcome` (previous version kept; `python -m learning.promote --rollback`).
+
+## On real AI2-THOR episodes (2026-11-27)
+
+`make collect-thor` logged 600 real AI2-THOR episodes (nothing injected; 349 succeeded, 251 failed). `make train-real` trained the same model on the synthetic episodes plus the 300 real episodes from training scenes, and tested it on the other 300, from 20 real scenes it never saw: 1,070 steps, of which 54 failed. Results: `results/outcome_real/offline_real_test.json`.
+
+| Real held-out steps | AUROC | Brier | ECE |
+|---|---|---|---|
+| **Current model (synthetic only, the one MILO ships)** | **0.39** | 0.231 | 0.239 |
+| Retrained (synthetic + real) | **0.99** | 0.017 | **0.017** |
+| Hand-written rules | 0.13 | 0.607 | 0.647 |
+
+**The shipped model does not transfer to real AI2-THOR**: it ranks real failures worse than chance. This is the risk the limits above warned about, now measured.
+
+**Most of the retrained model's 0.99 is easy.** In real AI2-THOR almost every failure is a *place* step: 51 of 99 "put it down" steps failed, against 3 of 971 other steps. So "place steps are risky" alone scores highly. On place steps alone (99 steps, 51 failures) the retrained model still has real skill: AUROC 0.87, ECE 0.054, while the shipped model predicts success for every one of them (AUROC 0.5). It has learned, for example, that putting down a plate, pillow, pot or box often fails, and keys or a mug rarely do.
+
+**Decision: not promoted, and the flag stays at `shadow`.** Its overall ECE (0.017) meets the 0.05 bar, but the bar for leaving shadow mode is a win on real *missions*: mission success and wasted steps against the rule-based reflector on held-out real scenes. That comparison hasn't been run. The retrained model is in `artifacts/outcome_real/` on this laptop (not in git); `make promote-outcome` would make it the served one.
+
+Two more caveats: 54 failing test steps is a small sample, and real missions fail mostly in ways step-level prediction can't see (95% of real steps succeed, but only 56% of real missions).

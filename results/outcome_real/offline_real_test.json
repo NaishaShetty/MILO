@@ -1,0 +1,86 @@
+{
+ "test_steps": 1070,
+ "test_failures": 54,
+ "synthetic_only (served now)": {
+  "n": 1070.0,
+  "positive_rate": 0.9495,
+  "auroc": 0.3935,
+  "pr_auc": 0.9391,
+  "brier": 0.2308,
+  "ece": 0.2387
+ },
+ "synthetic_plus_real (new)": {
+  "n": 1070.0,
+  "positive_rate": 0.9495,
+  "auroc": 0.9896,
+  "pr_auc": 0.9992,
+  "brier": 0.0174,
+  "ece": 0.0174
+ },
+ "rules": {
+  "n": 1070.0,
+  "positive_rate": 0.9495,
+  "auroc": 0.1334,
+  "pr_auc": 0.9187,
+  "brier": 0.6074,
+  "ece": 0.6467
+ },
+ "place_steps_only": {
+  "place_steps": 99,
+  "place_failures": 51,
+  "synthetic_only": {
+   "auroc": 0.5,
+   "brier": 0.515,
+   "ece": 0.515,
+   "mean_p": 1.0
+  },
+  "synthetic_plus_real": {
+   "auroc": 0.868,
+   "brier": 0.129,
+   "ece": 0.054,
+   "mean_p": 0.454
+  },
+  "place_by_target_fail_ok": {
+   "laptop": [
+    9,
+    0
+   ],
+   "plate": [
+    6,
+    2
+   ],
+   "pillow": [
+    6,
+    0
+   ],
+   "pot": [
+    6,
+    0
+   ],
+   "box": [
+    6,
+    0
+   ],
+   "keychain": [
+    0,
+    5
+   ],
+   "egg": [
+    3,
+    2
+   ],
+   "mug": [
+    0,
+    4
+   ],
+   "towel": [
+    3,
+    1
+   ],
+   "handtowel": [
+    3,
+    1
+   ]
+  }
+ }
+}

@@ -101,6 +101,7 @@ results/*
 !results/novel_bench_local/
 !results/parser_llm/
 !results/embedder_real/
+!results/outcome_real/
 !results/thor/
 
 # experiments/results/ holds raw benchmark run output (timestamped
