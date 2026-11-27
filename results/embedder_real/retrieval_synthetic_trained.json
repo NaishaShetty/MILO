@@ -1,0 +1,68 @@
+{
+  "test_corpus": 131,
+  "test_queries": 120,
+  "hashing_baseline": {
+    "all": {
+      "recall@1": 0.9,
+      "recall@5": 0.7845833333333334,
+      "recall@10": 0.8750000000000001,
+      "mrr": 0.9328422619047619,
+      "queries": 120
+    },
+    "unseen_objects": {
+      "recall@1": 1.0,
+      "recall@5": 0.6,
+      "recall@10": 0.7,
+      "mrr": 1.0,
+      "queries": 5
+    }
+  },
+  "bge_small_off_the_shelf": {
+    "all": {
+      "recall@1": 0.9166666666666666,
+      "recall@5": 0.8686111111111111,
+      "recall@10": 0.9340277777777779,
+      "mrr": 0.9472222222222223,
+      "queries": 120
+    },
+    "unseen_objects": {
+      "recall@1": 1.0,
+      "recall@5": 0.8,
+      "recall@10": 0.85,
+      "mrr": 1.0,
+      "queries": 5
+    }
+  },
+  "fine_tuned": {
+    "all": {
+      "recall@1": 1.0,
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "mrr": 1.0,
+      "queries": 120
+    },
+    "unseen_objects": {
+      "recall@1": 1.0,
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "mrr": 1.0,
+      "queries": 5
+    }
+  },
+  "fine_tuned_plus_reranker": {
+    "all": {
+      "recall@1": 1.0,
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "mrr": 1.0,
+      "queries": 120
+    },
+    "unseen_objects": {
+      "recall@1": 1.0,
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "mrr": 1.0,
+      "queries": 5
+    }
+  }
+}

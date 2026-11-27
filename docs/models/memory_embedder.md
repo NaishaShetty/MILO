@@ -34,7 +34,30 @@ Latency (fine-tuned, GPU, real `RetrievalEngine`): 5,000 memories p50 5.8 ms / p
 
 Reproduce: `make train-embedder eval-retrieval eval-retrieval-missions`.
 
-**Not yet retrained on real logs.** The next step is to retrain it on retrieval logs from real AI2-THOR episodes (`make collect-thor`, then the two commands in [remaining_work.md](../remaining_work.md)) and compare on the memory tiers. It was not retrained on the synthetic benchmark's own runs, because those are the missions it is scored on.
+## Retrained on real AI2-THOR episodes (2026-11-27): no gain
+
+`make collect-thor` logged 600 real AI2-THOR episodes (120 scenes: kitchens, living rooms, bedrooms, bathrooms; 349 succeeded, 251 failed, 2,503 steps, nothing injected). The embedder was fine-tuned on them the same way (`train_embedder --db-dir data/episodes_thor`, 4 epochs). It was not trained on the synthetic benchmark's own runs, since those are the missions it is scored on. Results: `results/embedder_real/`.
+
+**Retrieval on held-out real scenes** (scenes split by the same rule as before; 120 queries over 131 memories, a small set):
+
+| Embedder | recall@5 | MRR |
+|---|---|---|
+| Hashing | 0.785 | 0.933 |
+| BGE-small off the shelf | 0.869 | 0.947 |
+| Fine-tuned on synthetic episodes (the current model) | **1.000** | **1.000** |
+| Fine-tuned on the 600 real episodes | 0.979 | 0.960 |
+
+**Missions** (rule-based, benchmark memory tiers, 8 missions each):
+
+| Embedder | memory | memory_synonyms |
+|---|---|---|
+| Hashing (default) | 8/8 | 6/8 |
+| Fine-tuned on synthetic episodes | 8/8 | **7/8** |
+| Fine-tuned on the 600 real episodes | 8/8 | 5/8 |
+
+**Why it's worse:** not the threshold. On the separate threshold probe set the two models score matching names alike (median 0.79, lowest 0.43 vs 0.40), but the real-data model scores *non*-matching names much closer (highest 0.68 vs 0.55). The planner only uses a remembered place when its name is clearly the closest, so it declines more often. The likely cause is data: 600 real episodes against a much larger synthetic set. Re-picking the threshold wouldn't fix this, so it wasn't changed.
+
+**Decision:** the real-data model is not used. The synthetic-trained model stays the `learned` option and hashing stays the default. Worth retrying with real episodes added to the synthetic ones rather than instead of them, or with many more real episodes.
 
 ## On the benchmark's memory tiers (2026-11-26)
 
