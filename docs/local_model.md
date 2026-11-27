@@ -35,7 +35,7 @@ Every number below is labelled with where it came from. "DEV" numbers were used 
 **Not run yet** (they take hours on this laptop, or need you):
 
 ```bash
-make collect-thor       # 600 real AI2-THOR episodes, about 5-10 hours, resumable: run it overnight
+make collect-thor       # done 2026-11-27: 600 real AI2-THOR episodes, about 70 minutes, resumable
 make train-real         # after collect-thor: retrain the outcome predictor on real episodes
 make benchmark-thor     # the benchmark on real AI2-THOR, about 1 hour per planner, resumable
 ```
