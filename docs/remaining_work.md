@@ -7,7 +7,7 @@ A short, current list. Long-term research directions are in [roadmap.md](roadmap
 These are ready to run but take hours, so they weren't started for you. All are resumable.
 
 ```bash
-make collect-thor       # 600 real AI2-THOR episodes, about 5-10 hours: run it overnight
+make collect-thor       # done 2026-11-27: 600 real AI2-THOR episodes, about 70 minutes
 make train-real         # after collect-thor: retrain the outcome predictor on real episodes
 make benchmark-thor     # the benchmark in real AI2-THOR, about 1 hour per planner
 ```

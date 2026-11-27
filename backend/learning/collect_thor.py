@@ -13,8 +13,8 @@ Real AI2-THOR episodes for the step-outcome predictor, logged with the same
   out of training and evaluates on.
 - **Resumable**: episode ids are `thor-<scene>-<index>`; finished ones are skipped, so an
   interrupted overnight run continues where it stopped.
-- **Slow**: a fresh Unity process per episode, roughly 30-60 s each on an RTX 4050
-  laptop, so 600 episodes take about 5-10 hours. Needs a GPU and a display (or
+- **Time**: a fresh Unity process per episode, about 7 s each on an RTX 4050 laptop
+  (measured 2026-11-27), so 600 episodes take about 70 minutes. Needs a GPU and a display (or
   VISION_SIMULATOR_PLATFORM=cloud_rendering), and nothing else large on the GPU.
 """
 

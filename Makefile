@@ -126,7 +126,7 @@ benchmark-thor:
 
 ## Real AI2-THOR episodes for the outcome predictor (300 in held-out scenes)
 collect-thor:
-	@echo "Expect about 5-10 hours for 600 episodes. Run it overnight (tmux or nohup); resumable."
+	@echo "Expect about 70 minutes for 600 episodes (about 7 s each on an RTX 4050); resumable."
 	cd backend && $(PY) -m learning.collect_thor --episodes 600
 
 ## Retrain the outcome predictor on synthetic + real episodes; test = held-out real scenes
