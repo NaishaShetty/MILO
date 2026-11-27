@@ -211,6 +211,7 @@ All benchmark numbers come from `benchmarks/latest.json` (`make benchmark`, run 
   - It still rarely asks: 2 of 8 ambiguous commands (0 with v2). It refuses 4 of 7 impossible ones (1 with v2). In the app a model-made plan is shown for approval before it runs.
   - v3 was tuned on the DEV set only; TEST was run once afterwards.
 - **Skills** (same model): repeating a command drops from 1.3 to 0.2 model calls and from 8.6 to 1.5 s, and 90% transfer to another object. Composing two learned skills saves nothing yet.
+- On the benchmark's known tasks (one run, 2026-11-27): 17 of 23, and it refuses all 6 impossible requests. Its misses are its own plans: "bring me the apple" carried to a "user" that doesn't exist, and impossible success conditions for "find" ([benchmark](../docs/benchmark.md)).
 - The model was chosen on a separate DEV set from four candidates ([local model](../docs/local_model.md)).
 
 **Memory poisoning** (`make eval-trust`; missions correct at a 100% attack rate, defence off → on):

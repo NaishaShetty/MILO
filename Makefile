@@ -100,7 +100,11 @@ OLLAMA_URL ?= http://localhost:11434
 MODEL ?= qwen2.5:7b
 BAKEOFF_MODELS ?= qwen2.5:7b qwen3.5:4b llama3.1:8b gemma4:e2b-it-qat
 
-.PHONY: model-bakeoff novel-eval benchmark-thor collect-thor train-real profile-perception
+.PHONY: model-bakeoff novel-eval benchmark-thor collect-thor train-real profile-perception parser-phrasings
+## Messier parser phrasings from the local model, then parser before/after (about 5 min)
+parser-phrasings:
+	cd backend && MILO_OLLAMA_URL=$(OLLAMA_URL) $(PY) -m learning.parser.llm_phrasings --model $(MODEL)
+
 ## Time each perception stage (Grounding DINO, fast detector, SAM2, depth) on this GPU
 profile-perception:
 	$(PY) scripts/profile_perception.py --frames 40

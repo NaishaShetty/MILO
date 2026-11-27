@@ -17,6 +17,8 @@ Every number below is labelled with where it came from. "DEV" numbers were used 
 | Unsafe actions on TEST | not measured | 0 | `results/novel_local/` |
 | Repeat task with skills: model calls / seconds | 1.3 / 8.6 s | 0.2 / 1.5 s | `results/novel_local/prompt_v2/` |
 | ReAct, known tasks, model planning on its own | not measured | 13/23 | `results/react_local/` |
+| Language-model planner on the benchmark (one run) | reference plans only | known 17/23, faults 75/122, impossible refused 6/6 | `results/novel_bench_local/` |
+| Parser on hand-written held-out phrasings | 62.0% (hand-written templates) | 71.9% (+ model-written templates) | `results/parser_llm/` |
 | One real AI2-THOR mission, model + vision on a 6 GB GPU | untested | succeeded (5.77-5.87 GB peak) | smoke test above |
 | memory_synonyms tier, rule-based (synthetic, no model) | 75% (hashing embedder) | 88% (learned embedder) | `docs/benchmark.md` |
 | routes tier, rule-based (synthetic, no model) | 0% (no in-mission recovery) | 100% | `docs/benchmark.md` |

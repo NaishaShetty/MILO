@@ -32,3 +32,16 @@ Calibration: ECE of the exact-match confidence 0.058. Speed: 1.0 ms per parse. O
 - The learned parser sees one sentence; compound ("... and then ...") instructions are still handled by the rules.
 
 Reproduce: `make eval-parser` (writes `artifacts/parser/parser.pkl` and `eval.json`).
+
+## Messier training phrasings from a local model (2026-11-27)
+
+`make parser-phrasings` (`learning/parser/llm_phrasings.py`): `qwen2.5:7b` via Ollama wrote 25 phrasing *templates* per goal, with slots for the object and place, at temperature 0.8 (seed 0) for variety. Labels still come from filling the slots, never from the model. Each template must use exactly its goal's slots, once, and not as a verb ("i need you to {o} something" is rejected); duplicates and copies of hand-written templates are dropped. 287 of 325 passed (`data/parser_llm_phrasings.json`). 30% of them, chosen by hash, are held out and never trained on.
+
+Same small parser, trained on the hand-written templates alone (before) or with the model's training templates added (after), 1,500 test sentences per set, exact match on goal, object and place (`results/parser_llm/eval.json`):
+
+| Held-out phrasings | Phrasebook rules | Parser before | Parser after |
+|---|---|---|---|
+| Hand-written TEST phrasings | 13.7% | 62.0% | **71.9%** |
+| Model-written, never trained on | 6.9% | 61.3% | **91.6%** |
+
+The second row flatters the parser: those phrasings come from the same model, in the same style, as its new training data. The first row is the fairer gain: about 10 points on phrasing written by a person. The shipped parser is unchanged; the real test is the hand-written set in `data/parser_test_human.jsonl`, once it has its 100 commands.

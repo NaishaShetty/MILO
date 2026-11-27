@@ -34,6 +34,8 @@ Latency (fine-tuned, GPU, real `RetrievalEngine`): 5,000 memories p50 5.8 ms / p
 
 Reproduce: `make train-embedder eval-retrieval eval-retrieval-missions`.
 
+**Not yet retrained on real logs.** The next step is to retrain it on retrieval logs from real AI2-THOR episodes (`make collect-thor`, then the two commands in [remaining_work.md](../remaining_work.md)) and compare on the memory tiers. It was not retrained on the synthetic benchmark's own runs, because those are the missions it is scored on.
+
 ## On the benchmark's memory tiers (2026-11-26)
 
 On the memory tier (objects start out of view; only going where they usually are finds them) both embedders give 8/8. There the planner finds the place by the object's exact name, so the embedder isn't involved.

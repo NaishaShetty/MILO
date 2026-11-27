@@ -1,0 +1,414 @@
+{
+ "source": "qwen2.5:7b via Ollama, temperature 0.8, seed 0",
+ "per_goal": 25,
+ "stats": {
+  "fetch": {
+   "asked": 25,
+   "returned": 24,
+   "accepted": 9
+  },
+  "deliver": {
+   "asked": 25,
+   "returned": 23,
+   "accepted": 23
+  },
+  "store": {
+   "asked": 25,
+   "returned": 24,
+   "accepted": 24
+  },
+  "place": {
+   "asked": 25,
+   "returned": 25,
+   "accepted": 25
+  },
+  "pick_up": {
+   "asked": 25,
+   "returned": 23,
+   "accepted": 23
+  },
+  "open": {
+   "asked": 25,
+   "returned": 24,
+   "accepted": 23
+  },
+  "close": {
+   "asked": 25,
+   "returned": 24,
+   "accepted": 21
+  },
+  "turn_on": {
+   "asked": 25,
+   "returned": 23,
+   "accepted": 21
+  },
+  "turn_off": {
+   "asked": 25,
+   "returned": 25,
+   "accepted": 22
+  },
+  "find": {
+   "asked": 25,
+   "returned": 25,
+   "accepted": 25
+  },
+  "navigate_to": {
+   "asked": 25,
+   "returned": 24,
+   "accepted": 24
+  },
+  "clear_table": {
+   "asked": 25,
+   "returned": 23,
+   "accepted": 23
+  },
+  "tidy_up": {
+   "asked": 25,
+   "returned": 24,
+   "accepted": 24
+  }
+ },
+ "train": {
+  "fetch": [
+   "hey can i have the {o}",
+   "bring me the {o} from the kitchen i'll be out there soon",
+   "bring me the {o} from the dining room i need it for the salad"
+  ],
+  "deliver": [
+   "can you bring {o} to {t}",
+   "take {o} to the {t} please",
+   "i need {o} at {t} can you do that",
+   "hey will ya grab {o} and put it in {t}",
+   "could you transport {o} to {t}",
+   "i was wondering if you could bring {o} to {t}",
+   "hey could you pick up {o} and put it there at {t}",
+   "can ya do me a favor and take {o} to {t}",
+   "could you maybe bring {o} over to {t}",
+   "could you please bring {o} to {t} and then come back",
+   "take {o} to {t} and then come back",
+   "hey could you take {o} over to {t} and then turn off the lights",
+   "hey could you bring {o} to {t} and make sure the door is closed"
+  ],
+  "store": [
+   "can you toss {o} in the {t}",
+   "hey there could you put {o} away in the {t}",
+   "put that {o} in the {t} will ya",
+   "how about you shove {o} in the {t} for me",
+   "put the {o} in the {t} please",
+   "please put {o} in the {t}",
+   "if you could can you drop {o} in the {t}",
+   "can you plop {o} in the {t}",
+   "would you mind putting {o} in the {t}",
+   "i'd be grateful if you could put {o} in the {t}",
+   "put that {o} in the {t} wouldja",
+   "could you tuck {o} in the {t}",
+   "can you shove {o} in the {t} when you get a chance",
+   "can you stuff {o} in the {t}",
+   "can you stash {o} in the {t}",
+   "can you just put {o} in the {t} and maybe close the door"
+  ],
+  "place": [
+   "can you put {o} there on {t}",
+   "could ya put {o} on {t} for me",
+   "{o} needs to be placed on {t} ok",
+   "please put {o} on the {t}",
+   "would you mind putting {o} on {t}",
+   "hey can you set {o} on the {t}",
+   "i was wondering if you could put {o} on {t} for me thanks",
+   "sure put {o} on the {t}",
+   "put {o} on the {t} for me please",
+   "put {o} on the {t} will ya",
+   "can you just put {o} on {t}",
+   "i need you to put {o} on the {t}",
+   "i was like put {o} on the {t} you know",
+   "put {o} on {t} like right there",
+   "i was thinking can you put {o} on {t}",
+   "i was wondering if you could maybe put {o} on the {t}",
+   "you know i'm thinking {o} could go on {t}",
+   "can you put {o} over there on {t}",
+   "i was wondering if you could put {o} on the {t} asap",
+   "could you put {o} there on {t} thanks",
+   "i was wondering if you could put that {o} on the {t}",
+   "i was like {o} on the {t} ok"
+  ],
+  "pick_up": [
+   "hey could you hold the {o} for a sec",
+   "pick up the {o} and hold it please",
+   "could you grab the {o} and keep it ready",
+   "pick up the {o} from the floor will ya",
+   "hey can you hold onto the {o} for me",
+   "grab the {o} and keep it steady please",
+   "hey could you pick up the {o} for me",
+   "i need you to hold the {o} can you do that",
+   "hey could you pick up the {o} and keep it in your hand",
+   "hey would you mind picking up the {o} and holding it",
+   "grab the {o} and make sure it stays in place please",
+   "hey can you pick up the {o} and hold it for a bit",
+   "hey could you pick up the {o} and keep it in your hand please",
+   "could you grab the {o} and hold it for me",
+   "hey could you pick up the {o} and hold it steady for me",
+   "hey can you pick up the {o} and hold it for a moment",
+   "hey could you pick up the {o} and hold it for me please"
+  ],
+  "open": [
+   "could you open the {o} for me",
+   "hey open the {o} please",
+   "do me a favor and open the {o}",
+   "open {o} would ya",
+   "open the {o} if you can",
+   "you open the {o} when you get a chance",
+   "could ya open the {o}",
+   "please open the {o} for me",
+   "open the {o} because i want to see what's inside",
+   "open the {o} and see what's there",
+   "open the {o} so i can grab a drink",
+   "can you open the {o} so i can check the time",
+   "go on and open the {o} for me",
+   "please open the {o} so i can take a look inside",
+   "if you have a moment open the {o} for me"
+  ],
+  "close": [
+   "hey buddy close the {o}",
+   "i think the {o} is open could you please close it",
+   "the {o} is ajar close it will ya",
+   "close the {o} i'm trying to sleep",
+   "i'm not a fan of drafts so close the {o} for me",
+   "would you mind closing the {o}",
+   "could you close the {o} if you're around",
+   "hey you there close the {o} please",
+   "hey close the {o} if you're passing by",
+   "the {o} is wide open shut it for me",
+   "hey close the {o} when you get the chance",
+   "can you close the {o} now please",
+   "could you close the {o} and maybe turn off the lights"
+  ],
+  "turn_on": [
+   "can you flip the {o} switch",
+   "hey robot turn on the {o}",
+   "please {o} on",
+   "i need the {o} to be on",
+   "could you be a star and turn on the {o}",
+   "please i need the {o} to turn on",
+   "make sure the {o} is on",
+   "i need you to activate the {o}",
+   "do me a solid {o} on",
+   "hey robot could you turn on the {o} for me",
+   "please i need the {o} to switch on",
+   "hey i need the {o} to be switched on",
+   "can you turn on the {o} and make sure it's bright enough"
+  ],
+  "turn_off": [
+   "can you please {o} off",
+   "hey buddy {o} off",
+   "{o} off please",
+   "i think {o} needs to be turned off",
+   "hey {o} needs to go",
+   "give me a sec and {o} off",
+   "just {o} off will ya",
+   "switch {o} off would you",
+   "i'm trying to sleep {o} off",
+   "could you maybe {o} off",
+   "please {o} off i need peace",
+   "i think it's time for the {o} to go off",
+   "hey could you make the {o} go off",
+   "please {o} off i'm trying to focus",
+   "if you could {o} off that would be great"
+  ],
+  "find": [
+   "hey robot where's my {o}",
+   "where's the {o} i was lookin' for",
+   "hey do you know where my {o} went",
+   "i need you to find my {o} for me can you",
+   "where's that {o} i left behind",
+   "hey buddy could you tell me where the {o} is",
+   "hey robot have you seen my {o} around",
+   "could you check for my {o} somewhere",
+   "hey have you spotted my {o}",
+   "i need to locate my {o} can you help",
+   "hey robot where in the house is my {o}",
+   "hey do you know where i put my {o}",
+   "hey do you know if you've seen my {o}",
+   "hey robot i need you to find my {o} where is it",
+   "hey do you know where my {o} is could you tell me",
+   "hey robot i need to know where my {o} is could you find it",
+   "hey do you know where i might've left my {o}"
+  ],
+  "navigate_to": [
+   "can you head to the {t}",
+   "take me to the {t} please",
+   "i need you to go to the {t}",
+   "can you go to the {t} for me",
+   "go to the {t} if you can",
+   "could you maybe go to the {t}",
+   "do you mind going to the {t}",
+   "would you be able to go to the {t}",
+   "hey can you go to the {t}",
+   "could you head to the {t} for me",
+   "can you go to the {t} and grab something",
+   "can you go to the {t} and see what's up",
+   "would you mind going to the {t} for me",
+   "hey can you go to the {t} and tell me how it is",
+   "can you go to the {t} and fetch me what i need",
+   "could you go to the {t} and check if it's open",
+   "can you go to the {t} and get some snacks for me",
+   "can you go to the {t} and tell me if there's anything new"
+  ],
+  "clear_table": [
+   "can you move the {o} to the {t}",
+   "sure can ya move the {o} over to the {t}",
+   "could you maybe just slide the {o} onto the {t}",
+   "hey buddy can you grab the {o} and put it on the {t}",
+   "ya know could you shift the {o} over to the {t}",
+   "hey could you relocate the {o} to the {t}",
+   "can you take the {o} and move it to the {t} please",
+   "hey could you just slide the {o} to the {t} place",
+   "hey can you help me move the {o} to the {t} over there",
+   "can you just move the {o} over to the {t} for me",
+   "hey can you take the {o} and put it on the {t} like now",
+   "can you move the {o} onto the {t} for me please",
+   "could you move the {o} and put it in the {t}",
+   "hey can you move the {o} and place it on the {t}",
+   "hey can you move the {o} and place it onto the {t} like over there",
+   "hey can you move the {o} and put it on the {t} right now",
+   "hey can you move the {o} and place it on the {t} like super fast",
+   "hey can you move the {o} and put it onto the {t} real quick"
+  ],
+  "tidy_up": [
+   "can you clean up the mess",
+   "hey robot could you tidy up a bit",
+   "robot could you do some cleaning",
+   "you know could you maybe clean the place up a little",
+   "hey could you sweep the floor and dust the shelves",
+   "robot would you mind doing some cleaning",
+   "could you do the cleaning please",
+   "robot could you help me clean up",
+   "could you clean up the living space",
+   "hey could you dust and clean a bit",
+   "robot can you help me clean up",
+   "could you clean up the room please",
+   "hey robot can you clean the place up a bit",
+   "could you clean up the house",
+   "robot can you clean up the living space",
+   "hey robot can you do some dusting and cleaning",
+   "could you clean up a bit please",
+   "robot could you please clean up the room"
+  ]
+ },
+ "held_out": {
+  "fetch": [
+   "could you bring me my {o}",
+   "bring me that {o} from the other room will ya",
+   "i need you to get me the {o} alright",
+   "bring me the {o} you hear",
+   "i think i need the {o} over there can you get it",
+   "bring me that {o} will ya it's in the living room"
+  ],
+  "deliver": [
+   "could you move {o} to {t}",
+   "take {o} over to {t}",
+   "please can you relocate {o} to {t}",
+   "take {o} to {t} if you wouldn't mind",
+   "would you mind taking {o} to {t} for me",
+   "hey could you take {o} to {t} and then come back",
+   "i really need {o} at {t} can you do that",
+   "hey could you take {o} over to {t} and maybe get me a snack while you're at it",
+   "can you please bring {o} to {t} and then come back",
+   "i need {o} at {t} could you do that"
+  ],
+  "store": [
+   "could ya slide {o} into the {t} for me",
+   "can ya stick {o} in the {t}",
+   "could you store {o} in the {t} for me",
+   "can you place {o} inside the {t}",
+   "put {o} in the {t} if you have a sec",
+   "can you shove {o} in the {t} real quick",
+   "put the {o} in the {t} for me please",
+   "can you tuck {o} in the {t} and then help me with this"
+  ],
+  "place": [
+   "i think {o} should go on {t}",
+   "please {o} on the {t}",
+   "put the {o} on the {t} for me"
+  ],
+  "pick_up": [
+   "can you pick up the {o} on the table",
+   "could ya grab the {o} for me buddy",
+   "i need you to pick up that {o} okay",
+   "hey could you pick up the {o} and keep it ready",
+   "hey can you pick up the {o} and keep it close",
+   "hey could you pick up the {o} and make sure it stays in your hand"
+  ],
+  "open": [
+   "go ahead and open the {o}",
+   "i need you to open the {o}",
+   "why don't you open the {o}",
+   "open the {o} so i can see inside",
+   "why don't you open the {o} and let me know",
+   "open the {o} if you're not busy",
+   "open the {o} if you're up to it",
+   "open the {o} because i want to use it"
+  ],
+  "close": [
+   "can you shut the {o} for me",
+   "the {o} is wide open can you close it",
+   "hey there close the {o} for me",
+   "can you kindly close the {o}",
+   "close the {o} when you have a sec",
+   "hey close the {o} would you",
+   "the {o} is ajar could you shut it",
+   "can you close the {o} when you're done"
+  ],
+  "turn_on": [
+   "would you mind turning on the {o} for me",
+   "hey buddy can you turn on the {o}",
+   "just a sec {o} on",
+   "hey do me a favor and turn on the {o}",
+   "hey can you please turn on the {o}",
+   "hey turn on the {o} i'm cold",
+   "i'm gonna need the {o} to be on",
+   "could you turn on the {o} for me please"
+  ],
+  "turn_off": [
+   "the {o} is still on turn it off",
+   "can you shut {o} off for me",
+   "do me a favor and {o} off",
+   "please {o} off it's giving me a headache",
+   "turn off the {o} i can't stand it",
+   "could you turn {o} off i'm trying to read",
+   "can you make sure the {o} is off"
+  ],
+  "find": [
+   "can you find where my {o} is",
+   "where's the {o} i couldn't find",
+   "could you check if you see my {o}",
+   "hey robot where is the {o} i misplaced",
+   "can you check if you spot my {o}",
+   "hey robot where could i have left my {o}",
+   "hey robot could you check if you've seen my {o}",
+   "hey do you know where my {o} is i can't find it"
+  ],
+  "navigate_to": [
+   "could ya go to the {t} for me",
+   "could you get to the {t}",
+   "can you go to {t} real quick",
+   "could you kindly go to the {t}",
+   "can you go to the {t} and check on the kids for me",
+   "hey can you go to the {t} and bring me some water"
+  ],
+  "clear_table": [
+   "can you move that {o} thing over to the {t} spot",
+   "hey can you scoot the {o} over to the {t} real quick",
+   "hey can you just move the {o} over to the {t} and then i can clean this up",
+   "hey could you move the {o} and put it on the {t} when you get a sec",
+   "hey can you move the {o} and put it on the {t} over there"
+  ],
+  "tidy_up": [
+   "could you dust and clean up a bit please",
+   "hey could you clean up the living room and kitchen",
+   "hey robot can you clean the place up",
+   "hey robot can you dust the shelves and clean the floor",
+   "robot would you mind cleaning up",
+   "hey robot could you clean up the space"
+  ]
+ }
+}

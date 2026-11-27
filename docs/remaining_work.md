@@ -12,6 +12,15 @@ make train-real         # after collect-thor: retrain the outcome predictor on r
 make benchmark-thor     # the benchmark in real AI2-THOR, about 1 hour per planner
 ```
 
+After `make collect-thor`, the memory embedder can be retrained on real retrieval logs and checked on missions (a few minutes on the GPU):
+
+```bash
+cd backend && python -m learning.retrieval.train_embedder --db-dir data/episodes_thor --out artifacts/memory_embedder_real
+MEMORY_LEARNED_EMBEDDER_DIR=artifacts/memory_embedder_real python -m benchmark.run --subset full --out /tmp/bench_real_embedder.json
+```
+
+The `learned_memory_embedder` row of that report is the mission-level result. It hasn't been done from the synthetic benchmark runs on purpose: those are the missions the embedder is scored on, so training on them would be training on the test.
+
 Use `MILO_OLLAMA_KEEP_ALIVE=0` if a local model shares the GPU ([local_model.md](local_model.md)).
 
 ## Needs you

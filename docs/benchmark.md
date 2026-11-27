@@ -131,3 +131,26 @@ benchmark gate: FAILED          (exit code 1)
 ```
 
 This was run locally with the same command the CI step uses. Nothing was pushed, so the workflow itself hasn't yet run on GitHub's runners.
+
+## The language-model planner with a local model (2026-11-27, one run)
+
+`python -m benchmark.run --planners novel --provider ollama` with `qwen2.5:7b` (Q4_K_M) via Ollama, prompt v3, temperature 0. Results: `results/novel_bench_local/benchmark.md`. **One run**, not three: in a spot check, "fetch the mug" passed alone and failed in the full run, so GPU inference is not perfectly repeatable even at temperature 0, and single cases can flip. The published "language model" row above still uses the reference plans; this one uses the model on every case.
+
+| | Known | New tasks | Under faults | memory | memory_synonyms | long | routes | impossible |
+|---|---|---|---|---|---|---|---|---|
+| qwen2.5:7b, local | 74% (17/23) | 100% (8/8) | 61% (75/122) | 0% (0/8) | 0% (0/8) | not run | 50% (2/4) | **100% (6/6)** |
+| rule-based, for comparison | 100% | 0% | 78% | 100% | 75% | 100% | 100% | 83% |
+
+Under faults: blocked path, out of reach, timeout and wrong detection 17/23 each (the same tasks as without faults), stuck door 7/7, missing object 0/23. 1.83 model calls per mission.
+
+- **It refuses all six impossible requests**, the unicorn included, which no classical planner does: they look for it.
+- **Known tasks fail in two ways, both the model's own planning.** "Bring me the apple" is planned as carrying the apple to a "user" object that isn't in the scene, so the final step fails (fetch: 1 of 4). For "find the tomato" it adds a success condition that can never hold ("the tomato is closed"), and MILO enforces a plan's own conditions (find: 1 of 4).
+- **Memory tiers are 0% by construction**: the benchmark gives this planner no memory, so it can't know where an out-of-view object usually is. Not a model result.
+- **Long missions are not run**: they are several known goals in one mission, and this planner plans one command at a time.
+
+Running it found two bugs, both fixed before this run and covered by tests:
+
+1. **The end-of-mission check trusted the plan's own claims.** Asked to fetch a mug that wasn't there, the model fetched an apple, stated "holding the apple", and passed. Now what was asked always counts; a plan's own conditions are added, never substituted (`orchestration/orchestrator.py::_verify_goal`).
+2. **The model was told only the goal word.** A structured task reached it as "fetch", without "the mug", so it guessed the object. It now gets a sentence ("bring me the mug") (`novel/planner.py::command_text`).
+
+A first run with both bugs gave 48% known and 65% under a missing object (impossible: the object isn't there); a second, with only the first fixed, 17%. Neither is reported as a result. Every other benchmark number was rerun after each fix and is unchanged.

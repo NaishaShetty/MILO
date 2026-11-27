@@ -1,0 +1,108 @@
+{
+  "phrasings_source": "qwen2.5:7b via Ollama, temperature 0.8, seed 0",
+  "stats": {
+    "fetch": {
+      "asked": 25,
+      "returned": 24,
+      "accepted": 9
+    },
+    "deliver": {
+      "asked": 25,
+      "returned": 23,
+      "accepted": 23
+    },
+    "store": {
+      "asked": 25,
+      "returned": 24,
+      "accepted": 24
+    },
+    "place": {
+      "asked": 25,
+      "returned": 25,
+      "accepted": 25
+    },
+    "pick_up": {
+      "asked": 25,
+      "returned": 23,
+      "accepted": 23
+    },
+    "open": {
+      "asked": 25,
+      "returned": 24,
+      "accepted": 23
+    },
+    "close": {
+      "asked": 25,
+      "returned": 24,
+      "accepted": 21
+    },
+    "turn_on": {
+      "asked": 25,
+      "returned": 23,
+      "accepted": 21
+    },
+    "turn_off": {
+      "asked": 25,
+      "returned": 25,
+      "accepted": 22
+    },
+    "find": {
+      "asked": 25,
+      "returned": 25,
+      "accepted": 25
+    },
+    "navigate_to": {
+      "asked": 25,
+      "returned": 24,
+      "accepted": 24
+    },
+    "clear_table": {
+      "asked": 25,
+      "returned": 23,
+      "accepted": 23
+    },
+    "tidy_up": {
+      "asked": 25,
+      "returned": 24,
+      "accepted": 24
+    }
+  },
+  "n_train_before": 6000,
+  "n_train_after": 9000,
+  "hand_written_test_phrasings": {
+    "n": 1500,
+    "rules": {
+      "coverage": 0.304,
+      "exact_accuracy": 0.13733333333333334,
+      "accuracy_when_answering": 0.4517543859649123
+    },
+    "learned_before": {
+      "coverage": 1.0,
+      "exact_accuracy": 0.62,
+      "accuracy_when_answering": 0.62
+    },
+    "learned_after": {
+      "coverage": 1.0,
+      "exact_accuracy": 0.7193333333333334,
+      "accuracy_when_answering": 0.7193333333333334
+    }
+  },
+  "model_held_out_phrasings": {
+    "n": 1500,
+    "rules": {
+      "coverage": 0.256,
+      "exact_accuracy": 0.06866666666666667,
+      "accuracy_when_answering": 0.2682291666666667
+    },
+    "learned_before": {
+      "coverage": 1.0,
+      "exact_accuracy": 0.6133333333333333,
+      "accuracy_when_answering": 0.6133333333333333
+    },
+    "learned_after": {
+      "coverage": 1.0,
+      "exact_accuracy": 0.916,
+      "accuracy_when_answering": 0.916
+    }
+  }
+}
