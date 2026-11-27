@@ -21,7 +21,7 @@ Use `MILO_OLLAMA_KEEP_ALIVE=0` if a local model shares the GPU ([local_model.md]
 | Write `data/parser_test_human.jsonl` | It must be commands a person wrote, not generated ones | `make eval-parser` |
 | Hugging Face dataset and Space refresh | Needs your login. Revoke the token pasted in chat first, then run `huggingface-cli login` yourself | Upload the new results (ReAct, prompt v3, memory red team) |
 | A Claude result | No API credits; no number here comes from Claude | `python -m benchmark.run --provider claude` and `python -m novel.eval_novel --claude` (from `backend/`) |
-| Voice in a real browser | Real speech recognition can't be checked in the test browser ([voice.md](voice.md), "Not verified") | Try a spoken command once in Chrome or Edge and note what happened |
+| Voice with a real microphone | Real speech recognition can't be checked in the test browser | Follow the 5-minute checklist in [voice.md](voice.md#trying-it-yourself-5-minutes-chrome-or-edge) |
 | Public demo (Cloudflare Pages) | Needs your Cloudflare account, and a hosted backend: the frontend alone shows an offline app | `npm run build` in `frontend/`, deploy `dist/` |
 
 ## Open problems (measured, not solved)
@@ -38,6 +38,5 @@ Use `MILO_OLLAMA_KEEP_ALIVE=0` if a local model shares the GPU ([local_model.md]
 ## Smaller items not done
 
 - A "Record" button for saving a mission as a demo clip from the app.
-- A browser test for voice with a fake microphone (Playwright fake media), and a short manual checklist for trying voice in a real browser.
 - Scripts to fetch and publish trained model weights.
 - A `ci-gate-demo` branch that shows the benchmark gate failing a deliberately broken change.

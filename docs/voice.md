@@ -36,4 +36,21 @@ Tests (`frontend/src/state/BrowserVoice.test.tsx`, with stand-in speech APIs):
 - the yes/skip/cancel and choice matching;
 - the pose for each state.
 
-**Not verified:** real speech recognition in a real browser. jsdom has no speech engine, and recognition quality depends on the browser (Chrome and Edge ship `webkitSpeechRecognition`; Firefox doesn't).
+**In a real browser** (`frontend/tests/e2e/browserVoice.spec.ts`, Chromium, run in CI): the switch and its remembered setting, a spoken command sent as a speech mission, an approval request said out loud and approved by a spoken "yes", and the fallback when the browser has no speech APIs. Chrome's recognition sends audio to Google's servers, so the test uses a stand-in recogniser that "hears" a fixed sentence and a stand-in speaker that records what MILO says. Everything between them is the real app. The record-and-transcribe path (voice off) is tested with Chromium's fake microphone in `microphone.spec.ts`.
+
+The real-browser test found one bug: a command heard by browser voice was sent as typed text (`input_source: "text"`). It is now sent as `"speech"`, like the record-and-transcribe path.
+
+**Not verified:** real speech recognition with a real microphone. Recognition quality depends on the browser: Chrome and Edge ship `webkitSpeechRecognition`; Firefox doesn't.
+
+## Trying it yourself (5 minutes, Chrome or Edge)
+
+Run the app (`make demo`, or backend and frontend as in the README), open the Play page and allow the microphone when asked.
+
+1. Tick **Talk with MILO**. Reload the page: it should still be ticked.
+2. Press **Talk to MILO** and say "put the apple in the fridge". "Listening..." shows while it listens; the mission should start and the page move to Missions.
+3. Give a command with a risky step (for example "open the fridge" with approvals on). MILO should say the step and why out loud. Say "yes": the step should be approved. Try again and say "skip", then "cancel".
+4. Say something unclear ("bring me the cup" with two cups in view). MILO should ask which one out loud; answer "the one on the table".
+5. Untick **Talk with MILO**: the microphone should go back to record-and-transcribe through the server.
+6. Open the same page in Firefox: the switch should be disabled with a plain reason.
+
+Note what happened at each step, especially any word MILO misheard.

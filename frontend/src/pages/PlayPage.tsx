@@ -98,11 +98,11 @@ export function PlayPage() {
   // Tapping the floor sends MILO there (only while no mission is moving him).
   const shown = floorX !== null && direction.x === null ? { ...direction, x: floorX, pose: "walk" as const } : direction;
 
-  async function send(instruction: string) {
+  async function send(instruction: string, source: "text" | "speech" = "text") {
     const trimmed = instruction.trim();
     if (!trimmed || submitting) return;
     try {
-      const result = await submitInstruction(trimmed, "text", planner);
+      const result = await submitInstruction(trimmed, source, planner);
       setText("");
       setFloorX(null);
       if (result.kind === "task") navigate("/missions");
@@ -176,7 +176,7 @@ export function PlayPage() {
                       void browserVoice
                         .listen()
                         .then((heard) => {
-                          if (heard) void send(heard);
+                          if (heard) void send(heard, "speech");
                         })
                         .catch(() => undefined);
                     return;
