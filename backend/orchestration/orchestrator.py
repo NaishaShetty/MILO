@@ -1448,11 +1448,15 @@ class Orchestrator:
             )
 
             # Goals done in order: only each slot's last condition must hold at the end.
-            predicates = [
-                Predicate.from_dict(p) for p in stated
-            ] or final_state_predicates(
+            asked = final_state_predicates(
                 [goal_predicates(t) for t in (subtasks or [task])]
             )
+            # What the user asked for always counts. A plan's own stated conditions
+            # are added, never substituted: otherwise a model asked to fetch the mug
+            # could fetch an apple, state "holding the apple", and pass. For a novel
+            # command the request implies no conditions, so the stated ones decide.
+            own = [Predicate.from_dict(p) for p in stated]
+            predicates = asked + [p for p in own if p not in asked]
             if not predicates:
                 return None
             results = check_all(predicates, self._execution.get_metadata())

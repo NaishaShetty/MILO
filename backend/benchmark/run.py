@@ -300,6 +300,11 @@ def run(
             if (planner == "novel" and provider is None)
             else cases
         )
+        if planner == "novel":
+            # A long mission is several known goals in a row (a MultiTask); the
+            # language-model planner plans one command at a time, so that tier is
+            # "not run" for it rather than a crash.
+            todo = [c for c in todo if not c.subtasks]
         if planner == "react" and react_client is None:
             # Without a model ReAct falls back to rule-based: measuring it would only
             # repeat the rule-based row under another name.
