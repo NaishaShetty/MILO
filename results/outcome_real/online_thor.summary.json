@@ -1,0 +1,48 @@
+{
+  "model": "artifacts/outcome_real",
+  "model_version": "20261127-114908",
+  "seed": 1,
+  "scenes": [
+    "FloorPlan26",
+    "FloorPlan27",
+    "FloorPlan28",
+    "FloorPlan29",
+    "FloorPlan30",
+    "FloorPlan226",
+    "FloorPlan227",
+    "FloorPlan228",
+    "FloorPlan229",
+    "FloorPlan230",
+    "FloorPlan326",
+    "FloorPlan327",
+    "FloorPlan328",
+    "FloorPlan329",
+    "FloorPlan330",
+    "FloorPlan426",
+    "FloorPlan427",
+    "FloorPlan428",
+    "FloorPlan429",
+    "FloorPlan430"
+  ],
+  "pairs": 300,
+  "rule_based": {
+    "mission_success": 0.6,
+    "wasted_steps_per_mission": 1.277,
+    "replans_per_mission": 0.013,
+    "retries_per_mission": 0.12,
+    "steps_per_mission": 3.77
+  },
+  "learned": {
+    "mission_success": 0.6,
+    "wasted_steps_per_mission": 1.26,
+    "replans_per_mission": 0.01,
+    "retries_per_mission": 0.12,
+    "steps_per_mission": 3.753
+  },
+  "pairs_only_learned_succeeded": 0,
+  "pairs_only_rule_succeeded": 0,
+  "aborted_by_learned": 1,
+  "aborted_would_have_failed_anyway": 1.0,
+  "learned_runs_where_predictor_switched_off": 0,
+  "learned_runs_where_it_made_a_decision": 3
+}

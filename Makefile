@@ -100,7 +100,11 @@ OLLAMA_URL ?= http://localhost:11434
 MODEL ?= qwen2.5:7b
 BAKEOFF_MODELS ?= qwen2.5:7b qwen3.5:4b llama3.1:8b gemma4:e2b-it-qat
 
-.PHONY: model-bakeoff novel-eval benchmark-thor collect-thor train-real profile-perception parser-phrasings
+.PHONY: model-bakeoff novel-eval benchmark-thor collect-thor train-real profile-perception parser-phrasings eval-outcome-thor
+## Rule-based vs learned reflector on real AI2-THOR missions, held-out scenes, paired (about 70 min, resumable)
+eval-outcome-thor:
+	cd backend && $(PY) -m learning.eval_online_thor --model artifacts/outcome_real --episodes 300
+
 ## Messier parser phrasings from the local model, then parser before/after (about 5 min)
 parser-phrasings:
 	cd backend && MILO_OLLAMA_URL=$(OLLAMA_URL) $(PY) -m learning.parser.llm_phrasings --model $(MODEL)

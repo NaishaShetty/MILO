@@ -47,6 +47,19 @@ Duration MAE 234 ms (mean-predictor 1,482 ms). Failure-type accuracy 0.899 (majo
 
 **Most of the retrained model's 0.99 is easy.** In real AI2-THOR almost every failure is a *place* step: 51 of 99 "put it down" steps failed, against 3 of 971 other steps. So "place steps are risky" alone scores highly. On place steps alone (99 steps, 51 failures) the retrained model still has real skill: AUROC 0.87, ECE 0.054, while the shipped model predicts success for every one of them (AUROC 0.5). It has learned, for example, that putting down a plate, pillow, pot or box often fails, and keys or a mug rarely do.
 
-**Decision: not promoted, and the flag stays at `shadow`.** Its overall ECE (0.017) meets the 0.05 bar, but the bar for leaving shadow mode is a win on real *missions*: mission success and wasted steps against the rule-based reflector on held-out real scenes. That comparison hasn't been run. The retrained model is in `artifacts/outcome_real/` on this laptop (not in git); `make promote-outcome` would make it the served one.
+### On real missions: no gain (2026-11-27)
+
+`make eval-outcome-thor` (`learning/eval_online_thor.py`): 300 real AI2-THOR missions in the 20 held-out scenes, each run twice with the same scene, task and planner, once with the rule-based reflector and once with the retrained predictor deciding (`on`). Tasks use a different seed from the collected episodes. Results: `results/outcome_real/online_thor.summary.json`, one line per pair in `online_thor.jsonl`.
+
+| 300 paired real missions | Mission success | Wasted steps / mission | Replans / mission | Retries / mission |
+|---|---|---|---|---|
+| Rule-based reflector | 60.0% | 1.277 | 0.013 | 0.120 |
+| Retrained predictor deciding | 60.0% | 1.260 | 0.010 | 0.120 |
+
+No pair succeeded on one side only. The predictor made a decision in 3 of the 300 missions; it stopped 1 early, which also failed with the rule-based reflector. It never switched itself off for being slow.
+
+**Why so little:** the learned reflector chooses only between retrying, replanning and stopping, and its rules map the failure types the synthetic simulator injects (blocked, not reachable, not visible, wrong object) to those moves. Real AI2-THOR failures are almost all a *place* step failing for an "other" reason, and for that the rules have no move, so the rule-based choice stands. The model can tell which put-downs are likely to fail (AUROC 0.87 on place steps); MILO has no action that uses it.
+
+**Decision: not promoted; the flag stays at `shadow`.** Offline it is calibrated (ECE 0.017, under the 0.05 bar), but it does not win on real missions. The retrained model is in `artifacts/outcome_real/` on this laptop (not in git). The next step is a design change, not more training: use the prediction *before* a place step, for example to choose another receptacle or spot when one is likely to fail, and measure that on real missions the same way.
 
 Two more caveats: 54 failing test steps is a small sample, and real missions fail mostly in ways step-level prediction can't see (95% of real steps succeed, but only 56% of real missions).

@@ -189,7 +189,7 @@ All benchmark numbers come from `benchmarks/latest.json` (`make benchmark`, run 
 
 | Model | Baseline | Learned | Verdict |
 |---|---|---|---|
-| Step outcome predictor | rules: AUROC 0.661; success 0.717 | AUROC 0.968, ECE 0.005; success 0.783, wasted steps 1.94 → 1.22 | Better on synthetic data, but AUROC 0.39 on real AI2-THOR steps; retrained with real episodes 0.99 (0.87 on place steps), not yet tested on real missions ([card](../docs/models/outcome_predictor.md)) |
+| Step outcome predictor | rules: AUROC 0.661; success 0.717 | AUROC 0.968, ECE 0.005; success 0.783, wasted steps 1.94 → 1.22 | Better on synthetic data, but AUROC 0.39 on real AI2-THOR steps; retrained with real episodes 0.99 (0.87 on place steps), but no gain on 300 real missions (60% both ways) ([card](../docs/models/outcome_predictor.md)) |
 | Fast detector (real AI2-THOR frames) | Grounding DINO: mAP@0.5 0.315, 547 ms | mAP@0.5 0.548, 5.9 ms | Better |
 | Memory embedder | hashing: recall@5 0.606 | recall@5 0.9997 | Better retrieval; finds places remembered under other names: 7 of 8 missions vs 6 of 8 (2026-11-26) |
 | Instruction parser | phrasebook: 0.137 exact on new wording | 0.647 exact | Better on new wording |
